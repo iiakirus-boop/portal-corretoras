@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { entrarDemo, entrarEmail } from '@/lib/acoes';
+import { entrarDemo, entrarEmail, entrarSenha } from '@/lib/acoes';
 import { DEMO_USUARIOS } from '@/lib/demo/semente';
 import { destino, MODO_DEMO, sessao } from '@/lib/servidor';
 import { Aviso } from '@/components/Aviso';
@@ -28,7 +28,7 @@ export default async function Entrar({ searchParams }: P) {
           <div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800 }}>Entrar</h2>
             <p className="hint" style={{ marginTop: '.3rem' }}>
-              {MODO_DEMO ? 'Escolha um perfil para ver o portal como essa pessoa vê.' : 'Use o e-mail em que você recebeu o convite. Mandamos um link de acesso, sem senha.'}
+              {MODO_DEMO ? 'Escolha um perfil para ver o portal como essa pessoa vê.' : 'Entre com seu e-mail e senha. No primeiro acesso, peça o link por e-mail e crie sua senha.'}
             </p>
           </div>
           <Aviso sp={sp} />
@@ -45,12 +45,24 @@ export default async function Entrar({ searchParams }: P) {
           ) : sp.enviado ? (
             <p className="msg ok">Link enviado para {sp.enviado}. Abra o e-mail neste aparelho e clique no link para entrar.</p>
           ) : (
-            <form action={entrarEmail} className="form">
-              <label className="campo">E-mail
-                <input type="email" name="email" required autoComplete="email" placeholder="voce@empresa.com.br" />
-              </label>
-              <button className="btn">Receber link de acesso</button>
-            </form>
+            <>
+              <form action={entrarSenha} className="form">
+                <label className="campo">E-mail
+                  <input type="email" name="email" required autoComplete="email" placeholder="voce@empresa.com.br" />
+                </label>
+                <label className="campo">Senha
+                  <input type="password" name="senha" required autoComplete="current-password" />
+                </label>
+                <button className="btn">Entrar</button>
+              </form>
+              <form action={entrarEmail} className="form" style={{ marginTop: '1.4rem', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
+                <p className="hint" style={{ margin: 0 }}>Primeiro acesso ou esqueceu a senha? Mandamos um link para o seu e-mail; ao entrar por ele, você cria a senha.</p>
+                <label className="campo">E-mail
+                  <input type="email" name="email" required autoComplete="email" placeholder="voce@empresa.com.br" />
+                </label>
+                <button className="btn ghost">Receber link por e-mail</button>
+              </form>
+            </>
           )}
         </div>
       </section>

@@ -38,6 +38,7 @@ ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[
     ['/corretora/' + c + '/empresas', 'Empresas e acessos', '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>'],
     ...(a.admin ? [['/corretora/' + c + '/usuarios', 'Equipe', '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>']] : []),
     ...(a.master ? [['/master', 'Master', '<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>']] : []),
+    ['/conta/senha', 'Trocar senha', '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'],
     ['/sair', 'Sair', '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'],
   ]
     .map(([href, txt, ic]) => `<a class="pend-btn cx-link" href="${href}" aria-label="${txt}" title="${txt}">${ICONE(ic)}<span class="pl">${txt}</span></a>`)

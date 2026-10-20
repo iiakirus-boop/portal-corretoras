@@ -36,8 +36,35 @@ export async function entrarEmail(f: FormData) {
   const site = process.env.NEXT_PUBLIC_SITE_URL ?? `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
   const db = await cliente();
   const { error } = await db.auth.signInWithOtp({ email, options: { emailRedirectTo: `${site}/auth/callback` } });
-  if (error) volta('/entrar', 'erro', 'Não conseguimos mandar o link agora. Tente de novo em alguns minutos.');
+  if (error) volta('/entrar', 'erro', /rate limit|security purposes/i.test(error.message)
+    ? 'Muitos e-mails enviados em pouco tempo. Se você já criou sua senha, entre com ela; se não, tente o link de novo daqui a alguns minutos.'
+    : 'Não conseguimos mandar o link agora. Tente de novo em alguns minutos.');
   redirect(`/entrar?enviado=${encodeURIComponent(email)}`);
+}
+
+export async function entrarSenha(f: FormData) {
+  const email = txt(f, 'email').toLowerCase();
+  const senha = String(f.get('senha') ?? '');
+  if (!email || !senha) volta('/entrar', 'erro', 'Preencha o e-mail e a senha.');
+  const db = await cliente();
+  const { error } = await db.auth.signInWithPassword({ email, password: senha });
+  if (error) volta('/entrar', 'erro', 'E-mail ou senha incorretos. Se ainda não criou sua senha, peça o link de acesso abaixo.');
+  await db.rpc('aceitar_convites');
+  const s = await sessao();
+  redirect(s ? destino(s) : '/entrar');
+}
+
+// Primeiro acesso (depois do link) ou troca de senha
+export async function criarSenha(f: FormData) {
+  const senha = String(f.get('senha') ?? '');
+  const conf = String(f.get('confirmar') ?? '');
+  if (senha.length < 8) volta('/conta/senha', 'erro', 'A senha precisa ter pelo menos 8 caracteres.');
+  if (senha !== conf) volta('/conta/senha', 'erro', 'As duas senhas não são iguais.');
+  const db = await cliente();
+  const { error } = await db.auth.updateUser({ password: senha, data: { tem_senha: true } });
+  if (error) volta('/conta/senha', 'erro', /same|different/i.test(error.message) ? 'Escolha uma senha diferente da atual.' : /weak|short/i.test(error.message) ? 'Senha fraca. Use letras e números.' : 'Não deu para salvar a senha. Entre de novo pelo link e tente outra vez.');
+  const s = await sessao();
+  redirect(s ? destino(s) : '/entrar');
 }
 
 export async function sair() {
