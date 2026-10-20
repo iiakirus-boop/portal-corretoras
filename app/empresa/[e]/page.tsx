@@ -2,25 +2,41 @@ import Link from 'next/link';
 import { cliente, exigirEmpresa } from '@/lib/servidor';
 import { ABERTOS, competencia, data, moeda, num, seg, TIPO_PEDIDO } from '@/lib/formato';
 import { hoje, ultimas, vidasAtivas } from '@/lib/contas';
+import { preverBoletos } from '@/lib/previsao';
 import { StatusPill } from '@/components/Pill';
-import type { Fatura, Pedido } from '@/lib/tipos';
+import type { Fatura, Pedido, Vida } from '@/lib/tipos';
 
 export default async function InicioEmpresa({ params }: { params: Promise<{ e: string }> }) {
   const { e } = await params;
   const x = await exigirEmpresa(e);
   const db = await cliente();
-  const [{ data: faturas }, { data: pedidos }] = await Promise.all([
+  const desde = new Date(Date.now() - 120 * 86400000).toISOString();
+  const [{ data: faturas }, { data: pedidos }, { data: movs }, { data: apolices }] = await Promise.all([
     x.veFaturas || x.veVidas ? db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false }) : Promise.resolve({ data: [] }),
     db.from('pedidos').select('*').eq('empresa_id', e).in('status', ABERTOS).order('criado_em', { ascending: false }),
+    db.from('pedidos').select('*').eq('empresa_id', e).in('tipo', ['inclusao', 'exclusao']).neq('status', 'cancelado').gte('criado_em', desde),
+    db.from('apolices').select('id, seguradora_id').eq('empresa_id', e),
   ]);
   const fs = (faturas ?? []) as Fatura[];
   const ps = (pedidos ?? []) as Pedido[];
   const base = `/empresa/${e}`;
   const h = hoje();
-  const aPagar = fs.filter((f) => !f.data_pagamento).sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''));
   const ult = ultimas(fs);
   const comVoce = ps.filter((p) => p.status === 'pendencia_cliente' || (x.gestor && p.status === 'aguardando_aprovacao_empresa'));
-  const proximo = aPagar[0];
+  // Próximo boleto = último boleto de cada seguradora + inclusões − exclusões pedidas depois dele
+  let vs: Vida[] = [];
+  if (x.veFaturas && ult.length) {
+    const { data } = await db.from('vidas').select('seguradora_id, competencia, nome, nascimento, idade, plano, premio_base, valor_total, pro_rata, copart_total')
+      .eq('empresa_id', e).in('competencia', [...new Set(ult.map((f) => f.competencia))]);
+    vs = (data ?? []) as Vida[];
+  }
+  const previsoes = x.veFaturas ? preverBoletos(fs, vs, (movs ?? []) as Pedido[], apolices ?? [], h) : [];
+  const proximo = previsoes[0];
+  const detalhe = (p: NonNullable<typeof proximo>) => {
+    if (p.real) return `${seg(p.seguradora_id)}, vence ${data(p.vencimento)}`;
+    const mov = [p.inclusoes ? `+${p.inclusoes} inclus${p.inclusoes > 1 ? 'ões' : 'ão'}` : '', p.exclusoes ? `−${p.exclusoes} exclus${p.exclusoes > 1 ? 'ões' : 'ão'}` : ''].filter(Boolean).join(' ');
+    return `previsão: boleto de ${competencia(p.baseCompetencia)} ${moeda(p.base)}${mov ? ` ${mov}` : ', sem movimentações'}; ${seg(p.seguradora_id)}, vence ${data(p.vencimento)}`;
+  };
 
   return (
     <div className="page">
@@ -47,10 +63,10 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
 
       <div className="kpis">
         {x.veFaturas && (
-          <Link href={`${base}/faturas`} className={`kpi${proximo?.vencimento && proximo.vencimento < h ? ' alerta' : ''}`}>
-            <span className="kpi-l">Próximo boleto</span>
-            <span className="kpi-v">{proximo ? moeda(proximo.valor_boleto ?? proximo.valor_total) : 'Tudo pago'}</span>
-            <span className="kpi-s">{proximo ? `${seg(proximo.seguradora_id)}, vence ${data(proximo.vencimento)}` : 'nenhum boleto em aberto'}</span>
+          <Link href={`${base}/faturas`} className="kpi">
+            <span className="kpi-l">{proximo && !proximo.real ? 'Próximo boleto (previsão)' : 'Próximo boleto'}</span>
+            <span className="kpi-v">{proximo ? moeda(proximo.valor) : '—'}</span>
+            <span className="kpi-s">{proximo ? detalhe(proximo) : 'sem fatura recente'}</span>
           </Link>
         )}
         {x.veVidas && (
@@ -67,7 +83,7 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
             <ul className="rows">
               {fs.slice(0, 5).map((f) => (
                 <li key={f.id}>
-                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : `vence ${data(f.vencimento)}`}</small></div>
+                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : `${f.vencimento && f.vencimento < h ? 'venceu' : 'vence'} ${data(f.vencimento)}`}</small></div>
                   <span className="r">{moeda(f.valor_boleto ?? f.valor_total)}</span>
                 </li>
               ))}
