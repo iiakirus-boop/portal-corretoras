@@ -1,0 +1,1386 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Central de Agentes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: barra navy com 4 áreas (Início, Faturamento, Comissões, Projeção) + atalho discreto para Pendências; cada área é um painel de cartões; Faturamento é lista de empresas + ficha da empresa */
+:root{
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300;
+  --bg:#F2F4F7; --surface:#FFFFFF; --sunken:#F6F8FA; --raised:#EDF1F5; --line:#DDE3EA; --line-soft:#ECEFF3;
+  --fg:#132130; --muted:#5A6878; --faint:#8794A3; --navy:#0F2A44; --navy-fg:#FFFFFF; --navy-muted:#B9C8D8;
+  --accent:#0E7C7B; --accent-strong:#0A6463; --accent-soft:#E3F0EF;
+  --warn-bg:#FDEBD8; --warn-fg:#8A4100; --info-bg:#E0EDFB; --info-fg:#0B4F8A; --ok-bg:#DDF2E5; --ok-fg:#0B5E3A;
+  --idle-bg:#EBEEF2; --idle-fg:#475463; --bad-bg:#FBE3E3; --bad-fg:#9B1C1C;
+  --shadow:0 1px 2px rgba(16,33,52,.05),0 2px 8px rgba(16,33,52,.04); --overlay:rgba(15,30,45,.45);
+  --f-body:'Manrope','Segoe UI',system-ui,sans-serif;
+  --r-lg:14px; --r-md:10px; --r-sm:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#2f9a2f;
+  --bg:#0D141C; --surface:#151F2A; --sunken:#111A24; --raised:#1B2733; --line:#283646; --line-soft:#1F2B38;
+  --fg:#E6ECF2; --muted:#9DABBA; --faint:#738294; --navy:#0A1A2B; --navy-fg:#FFFFFF; --navy-muted:#9FB3C8;
+  --accent:#2BB3B1; --accent-strong:#4CC7C4; --accent-soft:#16312F;
+  --warn-bg:#3A2913; --warn-fg:#F5C38F; --info-bg:#132D49; --info-fg:#9CC8F2; --ok-bg:#123327; --ok-fg:#8FD9B0;
+  --idle-bg:#222E3A; --idle-fg:#B4C0CC; --bad-bg:#3B1818; --bad-fg:#F3A5A5;
+  --shadow:0 1px 2px rgba(0,0,0,.3); --overlay:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#2f9a2f;
+  --bg:#0D141C; --surface:#151F2A; --sunken:#111A24; --raised:#1B2733; --line:#283646; --line-soft:#1F2B38;
+  --fg:#E6ECF2; --muted:#9DABBA; --faint:#738294; --navy:#0A1A2B; --navy-fg:#FFFFFF; --navy-muted:#9FB3C8;
+  --accent:#2BB3B1; --accent-strong:#4CC7C4; --accent-soft:#16312F;
+  --warn-bg:#3A2913; --warn-fg:#F5C38F; --info-bg:#132D49; --info-fg:#9CC8F2; --ok-bg:#123327; --ok-fg:#8FD9B0;
+  --idle-bg:#222E3A; --idle-fg:#B4C0CC; --bad-bg:#3B1818; --bad-fg:#F3A5A5;
+  --shadow:0 1px 2px rgba(0,0,0,.3); --overlay:rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--navy)}
+h1,h2,h3,h4{margin:0;text-wrap:balance;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:1.25rem}
+@media (max-width:640px){.wrap{padding-inline:1rem}}
+
+/* topo */
+.top{background:var(--navy);color:var(--navy-fg);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top .wrap{display:flex;align-items:center;gap:1.25rem;min-height:56px}
+.brand{display:flex;align-items:center;gap:.6rem;flex-shrink:0}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.brand-name{font-weight:800;font-size:.98rem}
+.brand-sub{font-size:.72rem;color:var(--navy-muted)}
+.nav{display:flex;gap:.1rem;overflow-x:auto;scrollbar-width:none;flex:1;align-self:stretch}
+.nav::-webkit-scrollbar{display:none}
+.nav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;padding:0 .85rem;color:var(--navy-muted);font-weight:700;font-size:.88rem;white-space:nowrap;border-bottom:3px solid transparent;border-top:3px solid transparent}
+.nav button:hover{color:var(--navy-fg)}
+.nav button[aria-current="page"]{color:var(--navy-fg);border-bottom-color:var(--accent-strong)}
+.pend-btn{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:.45rem;padding:.35rem .7rem;border-radius:999px;font-size:.8rem;font-weight:700;color:var(--navy-muted);border:1px solid rgba(255,255,255,.14);white-space:nowrap;flex-shrink:0}
+.pend-btn:hover,.pend-btn[aria-current="page"]{color:var(--navy-fg);border-color:rgba(255,255,255,.35)}
+.pend-btn .badge{font-size:.7rem;font-weight:800;background:var(--warn-bg);color:var(--warn-fg);border-radius:999px;padding:.02rem .42rem}
+@media (max-width:760px){.brand-txt{display:none}.top .wrap{gap:.6rem}}
+
+/* página */
+main.wrap{padding-block:1.5rem 3.5rem}
+.page{display:flex;flex-direction:column;gap:1.1rem}
+.page-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:.75rem 1.5rem}
+.page-head>div:first-child{min-width:0;flex:1 1 300px}
+.page-head h1{font-size:1.5rem;font-weight:800}
+.page-head p{margin:.25rem 0 0;color:var(--muted);font-size:.86rem;max-width:72ch}
+.filters{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.5rem;min-width:0;max-width:100%}
+.offline{background:var(--warn-bg);color:var(--warn-fg);border-radius:var(--r-md);padding:.6rem .9rem;font-size:.84rem;font-weight:600;margin:0}
+
+.pill{display:inline-block;font-weight:700;font-size:.72rem;padding:.16rem .55rem;border-radius:999px;white-space:nowrap;line-height:1.35}
+.p-warn{background:var(--warn-bg);color:var(--warn-fg)}.p-info{background:var(--info-bg);color:var(--info-fg)}.p-ok{background:var(--ok-bg);color:var(--ok-fg)}.p-idle{background:var(--idle-bg);color:var(--idle-fg)}.p-bad{background:var(--bad-bg);color:var(--bad-fg)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.1rem 1.2rem;box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.3rem 1rem;margin-bottom:.85rem}
+.card-h h2{font-size:.98rem;font-weight:800}
+.card-h .hint{margin-left:auto}
+.hint{font-size:.78rem;color:var(--muted)}
+.note{font-size:.76rem;color:var(--muted);line-height:1.5;margin:.6rem 0 0}
+.empty{margin:0;font-size:.84rem;color:var(--muted);line-height:1.5}
+.go{all:unset;cursor:pointer;font-size:.8rem;font-weight:800;color:var(--accent);white-space:nowrap}
+.go:hover{text-decoration:underline}
+.grid{display:grid;gap:1.1rem}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g32{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+@media (max-width:1100px){.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.g3>:last-child{grid-column:1/-1}}
+@media (max-width:860px){.g2,.g3,.g32{grid-template-columns:minmax(0,1fr)}.g3>:last-child{grid-column:auto}}
+
+/* filtros */
+.seg{display:flex;overflow-x:auto;scrollbar-width:none;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:3px}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:0 0 auto;min-height:30px;padding:0 .7rem;border-radius:7px;border:0;background:transparent;color:var(--muted);font-weight:700;font-size:.8rem;white-space:nowrap}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--navy-fg)}
+.chips{display:flex;flex-wrap:wrap;gap:.3rem}
+.chips button{min-height:30px;padding:0 .7rem;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-weight:700;font-size:.78rem;display:inline-flex;align-items:center;gap:.35rem}
+.chips button:hover{color:var(--fg)}
+.chips button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--fg)}
+.chips i{width:.55rem;height:.55rem;border-radius:2px;display:inline-block}
+input.search,select.sel{min-height:36px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:0 .7rem;font-size:.85rem;width:100%}
+
+/* números */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem}
+.kpi{all:unset;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.2rem;min-width:0}
+button.kpi{cursor:pointer}button.kpi:hover{border-color:var(--accent)}
+.kpi-l{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:.5rem}
+.kpi-v{font-size:1.4rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.015em;line-height:1.25}
+.kpi-s{font-size:.76rem;color:var(--muted);line-height:1.4}
+.up{color:var(--info-fg);font-weight:800}.down{color:var(--warn-fg);font-weight:800}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.kpi-v{font-size:1.1rem}.kpi{padding:.75rem .8rem}}
+
+/* gráficos */
+.chart{position:relative;overflow-x:auto;scrollbar-width:thin}
+.chart svg{display:block;overflow:visible;max-width:none}
+.chart .grid-l{stroke:var(--line-soft);stroke-width:1}
+.chart .ax{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
+.chart .val{fill:var(--fg);font-size:11.5px;font-weight:800;font-family:var(--f-body);font-variant-numeric:tabular-nums}
+.chart .sub{fill:var(--faint);font-size:10.5px;font-family:var(--f-body)}
+.chart .bg{cursor:pointer}
+.chart .bg rect.hit{fill:transparent}
+.chart .bg:hover rect.hit{fill:var(--sunken)}
+.chart .bg.sel rect.hit{fill:var(--accent-soft)}
+.chart .bg:focus-visible{outline:none}.chart .bg:focus-visible rect.hit{stroke:var(--accent);stroke-width:2}
+.tip{position:absolute;pointer-events:none;background:var(--navy);color:var(--navy-fg);border-radius:var(--r-sm);padding:.5rem .7rem;font-size:.77rem;line-height:1.55;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.22);z-index:4;transform:translate(-50%,-100%)}
+.tip i{display:inline-block;width:.55rem;height:.55rem;border-radius:2px;margin-right:.35rem}
+.tip b{font-variant-numeric:tabular-nums}
+.legend{list-style:none;margin:0 0 .6rem;padding:0;display:flex;flex-wrap:wrap;gap:.3rem .9rem;font-size:.75rem;color:var(--muted);font-weight:700}
+.legend li{display:flex;align-items:center;gap:.35rem}
+.legend i{width:.65rem;height:.65rem;border-radius:2px;display:block}
+.legend i.ln{height:3px;width:1rem}
+.legend i.dash{height:0;width:1rem;border-top:2px dashed var(--muted);border-radius:0}
+.legend i.hz{background:repeating-linear-gradient(45deg,var(--muted) 0 2px,transparent 2px 5px)}
+
+.hbars{display:flex;flex-direction:column;gap:.5rem}
+.hbar{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,11rem) minmax(0,1fr) auto;align-items:center;gap:.7rem;font-size:.82rem;cursor:default;border-radius:6px}
+button.hbar{cursor:pointer}button.hbar:hover .hb-name{color:var(--accent)}
+.hb-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.hb-name small{font-weight:600;color:var(--faint);margin-left:.3rem}
+.hb-track{height:12px;background:var(--line-soft);border-radius:3px;overflow:hidden;display:flex}
+.hb-track span{display:block;height:100%}
+.hb-val{font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap;text-align:right}
+.hb-val small{display:block;font-size:.7rem;color:var(--muted);font-weight:600}
+@media (max-width:560px){.hbar{grid-template-columns:minmax(0,7.5rem) minmax(0,1fr) auto}}
+
+/* listas */
+.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.rows>li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.15rem 1rem;align-items:center;padding:.6rem 0;border-top:1px solid var(--line-soft)}
+.rows>li:first-child{border-top:0;padding-top:0}
+.rows b{font-size:.86rem;font-weight:800;display:block;overflow:hidden;text-overflow:ellipsis}
+.rows small{display:block;font-size:.74rem;color:var(--muted)}
+.rows .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;font-size:.86rem;white-space:nowrap}
+.rows .r small{font-weight:600}
+.rows button.rowbtn{all:unset;cursor:pointer;display:contents}
+.rows li.click{cursor:pointer}
+.rows li.click:hover b{color:var(--accent)}
+.date{display:inline-grid;place-items:center;min-width:2.6rem;padding:.2rem .3rem;border-radius:var(--r-sm);background:var(--raised);font-size:.7rem;font-weight:800;line-height:1.15;text-align:center;color:var(--fg)}
+.date.late{background:var(--bad-bg);color:var(--bad-fg)}.date.soon{background:var(--warn-bg);color:var(--warn-fg)}
+.lrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.75rem;align-items:center}
+
+/* tabelas */
+.tbl{overflow:auto;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.tbl.scroll{max-height:min(64vh,600px)}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.83rem;min-width:640px}
+th{text-align:left;font-size:.67rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800;padding:.55rem .75rem;background:var(--sunken);white-space:nowrap;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
+td{padding:.55rem .75rem;border-top:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:first-child td{border-top:0}
+tbody tr:hover td{background:var(--sunken)}
+tr.click{cursor:pointer}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td small{display:block;font-size:.72rem;color:var(--muted);font-weight:500}
+.emp{font-weight:700}
+tr.tot td{font-weight:800;background:var(--sunken);border-top:2px solid var(--line)}
+tr.fam td{background:var(--sunken);font-weight:800;font-size:.76rem;color:var(--muted)}
+tr.excl td{color:var(--faint);text-decoration:line-through}
+
+details.fold{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow)}
+details.fold>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.3rem 1rem;padding:.95rem 1.2rem}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary h2{font-size:.98rem;font-weight:800;display:flex;align-items:center;gap:.55rem}
+details.fold>summary h2::before{content:"";width:.42rem;height:.42rem;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+details.fold[open]>summary h2::before{transform:rotate(45deg)}
+details.fold>.fb{padding:0 1.2rem 1.1rem}
+
+/* faturamento: lista + ficha */
+.fat-layout{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:1.1rem;align-items:start}
+@media (max-width:960px){.fat-layout{grid-template-columns:minmax(0,1fr)}}
+.elist{position:sticky;top:calc(env(safe-area-inset-top,0px) + 72px);display:flex;flex-direction:column;gap:.6rem;max-height:calc(100vh - 96px);padding:.9rem}
+@media (max-width:960px){.elist{position:static;max-height:none}}
+.elist .tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.4rem}
+.elist ul{list-style:none;margin:0 -.4rem;padding:0;overflow:auto;flex:1;min-height:120px}
+@media (max-width:960px){.elist ul{max-height:420px}}
+.ei{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:.5rem minmax(0,1fr) auto;gap:.15rem .6rem;align-items:center;width:100%;padding:.55rem .6rem;border-radius:var(--r-sm)}
+.ei:hover{background:var(--sunken)}
+.ei[aria-current="true"]{background:var(--accent-soft)}
+.ei .dot{width:.5rem;height:.5rem;border-radius:2px;grid-row:1/3}
+.ei b{font-size:.83rem;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ei small{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ei .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;font-size:.83rem;white-space:nowrap}
+.ei .s{text-align:right;font-size:.7rem;white-space:nowrap}
+.ei .s.ab{color:var(--warn-fg);font-weight:800}.ei .s.dv{color:var(--bad-fg);font-weight:800}
+.ficha{display:flex;flex-direction:column;gap:1rem;min-width:0}
+.fh{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:.75rem}
+.fh h2{font-size:1.2rem;font-weight:800}
+.fh p{margin:.25rem 0 0;font-size:.8rem;color:var(--muted)}
+.btn{min-height:36px;padding:0 .95rem;border:0;border-radius:var(--r-sm);background:var(--accent);color:#fff;font-weight:800;font-size:.82rem;display:inline-flex;align-items:center;gap:.4rem}
+.btn:hover{background:var(--accent-strong)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--surface);color:var(--fg);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--faint)}
+.mini-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem}
+.mini-k>div{background:var(--sunken);border-radius:var(--r-md);padding:.65rem .8rem}
+.mini-k .kpi-v{font-size:1.1rem}
+.ages{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;align-items:end;height:120px;padding-top:1.1rem}
+.ages div{position:relative;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.ages div span{position:absolute;top:-1.15rem;left:0;right:0;text-align:center;font-size:.7rem;font-weight:800;font-variant-numeric:tabular-nums}
+.ages-l{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;font-size:.64rem;color:var(--muted);text-align:center;margin-top:.3rem;font-variant-numeric:tabular-nums}
+.facts{display:flex;flex-wrap:wrap;gap:.4rem}
+.facts span{background:var(--sunken);border-radius:999px;padding:.2rem .6rem;font-size:.75rem;font-weight:700;color:var(--muted)}
+.facts b{color:var(--fg)}
+.overview-empty{display:grid;place-items:center;text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.86rem}
+
+/* parâmetros */
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem}
+.param{background:var(--sunken);border:1px solid var(--line-soft);border-radius:var(--r-md);padding:.7rem .8rem}
+.param b{display:block;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:.2rem}
+.param span{font-size:.82rem;line-height:1.45;display:block}
+.agsel{min-height:32px;padding:0 .4rem;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);font-size:.8rem;font-weight:700}
+.ktag{display:inline-block;font-size:.66rem;font-weight:800;padding:.05rem .4rem;border-radius:999px;margin-right:.35rem}.ktag.ag{background:var(--warn-bg);color:var(--warn-fg)}.ktag.vit{background:var(--accent-soft);color:var(--fg)}.ktag.outro{background:var(--idle-bg);color:var(--idle-fg)}
+
+/* pendências */
+.tcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:.75rem}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:.85rem .9rem;display:flex;flex-direction:column;gap:.35rem;box-shadow:var(--shadow)}
+.tag{align-self:flex-start;font-size:.66rem;font-weight:800;background:var(--accent-soft);color:var(--accent-strong);padding:.08rem .5rem;border-radius:999px}
+.tcard h4{font-size:.88rem;font-weight:800;line-height:1.35}
+.tcard p{margin:0;font-size:.79rem;color:var(--muted);line-height:1.5}
+.who{font-size:.71rem;color:var(--faint);font-weight:700}
+.done-by{font-size:.74rem;font-weight:800;color:var(--ok-fg)}
+.sec-t{font-size:.98rem;font-weight:800;margin:.4rem 0 .6rem;display:flex;align-items:center;gap:.5rem}
+.fr{display:grid;grid-template-columns:10rem minmax(0,1fr);gap:.4rem 1.25rem;padding:.85rem 0;border-top:1px solid var(--line-soft)}
+.fr:first-child{border-top:0;padding-top:0}
+.fr-m{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem}
+.fr-m b{font-size:.98rem}
+.fr .tot{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.fr ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.35rem;font-size:.81rem;line-height:1.5}
+.fr li{position:relative;padding-left:.9rem;color:var(--muted)}
+.fr li::before{content:"";position:absolute;left:0;top:.55em;width:.38rem;height:.38rem;border-radius:999px;background:var(--line)}
+.fr li.falta{color:var(--fg);font-weight:700}.fr li.falta::before{background:var(--bad-fg)}
+@media (max-width:640px){.fr{grid-template-columns:1fr}.fr-m{flex-direction:row;flex-wrap:wrap;align-items:center}}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:grid;grid-template-columns:3.2rem minmax(0,1fr);gap:.6rem;padding:.6rem 0;border-top:1px solid var(--line-soft);font-size:.82rem;line-height:1.5}
+.feed li:first-child{border-top:0;padding-top:0}
+.feed time{font-size:.72rem;font-weight:800;color:var(--faint);font-variant-numeric:tabular-nums}
+.agents{display:flex;flex-wrap:wrap;gap:.5rem}
+.agent{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.35rem .75rem .35rem .4rem;font-size:.8rem;font-weight:700}
+.agent:hover{border-color:var(--accent)}
+.agent .ic{width:24px;height:24px;border-radius:999px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+
+/* formulário de movimentação */
+.modal{position:fixed;inset:0;z-index:20;background:var(--overlay);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) 16px}
+.modal form{background:var(--surface);border-radius:var(--r-lg);width:min(520px,100%);max-height:100%;overflow:auto;padding:1.25rem;display:flex;flex-direction:column;gap:.85rem;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal h3{font-size:1.1rem;font-weight:800}
+.modal label{display:flex;flex-direction:column;gap:.3rem;font-size:.78rem;font-weight:800;color:var(--muted)}
+.modal select,.modal input,.modal textarea{min-height:38px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:.45rem .6rem;font-size:.88rem;font-weight:500;color:var(--fg)}
+.modal textarea{min-height:80px;resize:vertical}
+.modal .acts{display:flex;justify-content:flex-end;gap:.5rem}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--navy);color:var(--navy-fg);padding:.6rem 1rem;border-radius:var(--r-md);font-size:.85rem;font-weight:700;z-index:30;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+/* popup: distribuição de vidas */
+.modal .vd{background:var(--surface);border-radius:var(--r-lg);width:min(900px,100%);max-height:100%;overflow:auto;padding:1.25rem;display:flex;flex-direction:column;gap:1rem;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.vd-h{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem}
+.vd-h h3{font-size:1.15rem;font-weight:800}
+.vd-h p{margin:.2rem 0 0;font-size:.8rem;color:var(--muted)}
+.vd-x{all:unset;cursor:pointer;width:34px;height:34px;border-radius:999px;display:grid;place-items:center;color:var(--muted);flex-shrink:0}
+.vd-x:hover{background:var(--sunken);color:var(--fg)}
+.vd-sec{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 .5rem;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.vd-sec span{text-transform:none;letter-spacing:0;font-weight:600}
+.fxr{display:grid;grid-template-columns:3.4rem minmax(0,1fr) 2.6rem 2.6rem 3rem 3.2rem;gap:.5rem;align-items:center;font-size:.8rem;font-variant-numeric:tabular-nums;padding:.2rem 0}
+.fxr.h{font-size:.64rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.fxr>span:not(:first-child):not(.fxb){text-align:right}
+.fxr .fxl{font-weight:800}
+.fxb{height:14px;background:var(--line-soft);border-radius:3px;overflow:hidden;display:flex}
+.fxb i{display:block;height:100%}
+.fxr.tot{border-top:1px solid var(--line);margin-top:.2rem;padding-top:.45rem;font-weight:800}
+.vd-ev{display:grid;gap:4px;align-items:end;height:90px;padding-top:1.1rem}
+.vd-ev button{all:unset;cursor:pointer;position:relative;background:var(--line);border-radius:4px 4px 0 0;min-height:2px}
+.vd-ev button.on{background:var(--accent)}
+.vd-ev button:hover{background:var(--accent-strong)}
+.vd-ev button span{position:absolute;top:-1.1rem;left:0;right:0;text-align:center;font-size:.66rem;font-weight:800;font-variant-numeric:tabular-nums;color:var(--fg)}
+.vd-evl{display:grid;gap:4px;font-size:.62rem;color:var(--muted);text-align:center;margin-top:.3rem}
+.vd-mov summary{cursor:pointer;list-style:none}
+.vd-mov summary::-webkit-details-marker{display:none}
+.vd-mov .nm{font-size:.74rem;color:var(--muted);line-height:1.5;margin:.2rem 0 .1rem}
+.lnk{all:unset;cursor:pointer;color:var(--accent);font-weight:800;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.lnk:hover{color:var(--accent-strong)}
+#flist li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.15rem}
+.vbtn{all:unset;box-sizing:border-box;cursor:pointer;width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--muted)}
+.vbtn:hover{background:var(--accent-soft);color:var(--accent)}
+.fxr.sx{grid-template-columns:3.6rem minmax(0,1fr) repeat(var(--n),2.5rem) 2.8rem}
+@media (max-width:640px){.fxr:not(.sx){grid-template-columns:3rem minmax(0,1fr) 2.2rem 2.2rem 2.6rem}.fxr:not(.sx)>:nth-child(6){display:none}.fxr.sx{grid-template-columns:2.9rem minmax(1rem,1fr) repeat(var(--n),1.85rem) 2.2rem;gap:.3rem;font-size:.74rem}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.chart .grid{stroke:var(--line-soft);stroke-width:1}.chart .axis{fill:var(--muted);font-size:11px;font-family:var(--f-body)}
+.chart .barg{cursor:pointer}.chart .barg rect.hit{fill:transparent}.chart .barg:hover rect.hit{fill:var(--sunken)}.chart .barg:focus-visible{outline:none}.chart .barg:focus-visible rect.hit{stroke:var(--accent);stroke-width:2}
+/* início: semanas de comissão */
+.wk-h{display:flex;align-items:baseline;flex-wrap:wrap;gap:.2rem .6rem}
+.wk-h b{font-size:.95rem;font-weight:800}
+.wk-h .r{margin-left:auto;font-weight:800;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.day{margin-top:.85rem}
+.day-h{display:flex;justify-content:space-between;gap:.5rem;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--sunken);padding:.35rem .6rem;border-radius:var(--r-sm);margin-bottom:.35rem;font-variant-numeric:tabular-nums}
+details.more>summary{list-style:none;cursor:pointer;font-size:.76rem;font-weight:800;color:var(--accent);padding:.45rem 0 .1rem}
+details.more>summary::-webkit-details-marker{display:none}
+#hwk .rows small .ktag{margin-right:.4rem}
+#hwk .rows .r small .pill{margin-top:.15rem}
+/* revisão de design (crítica + acessibilidade WCAG AA) */
+:root{--faint:#637080;--on-accent:#FFFFFF}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--faint:#8E9CAD;--on-accent:#0B1A1A}}
+:root[data-theme="dark"]{--faint:#8E9CAD;--on-accent:#0B1A1A}
+.btn:not(.ghost){color:var(--on-accent)}
+html body :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+html body .top :focus-visible{outline-color:var(--navy-fg);outline-offset:-3px;border-radius:6px}
+.kpi-l,.param b,.vd-sec,.day-h,th,.fxr.h{text-transform:none;letter-spacing:0}
+.kpi-l{font-size:.76rem;font-weight:700}
+th{font-size:.74rem;font-weight:700}
+.param b{font-size:.76rem;font-weight:800;color:var(--fg)}
+.vd-sec{font-size:.78rem;font-weight:800;color:var(--fg)}
+.day-h{font-size:.74rem;font-weight:700}
+.fxr.h{font-size:.72rem;font-weight:700}
+.kpi-s{line-height:1.45}
+.go{text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:text-decoration-color .15s}
+.go:hover,.go:focus-visible{text-decoration-color:currentColor}
+.day{margin-top:.65rem}
+#pnw td .hint,#pdet td .hint{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#pnw tr:hover td .hint,#pdet tr:hover td .hint,#pnw tr:focus-within td .hint,#pdet tr:focus-within td .hint{display:inline;-webkit-line-clamp:unset}
+.pend-btn svg{flex-shrink:0}
+.dstrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.4rem;margin-top:.75rem}
+.dcell{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.55rem .25rem .45rem;border-radius:var(--r-md);border:1px solid var(--line);background:var(--surface);min-width:0}
+.dcell:hover{border-color:var(--accent)}
+.dcell.on{background:var(--accent-soft);border-color:var(--accent)}
+.dcell .dn{font-size:.74rem;font-weight:700;color:var(--muted)}
+.dcell.today .dn{color:var(--accent);font-weight:800}
+.dcell .db{width:56%;height:46px;display:flex;align-items:flex-end;background:var(--sunken);border-radius:4px;overflow:hidden}
+.dcell .db i{display:block;width:100%;background:var(--accent);min-height:2px;border-radius:3px 3px 0 0}
+.dcell .dv{font-size:.84rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dcell .dc{font-size:.68rem;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dcell .dc.late{color:var(--bad-fg);font-weight:700}
+@media (max-width:420px){.dcell .dc{font-size:.62rem}.dcell .dv{font-size:.76rem}}
+@media (max-width:560px){.brand{display:none}.top .wrap{gap:.35rem}.nav button{padding:0 .36rem;font-size:.8rem}.nav{gap:0}.kpis>:last-child:nth-child(odd){grid-column:1/-1}.pend-btn .pl{display:none}.pend-btn{padding:.45rem .55rem}}
+.ei b{display:flex;align-items:center;gap:.4rem;min-width:0}.ei b .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.subn{flex-shrink:0;font-size:.66rem;font-weight:800;padding:.05rem .45rem;border-radius:999px;background:var(--info-bg);color:var(--info-fg);white-space:nowrap}
+.subn.pend{background:var(--warn-bg);color:var(--warn-fg)}
+.fh h2 .pill{vertical-align:middle;margin-left:.4rem}
+/* projeção simplificada: destaque do mês, mês a mês, semanas e empresas */
+.ph{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:1.25rem 2rem;align-items:center;padding:1.35rem 1.4rem}
+.ph-l{display:block;font-size:.88rem;font-weight:700;color:var(--muted)}
+.ph-v{display:block;font-size:2.5rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1;margin:.2rem 0 .9rem}
+.ph-bar{display:flex;gap:2px;height:14px;border-radius:999px;overflow:hidden;background:var(--line-soft)}
+.ph-bar i{display:block;height:100%}
+.ph-leg{list-style:none;margin:.7rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.35rem 1.25rem;font-size:.82rem;color:var(--muted)}
+.ph-leg li{display:flex;align-items:center;gap:.4rem}.ph-leg i{width:.7rem;height:.7rem;border-radius:3px;display:block}
+.ph-leg b{color:var(--fg);font-variant-numeric:tabular-nums}
+.ph-next{display:flex;flex-direction:column;gap:.15rem;border-left:1px solid var(--line-soft);padding-left:1.5rem}
+.ph-next .ph-l{margin:0 0 .25rem .6rem;font-size:.8rem}
+.ph-m{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:3.6rem minmax(0,1fr);align-items:baseline;gap:0 .75rem;padding:.45rem .6rem;border-radius:var(--r-sm)}
+.ph-m:hover{background:var(--sunken)}.ph-m[aria-pressed="true"]{background:var(--accent-soft)}
+.ph-m span{font-size:.84rem;font-weight:700;color:var(--muted)}
+.ph-m b{font-size:1.05rem;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.ph-m small{grid-column:2;font-size:.74rem;color:var(--muted);text-align:right}
+@media (max-width:860px){.ph{grid-template-columns:minmax(0,1fr)}.ph-next{border-left:0;padding-left:0;border-top:1px solid var(--line-soft);padding-top:.9rem}.ph-next .ph-l{margin-left:.6rem}}
+@media (max-width:640px){.ph{padding:1.1rem 1rem}.ph-v{font-size:1.95rem}}
+#pweek{margin-top:0}
+#pweek .db{width:44%;max-width:72px}
+#pweek .dcell.today .dn::after{content:' · hoje';font-weight:700}
+@media (max-width:640px){#pweek .dcell.today .dn::after{content:''}#pweek{gap:.3rem}}
+.dcell.proj .db i{opacity:.45}
+.plist>li{display:block;padding:0}
+.prow>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.55rem 0}
+.plist>li:first-child .prow>summary{padding-top:.2rem}
+.prow>summary::-webkit-details-marker{display:none}
+.prow>summary:hover b{color:var(--accent)}
+.prow[open]>summary b{color:var(--accent)}
+.prow .pwhy{font-size:.79rem;color:var(--muted);line-height:1.55;margin:0 0 .65rem 3.35rem;background:var(--sunken);border-radius:var(--r-sm);padding:.55rem .75rem}
+@media (max-width:640px){.prow .pwhy{margin-left:0}}
+/* revisão das abas */
+.kpi-main{border-color:var(--accent);background:var(--accent-soft)}button.kpi-main:hover{border-color:var(--accent-strong)}
+#ck{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.hmov{margin-top:.9rem;padding-top:.8rem;border-top:1px solid var(--line-soft)}
+.hmov .facts{align-items:center}
+tr.subf td{background:var(--sunken);font-size:.8rem}
+tr.subf td:nth-child(2){padding-left:1.4rem}
+.ei small .subn{margin-right:.15rem}
+#fech-now .fr{padding-top:0;display:block}#fech-now .card-h .pill{margin-right:auto}#fech-now .card-h .hint{margin-left:0}
+#fech-now li{overflow-wrap:anywhere}
+@media (max-width:860px){#hleft{display:contents}#hagw{order:3}}
+@media (pointer:coarse){.seg button,.chips button,.btn,input.search,select.sel,.agsel,.modal select,.modal input{min-height:44px}.vbtn,.vd-x{width:44px;height:44px}.go,.lnk{padding-block:.55rem}.ei{padding-block:.7rem}}
+</style>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="logo"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+      <div class="brand-txt"><div class="brand-name">Central de Agentes</div><div class="brand-sub" id="sub">Shaddai Seguros</div></div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Áreas">
+      <button type="button" data-page="inicio">Início</button>
+      <button type="button" data-page="faturamento">Faturamento</button>
+      <button type="button" data-page="comissoes">Comissões</button>
+      <button type="button" data-page="projecao">Projeção</button>
+    </nav>
+    <button type="button" class="pend-btn" data-page="pendencias" id="pendbtn" aria-label="Pendências"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pl">Pendências</span><span class="badge" id="pendn" hidden></span></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <p id="offline" class="offline" hidden>Sem conexão com a base. Os números aparecem assim que a conexão voltar.</p>
+
+  <!-- INÍCIO -->
+  <div class="page" data-pg="inicio">
+    <div class="page-head"><div><h1>Visão geral</h1><p id="h-sub">O que importa hoje: os números do mês, a comissão desta semana, os boletos vencendo e o que os agentes estão fazendo.</p></div></div>
+    <div class="kpis" id="hk"></div>
+    <div class="grid g32" style="align-items:start">
+      <div class="page" id="hleft" style="gap:1.1rem;min-width:0">
+        <section class="card"><div class="card-h"><h2>Comissão desta semana</h2><span class="hint" id="hwk-t"></span><button class="go" type="button" data-page="projecao">Abrir projeção</button></div><div id="hwk"></div></section>
+        <section class="card" id="hagw"><div class="card-h"><h2>Agentes</h2><span class="hint" id="hag-h"></span></div><div class="agents" id="hag"></div><div id="hmov" class="hmov"></div></section>
+      </div>
+      <section class="card"><div class="card-h"><h2>Próximos vencimentos</h2><span class="hint">Boletos em aberto</span></div><ul class="rows" id="hven"></ul></section>
+    </div>
+  </div>
+
+  <!-- FATURAMENTO -->
+  <div class="page" data-pg="faturamento" hidden>
+    <div class="page-head"><div><h1>Faturamento</h1><p id="f-sub">Clique numa empresa para ver as faturas, as vidas e a situação dela.</p></div>
+      <div class="filters"><div class="chips" id="fops" role="group" aria-label="Seguradora"></div><div class="seg" id="fmes" role="group" aria-label="Competência"></div></div></div>
+    <div class="kpis" id="fk"></div>
+    <p class="offline" id="fpend" hidden></p>
+    <div class="fat-layout">
+      <aside class="card elist" aria-label="Empresas">
+        <div class="tools"><input class="search" id="fq" type="search" placeholder="Buscar empresa" aria-label="Buscar empresa"><select class="sel" id="fsort" aria-label="Ordenar"><option value="valor">Maior valor</option><option value="venc">Vencimento</option><option value="nome">Nome</option><option value="var">Variação</option></select></div>
+        <div class="chips" id="ffil" role="group" aria-label="Filtro">
+          <button type="button" data-ff="todas" aria-pressed="true">Todas</button>
+          <button type="button" data-ff="aberto" aria-pressed="false">Em aberto</button>
+          <button type="button" data-ff="variou" aria-pressed="false">Mudou de valor</button>
+          <button type="button" data-ff="div" aria-pressed="false">Divergência</button>
+        </div>
+        <ul id="flist"></ul>
+        <p class="hint" id="flist-n" style="margin:0"></p>
+      </aside>
+      <section class="ficha" id="ficha" aria-live="polite"></section>
+    </div>
+  </div>
+
+  <!-- COMISSÕES -->
+  <div class="page" data-pg="comissoes" hidden>
+    <div class="page-head"><div><h1>Comissões</h1><p id="c-sub">Quanto cada seguradora e cada empresa pagou, pelo mês do extrato. Para saber em que dia cada valor cai, veja a Projeção.</p></div>
+      <div class="filters"><div class="chips" id="cops" role="group" aria-label="Seguradora"></div><div class="seg" id="cmes" role="group" aria-label="Mês do extrato"></div></div></div>
+    <div class="kpis" id="ck"></div>
+    <div class="grid g32">
+      <section class="card"><div class="card-h"><h2>Comissão bruta por mês</h2><span class="hint">Pelo mês do extrato · clique num mês para abrir</span></div><ul class="legend" id="cchart-lg"></ul><div class="chart" id="cchart"></div></section>
+      <section class="card"><div class="card-h"><h2>Por seguradora</h2><span class="hint" id="cseg-h"></span></div><div class="hbars" id="cseg"></div><p class="note" id="cbridge"></p></section>
+    </div>
+    <section class="card"><div class="card-h"><h2>Detalhe por empresa</h2><input class="search" id="cq" type="search" placeholder="Buscar empresa" aria-label="Buscar empresa" style="max-width:260px;margin-left:auto"></div>
+      <div class="tbl scroll"><table><thead><tr><th>Empresa</th><th>Seguradora</th><th>Tipo</th><th class="num">Faturado (R$)</th><th class="num">Taxa</th><th class="num">Comissão (R$)</th></tr></thead><tbody id="crows"></tbody></table></div>
+      <p class="note" id="cnote"></p>
+    </section>
+    <details class="fold" id="cobsw" hidden><summary><h2>Notas da conferência</h2><span class="hint">O que o Agente Comissão observou neste mês</span></summary><div class="fb"><p class="note" id="cobs" style="margin:0"></p></div></details>
+    <details class="fold"><summary><h2>Ordens de pagamento</h2><span class="hint" id="cord-h"></span></summary><div class="fb"><div class="tbl scroll"><table><thead><tr><th>Ordem</th><th>Data</th><th>Seguradora</th><th class="num">Bruto (R$)</th><th class="num">Débitos (R$)</th><th class="num">A pagar (R$)</th></tr></thead><tbody id="cord"></tbody></table></div></div></details>
+    <details class="fold"><summary><h2>Lançamentos sem fatura na base</h2><span class="hint">Odonto, bônus, seguros gerais e faturas não baixadas</span></summary><div class="fb"><ul class="rows" id="cextra"></ul></div></details>
+  </div>
+
+  <!-- PROJEÇÃO -->
+  <div class="page" data-pg="projecao" hidden>
+    <div class="page-head"><div><h1>Projeção</h1><p>Quanto deve entrar este mês e nos próximos. Escolha um mês e uma semana para ver as empresas.</p></div>
+      <div class="filters"><div class="chips" id="pops" role="group" aria-label="Seguradora"></div><div class="seg" id="pvseg" role="group" aria-label="O que projetar"><button type="button" data-pv="com" aria-pressed="true">Comissão da Shaddai</button><button type="button" data-pv="emp" aria-pressed="false">Pagamentos das empresas</button></div></div></div>
+    <section class="card ph" id="phero"></section>
+    <section class="card"><div class="card-h"><h2 id="pmes-h">Mês a mês</h2><span class="hint">Barras claras = projetado · clique num mês</span></div><ul class="legend" id="pmes-lg"></ul><div class="chart" id="pmes"></div></section>
+    <section class="card"><div class="card-h"><h2 id="pweek-h">Semanas</h2><span class="hint">Clique numa semana para ver as empresas</span></div><div class="dstrip" id="pweek"></div><div id="pdet"></div></section>
+    <details class="fold"><summary><h2>Implantações</h2><span class="hint" id="pimp-h"></span></summary><div class="fb"><div style="display:flex;justify-content:flex-end;margin-bottom:.6rem"><button class="btn" type="button" id="imp-new">Nova implantação</button></div><div id="pimp"></div><p class="note">Cada implantação cadastrada entra na projeção: o agenciamento pelo % do contrato (300% = 3 faturas; 250% = 2 inteiras + 50% da 3ª) e depois o vitalício. Também dá para cadastrar na aba Implantações da planilha.</p></div></details>
+    <details class="fold" id="pagwrap"><summary><h2>Agenciamentos em andamento</h2><span class="hint" id="pag-h"></span></summary><div class="fb">
+      <div class="tbl"><table><thead><tr><th>Empresa</th><th>Já recebido</th><th>Próximos agenciamentos</th><th>Ainda faltam</th><th>Vira vitalício</th></tr></thead><tbody id="pag"></tbody></table></div>
+      <p class="note">Ajuste quantas parcelas ainda faltam quando um agenciamento cair. 300% = 3 faturas inteiras. Se caiu a 1ª e o contrato é de 200%, escolha 1. "Automático" volta para a regra padrão.</p></div></details>
+    <details class="fold"><summary><h2>Projetado × realizado</h2><span class="hint" id="pacc-h"></span></summary><div class="fb"><div id="pacc"></div></div></details>
+    <details class="fold"><summary><h2>Como a projeção é calculada</h2></summary><div class="fb"><div class="params" id="pparams"></div></div></details>
+  </div>
+
+  <!-- PENDÊNCIAS -->
+  <div class="page" data-pg="pendencias" hidden>
+    <div class="page-head"><div><h1>Pendências</h1><p>O que precisa de você, o que os agentes estão fazendo e o que impede cada mês de fechar.</p></div>
+      <div class="filters"><div class="chips" id="agfilter" role="group" aria-label="Agente"></div></div></div>
+    <section><h2 class="sec-t">Precisa de você <span class="pill p-warn" id="tn-p"></span></h2><div class="tcards" id="tprec"></div></section>
+    <section><h2 class="sec-t">Em andamento <span class="pill p-info" id="tn-a"></span></h2><div class="tcards" id="tand"></div></section>
+    <section class="card" id="fech-now"></section>
+    <details class="fold"><summary><h2>Meses anteriores</h2><span class="hint">Fechamento das outras competências</span></summary><div class="fb" id="fech"></div></details>
+    <details class="fold"><summary><h2>Concluídas recentemente</h2><span class="hint" id="tn-c"></span></summary><div class="fb"><div class="tcards" id="tconc"></div></div></details>
+    <details class="fold"><summary><h2>Linha do tempo</h2><span class="hint">O que cada agente fez</span></summary><div class="fb"><ol class="feed" id="feed"></ol></div></details>
+  </div>
+</main>
+
+<div class="modal" id="movm" role="dialog" aria-modal="true" aria-labelledby="movt" hidden>
+  <form id="movf">
+    <h3 id="movt">Solicitar movimentação</h3>
+    <p class="hint" id="movs" style="margin:-.5rem 0 0"></p>
+    <label for="mov-tipo">Tipo<select id="mov-tipo" required><option value="Inclusão">Inclusão de vida</option><option value="Exclusão">Exclusão de vida</option><option value="Alteração de plano">Alteração de plano</option><option value="Alteração cadastral">Alteração cadastral</option><option value="Segunda via de carteirinha">Segunda via de carteirinha</option></select></label>
+    <label for="mov-benef" id="mov-benef-l">Beneficiário<select id="mov-benef"></select></label>
+    <label for="mov-nome" id="mov-nome-l">Nome de quem entra<input id="mov-nome" type="text" autocomplete="off"></label>
+    <label for="mov-data">A partir de<input id="mov-data" type="date"></label>
+    <label for="mov-obs">Observação<textarea id="mov-obs" placeholder="Parentesco, plano desejado, motivo da exclusão…"></textarea></label>
+    <p class="hint" style="margin:0">O pedido vai para Pendências, na fila do Agente Movimentações.</p>
+    <div class="acts"><button type="button" class="btn ghost" id="mov-cancel">Cancelar</button><button type="submit" class="btn" id="mov-ok">Enviar pedido</button></div>
+  </form>
+</div>
+<div class="modal" id="impm" role="dialog" aria-modal="true" aria-labelledby="impt" hidden>
+  <form id="impf">
+    <h3 id="impt">Nova implantação</h3>
+    <p class="hint" style="margin:-.5rem 0 0">O Agente Projeção recalcula a projeção com esta empresa.</p>
+    <label for="imp-emp">Empresa<input id="imp-emp" type="text" autocomplete="off" required></label>
+    <label for="imp-eid">Já está na base?<select id="imp-eid"></select></label>
+    <label for="imp-op">Seguradora<select id="imp-op" required><option>Porto Saúde</option><option>Bradesco Saúde</option><option>Bradesco Dental</option><option>Amil</option><option>Amil Dental</option><option>Hapvida</option><option>SulAmérica</option><option>Santa Helena</option></select></label>
+    <div class="grid g2" style="gap:.85rem">
+      <label for="imp-ini">Competência da 1ª fatura<input id="imp-ini" type="month" required></label>
+      <label for="imp-dia">Dia de vencimento<input id="imp-dia" type="number" min="1" max="31" value="10"></label>
+      <label for="imp-val">Valor mensal estimado (R$)<input id="imp-val" type="number" min="0" step="0.01" required></label>
+      <label for="imp-vid">Vidas<input id="imp-vid" type="number" min="0"></label>
+      <label for="imp-ag">Agenciamento (%)<input id="imp-ag" type="number" min="0" step="1" value="300" required></label>
+      <label for="imp-vit">Vitalício (%)<input id="imp-vit" type="number" min="0" max="50" step="0.01" value="2"></label>
+    </div>
+    <label for="imp-st">Situação<select id="imp-st"><option>Prevista</option><option>Implantada</option><option>Cancelada</option></select></label>
+    <label for="imp-obs">Observação<textarea id="imp-obs" placeholder="Contrato, corretor, condições do agenciamento…"></textarea></label>
+    <div class="acts"><button type="button" class="btn ghost" id="imp-cancel">Cancelar</button><button type="submit" class="btn" id="imp-ok">Salvar</button></div>
+  </form>
+</div>
+<div class="modal" id="vdm" hidden>
+  <div class="vd" role="dialog" aria-modal="true" aria-labelledby="vdt" tabindex="-1" id="vdbox">
+    <div class="vd-h"><div><h3 id="vdt">Distribuição de vidas</h3><p id="vds"></p></div><button type="button" class="vd-x" id="vd-close" aria-label="Fechar"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div id="vdb"><p class="empty">Carregando…</p></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>
+(function(){
+const S={imps:[],fotos:[],impEdit:null,agcfg:{},pv:'com',pwk:null,pmk:null,op:'todas',_fat:[],_com:[],_comAll:[],faturas:[],comissoes:[],page:'inicio',agentes:[],tarefas:[],eventos:[],mes:null,cmes:null,emp:null,ff:'todas',fq:'',fsort:'valor',cq:'',filtro:null,canEdit:false,me:null,user:null,db:null,vcache:{},fexp:{},vq:'',vd:{},vdE:null,vdC:null,vdSx:(()=>{try{return localStorage.getItem('vdSx')==='1'}catch(e){return false}})()};
+const $=id=>document.getElementById(id);
+//<model>
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl=n=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const int=n=>Number(n||0).toLocaleString('pt-BR');
+const pct=(n,d=1)=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const mesLabel=c=>{if(!c)return '—';const [a,m]=c.split('-');return MES[+m-1]+'/'+a.slice(2)};
+const kfmt=v=>{const a=Math.abs(v);return a>=1e6?(v/1e6).toFixed(2).replace('.',',')+' mi':a>=1e3?Math.round(v/1000)+' mil':String(Math.round(v))};
+const isAg=i=>i.tipo?i.tipo==='AN':+i.taxa>50;
+const nomeAg=k=>(S.agentes.find(a=>a.id===k)||{}).nome||k;
+const sum=(a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
+const uniq=a=>[...new Set(a)];
+const pdate=s=>{if(!s)return null;const p=String(s).split('/');return p.length===3?new Date(Date.UTC(+p[2],+p[1]-1,+p[0])):null};
+const today=()=>{const d=new Date();return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))};
+const addMonth=(c,k)=>{let [a,m]=c.split('-').map(Number);m+=k;while(m>12){m-=12;a++}while(m<1){m+=12;a--}return a+'-'+String(m).padStart(2,'0')};
+const ckey=d=>d.toISOString().slice(0,7);
+
+// seguradoras: ordem e cor fixas (a cor segue a seguradora, nunca a posição)
+const FAMS=['Porto','Bradesco','Amil','Santa Helena','Hapvida','SulAmérica'];
+const FCOL={Porto:'var(--s1)',Bradesco:'var(--s2)',Amil:'var(--s3)','Santa Helena':'var(--s4)',Hapvida:'var(--s5)','SulAmérica':'var(--s6)',Outras:'var(--faint)','Vitalício':'var(--accent)','Agenciamento':'var(--s4)','Outros':'var(--faint)','A cair':'var(--faint)'};
+const fam=op=>{op=String(op||'');return /porto/i.test(op)?'Porto':/bradesco/i.test(op)?'Bradesco':/amil/i.test(op)?'Amil':/santa/i.test(op)?'Santa Helena':/hapvida/i.test(op)?'Hapvida':/sul/i.test(op)?'SulAmérica':'Outras'};
+const famsIn=list=>FAMS.filter(f=>list.includes(f));
+const norm=s=>{s=String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ');
+  const w=s.split(/\s+/).filter(x=>x&&!/^\d+$/.test(x)&&!['LTDA','ME','EPP','EIRELI','DE','DO','DA','DOS','E','S','A','CIA','SA','LIMITADA','MEI'].includes(x));return w.slice(0,2).join(' ')};
+//</model>
+const ICON={projecao:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',faturas:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',vidas:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/>',movimentacoes:'<path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/>',comissoes:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/>',financeiro:'<path d="M3 10 12 4l9 6"/><path d="M5 10v8M12 10v8M19 10v8"/>'};
+const STATUS={trabalhando:['Trabalhando','p-info'],em_dia:['Em dia','p-ok'],aguardando:['Aguardando você','p-warn'],em_breve:['Em breve','p-idle'],parado:['Parado','p-bad']};
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,3200)}
+
+// gráfico de barras empilhadas por seguradora (SVG), com dica ao passar o mouse
+function barsSVG(id,buckets,opt){
+  const box=$(id); if(!box)return; if(!buckets.length){box.innerHTML='<p class="empty">Sem dados ainda.</p>';return}
+  const keys=opt.keys, H=opt.h||220, top=24, bot=opt.subs?40:26, PADL=42, n=buckets.length;
+  const W=Math.max(Math.round(box.clientWidth||600),PADL+n*(opt.minW||44));
+  const tot=b=>keys.reduce((s,k)=>s+(b.vals[k]||0),0);
+  const max=Math.max(1,...buckets.map(tot))*1.12;
+  const r=max/4,p=Math.pow(10,Math.floor(Math.log10(r))),step=[1,2,2.5,5,10].map(m=>m*p).find(x=>x>=r),ymax=Math.ceil(max/step)*step,Y=v=>top+(H-top-bot)*(1-v/ymax);
+  const cw=(W-PADL)/n, bw=Math.min(opt.maxBw||42,cw*.62), cx=i=>PADL+cw*(i+.5), small=cw<52;
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px" role="img" aria-label="${esc(opt.aria||'')}"><defs><pattern id="${id}-hz" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="var(--surface)" stroke-width="2" opacity=".55"/></pattern></defs>`;
+  for(let t=0;t<=ymax+1e-6;t+=step)s+=`<line class="grid-l" x1="${PADL-4}" x2="${W}" y1="${Y(t)}" y2="${Y(t)}"/><text class="ax" x="0" y="${Y(t)+4}">${t?kfmt(t):'0'}</text>`;
+  buckets.forEach((b,i)=>{const sel=b.key===opt.sel;let y0=Y(0),g='';
+    keys.forEach(k=>{const v=b.vals[k]||0;if(v<=0)return;const h=Math.max(1,Y(0)-Y(v)),y=y0-h;g+=`<rect x="${cx(i)-bw/2}" y="${y}" width="${bw}" height="${h}" fill="${FCOL[k]||'var(--accent)'}" stroke="var(--surface)" stroke-width="1"/>`+(b.proj?`<rect x="${cx(i)-bw/2}" y="${y}" width="${bw}" height="${h}" fill="url(#${id}-hz)"/>`:'');y0=y});
+    const tv=tot(b);
+    s+=`<g class="bg${sel?' sel':''}" tabindex="0" role="button" data-i="${i}" aria-label="${esc(b.title||b.label)}: R$ ${brl(tv)}"><rect class="hit" x="${cx(i)-cw*.47}" y="${top-20}" width="${cw*.94}" height="${H-top-bot+20}" rx="6"/>
+      <g style="opacity:${b.proj||b.part?.55:1}">${g}</g>
+      ${tv>0&&opt.labels!==false?`<text class="val" x="${cx(i)}" y="${Y(tv)-6}" text-anchor="middle" style="font-size:${small?10:11.5}px">${kfmt(tv)}</text>`:''}
+      <text class="ax" x="${cx(i)}" y="${H-bot+15}" text-anchor="middle" style="font-weight:${sel?800:600};fill:var(--fg);font-size:${small?10:11}px">${esc(b.label)}</text>
+      ${opt.subs&&b.sub?`<text class="sub" x="${cx(i)}" y="${H-bot+30}" text-anchor="middle">${esc(b.sub)}</text>`:''}</g>`});
+  s+='</svg><div class="tip" hidden></div>';box.innerHTML=s;
+  const tip=box.querySelector('.tip');
+  box.querySelectorAll('.bg').forEach(g=>{const b=buckets[+g.dataset.i];
+    const show=()=>{const rr=g.querySelector('.hit').getBoundingClientRect(),pb=box.getBoundingClientRect();
+      tip.innerHTML=`<b>${esc(b.title||b.label)}${b.proj?' (projetado)':''}</b>`+keys.filter(k=>b.vals[k]>0).map(k=>`<br><i style="background:${FCOL[k]}"></i>${esc(k)}: R$ <b>${brl(b.vals[k])}</b>`).join('')+(keys.length>1?`<br>Total: R$ <b>${brl(tot(b))}</b>`:'')+(b.extra?'<br>'+b.extra:'');
+      tip.style.left=Math.min(Math.max(rr.left-pb.left+box.scrollLeft+rr.width/2,90),box.scrollWidth-90)+'px';tip.style.top=Math.max(40,Y(tot(b))-8)+'px';tip.hidden=false};
+    g.addEventListener('mouseenter',show);g.addEventListener('focus',show);g.addEventListener('mouseleave',()=>tip.hidden=true);g.addEventListener('blur',()=>tip.hidden=true);
+    if(opt.onClick){g.addEventListener('click',()=>opt.onClick(b.key));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();opt.onClick(b.key)}})}});
+  if(box.scrollWidth>box.clientWidth){const sg=box.querySelector('.bg.sel');box.scrollLeft=opt.scrollEnd===false?0:box.scrollWidth}
+}
+function famLegend(id,keys,extra){$(id).innerHTML=keys.map(k=>`<li><i style="background:${FCOL[k]}"></i>${esc(k)}</li>`).join('')+(extra||'')}
+function hbars(list,opt){ // list: [{label,sub,v,col,attrs,right}]
+  const max=Math.max(1,...list.map(x=>x.v));
+  return list.map(x=>`<${x.attrs?'button type="button"':'div'} class="hbar" ${x.attrs||''}><span class="hb-name" title="${esc(x.label)}">${esc(x.label)}${x.tag?`<small>${esc(x.tag)}</small>`:''}</span><span class="hb-track"><span style="width:${Math.max(1,x.v/max*100).toFixed(1)}%;background:${x.col||'var(--accent)'}"></span></span><span class="hb-val">R$ ${brl(x.v)}${x.sub?`<small>${esc(x.sub)}</small>`:''}</span></${x.attrs?'button':'div'}>`).join('');
+}
+function comFora(){
+  const all=S.faturas.flatMap(d=>(d.itens||[]).map(r=>({m:d.comp,eid:r.eid,t:+r.titulo})));
+  const titBase=new Set(all.map(x=>String(x.t)));
+  const ms=[...new Set(S.faturas.map(f=>f.comp))].sort();
+  const med={};ms.forEach(m=>{const t=all.filter(x=>x.m===m).map(x=>x.t).sort((a,b)=>a-b);med[m]=t.length?t[Math.floor(t.length/2)]:Infinity});
+  const out={},seen=new Set();
+  S.comissoes.forEach(c=>(c.extras||[]).forEach(e=>{if(!/ainda não baixada/i.test(e.tipo||''))return;const t=+e.titulo;if(!t||titBase.has(String(t))||seen.has(t))return;seen.add(t);
+    const own=all.filter(x=>x.eid===e.eid).sort((a,b)=>a.t-b.t);let m=null;
+    if(own.length){if(t<own[0].t)m=null;else own.forEach(x=>{if(t>x.t)m=x.m});}
+    else{ms.forEach(x=>{if(t>=med[x])m=x});if(!m&&t>=Math.min(...all.map(x=>x.t)))m=ms[0];}
+    const k=m||'antes';(out[k]=out[k]||[]).push(Object.assign({extrato:c.comp},e))}));
+  return out;
+}
+function statusMes(m){
+  const docs=S.faturas.filter(f=>f.comp===m), it=docs.flatMap(d=>d.itens||[]), parcial=docs.some(d=>d.parcial);
+  const pend=docs.flatMap(d=>(d.pendentes||[]).map(p=>Object.assign({tipo:parcial?'nao_emitida':'sem_fatura'},p)));
+  const falt=pend.filter(p=>p.tipo==='faltando'), naoEm=pend.filter(p=>p.tipo==='nao_emitida'), semF=pend.filter(p=>p.tipo==='sem_fatura'), confF=pend.filter(p=>p.tipo==='confirmado');
+  const valDiv=it.filter(r=>r.confValor==='Divergência'), semV=it.filter(r=>r.confValor==='Sem vidas'), vidDiv=it.filter(r=>r.confValor==='OK'&&r.confVidas!=='OK'&&!r.verificado), vidVer=it.filter(r=>r.confValor==='OK'&&r.confVidas!=='OK'&&r.verificado);
+  const titFalt=new Set(falt.map(p=>String(p.titulo)));
+  const fora=comFora(), cxNovo=(fora[m]||[]).filter(e=>!titFalt.has(String(e.titulo)));
+  const ms=[...new Set(S.faturas.map(f=>f.comp))].sort(), cxAnt=m===ms[0]?(fora.antes||[]):[];
+  const L=[];
+  falt.forEach(p=>L.push({lvl:'falta',t:`Falta baixar: ${p.empresa}${p.titulo?' (fatura '+p.titulo+')':''} — ${p.motivo}`}));
+  valDiv.forEach(r=>L.push({lvl:'falta',t:`Valor não bate: ${r.empresa} (fatura ${r.titulo})${r.obs?' — '+r.obs:''}`}));
+  cxNovo.forEach(e=>L.push({lvl:'falta',t:`Falta baixar: ${e.hist} (fatura ${e.titulo}) — a Porto pagou R$ ${brl(e.comissao)} de comissão dela no extrato de ${mesLabel(e.extrato)}, mas a fatura não está na base`}));
+  naoEm.forEach(p=>L.push({lvl:'conf',t:`Ainda não emitida: ${p.empresa} — ${p.motivo}`}));
+  semF.forEach(p=>L.push({lvl:'conf',t:`Confirmar que não houve fatura: ${p.empresa} (${p.eid}) — ${p.motivo}`}));
+  if(confF.length)L.push({lvl:'info',t:`Sem fatura no mês, conferido pela data de adesão: ${confF.map(p=>p.empresa.split(' (')[0]+' ('+p.motivo+')').join('; ')}`});
+  if(semV.length)L.push({lvl:'info',t:`Sem relação de vidas para conferir o valor em ${semV.length} fatura${semV.length>1?'s':''}: ${semV.map(r=>r.empresa.split(' (')[0]).slice(0,6).join(', ')}${semV.length>6?'…':''}`});
+  if(vidVer.length)L.push({lvl:'info',t:`Vidas do resumo diferentes do TXT em ${vidVer.length} fatura${vidVer.length>1?'s':''}, já verificado pela equipe (valor confere)`});
+  if(vidDiv.length)L.push({lvl:'conf',t:`Vidas do resumo do portal não batem com o TXT em ${vidDiv.length} fatura${vidDiv.length>1?'s':''} (valor confere): ${vidDiv.map(r=>r.empresa.split(' (')[0]).join(', ')}`});
+  if(cxAnt.length)L.push({lvl:'info',t:`Antes da base: os extratos de comissões pagaram ${cxAnt.length} fatura${cxAnt.length>1?'s':''} de meses anteriores a ${mesLabel(m)}, que não estão na base (R$ ${brl(cxAnt.reduce((s,e)=>s+(+e.comissao||0),0))} de comissão): ${cxAnt.map(e=>String(e.hist||'').split(' ').slice(0,2).join(' ')).join(', ')}`});
+  let st;
+  if(falt.length||valDiv.length||cxNovo.length)st=['Incompleto','p-bad'];
+  else if(naoEm.length)st=['Em andamento','p-info'];
+  else if(semF.length||vidDiv.length)st=['Conferido com ressalvas','p-warn'];
+  else st=['Conferido','p-ok'];
+  return {st,L,n:it.length,v:it.reduce((s,r)=>s+(+r.valor||0),0)};
+}
+//<model>
+function mergeCom(list){const g={};list.forEach(c=>{const m=g[c.comp]=g[c.comp]||{comp:c.comp,ops:[],ordens:[],itens:[],extras:[],pendentes:[],faturasMes:0,obs:[],atualizadoEm:''};
+  m.ops.push(c.operadora);m.ordens.push(...(c.ordens||[]).map(o=>Object.assign({operadora:c.operadora},o)));m.itens.push(...(c.itens||[]).map(i=>Object.assign({operadora:c.operadora},i)));m.extras.push(...(c.extras||[]));m.pendentes.push(...(c.pendentes||[]));
+  m.faturasMes+=(+c.faturasMes||0);if(c.obs)m.obs.push(c.obs);if(String(c.atualizadoEm)>m.atualizadoEm)m.atualizadoEm=c.atualizadoEm});
+  return Object.values(g).map(m=>Object.assign(m,{operadora:m.ops.join(', '),obs:m.obs.join(' ')}))}
+function projModel(faturas,comissoes,hoje,agcfg,imps){
+  agcfg=agcfg||{};imps=(imps||[]).filter(i=>i&&i.status!=='Cancelada'&&i.inicio);
+  const impBy={};imps.forEach(i=>{if(i.eid)impBy[i.eid]=i});
+  const impN=im=>im&&+im.agPct>0?Math.ceil(+im.agPct/100-1e-9):0;
+  const impFr=(im,k)=>{const n=impN(im);if(!n||k<1||k>n)return 0;return k<n?1:Math.round((+im.agPct-100*(n-1)))/100};
+  const pctTx=v=>String(+v).replace('.',',')+'%';
+  const pd=s=>{const [d,m,a]=String(s).split('/');return new Date(Date.UTC(+a,+m-1,+d))};
+  const iso=d=>d.toISOString().slice(0,10);
+  const addD=(d,n)=>new Date(d.getTime()+n*864e5);
+  const addM=(c,k)=>{let [a,m]=c.split('-').map(Number);m+=k;while(m>12){m-=12;a++}while(m<1){m+=12;a--}return a+'-'+String(m).padStart(2,'0')};
+  const mdiff=(a,b)=>{const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1)};
+  const shiftM=(d,k)=>{const y=d.getUTCFullYear(),m=d.getUTCMonth()+k,day=d.getUTCDate();const last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return new Date(Date.UTC(y,m,Math.min(day,last)))};
+  const T=new Date(Date.UTC(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()));
+  const util=d=>{const w=d.getUTCDay();return w===6?addD(d,2):w===0?addD(d,1):d};
+  const kindOf=i=>isAg(i)?'ag':'vit';
+  const PROX=util(addD(T,1)); // o que já devia ter caído e não caiu: atraso, vai para o próximo dia útil (nunca fim de semana)
+  const fat=faturas.flatMap(d=>(d.itens||[]).map(r=>Object.assign({comp:d.comp,operadora:d.operadora},r)));
+  if(!fat.length)return null;
+  // histórico de comissões por empresa
+  const hist={},pagos=new Set(),real=[];
+  comissoes.forEach(c=>{const od={};(c.ordens||[]).forEach(o=>od[o.op]=o.dataISO);
+    (c.itens||[]).forEach(i=>{pagos.add(String(i.titulo)+'|'+i.compFat);const dt=od[i.op]?new Date(od[i.op]+'T00:00:00Z'):null;
+      (hist[i.eid]=hist[i.eid]||[]).push(Object.assign({dt},i));
+      if(dt)real.push({tipo:'real',op:i.operadora,kind:kindOf(i),eid:i.eid,empresa:i.empresa,titulo:i.titulo,data:dt,valor:+i.comissao||0,parc:i.parcela,comp:i.compFat,taxa:+i.taxa,obs:i.parcela+'ª parcela · '+String(i.taxa).replace('.',',')+'%',base:{fat:i.titulo,comp:i.compFat,valor:+i.valorFat||0,venc:i.venc},how:'Já creditada: ordem '+i.op+' · '+String(i.taxa).replace('.',',')+'% sobre prêmio de R$ '+brl(i.premio),quando:'pago em '+(od[i.op]?od[i.op].split('-').reverse().join('/'):'')})});
+    const oo={};(c.ordens||[]).forEach(o=>oo[o.op]=o.operadora);
+    // lançamentos sem fatura na base (bônus, odonto, seguros gerais) também são crédito: entram no "já caiu"
+    (c.extras||[]).forEach(e=>{if(e.titulo)pagos.add(String(e.titulo));const dt=od[e.op]?new Date(od[e.op]+'T00:00:00Z'):null;if(!dt||!(+e.comissao))return;
+      real.push({tipo:'real',extra:true,op:oo[e.op]||'',kind:'outro',eid:e.eid||'',empresa:String(e.hist||e.tipo||'Lançamento').split(' / ')[0].split(' · ')[0],titulo:e.titulo||null,data:dt,valor:+e.comissao||0,parc:null,comp:c.comp,taxa:+e.taxa,obs:e.tipo||'Outro',base:{fat:e.titulo||null,comp:c.comp,valor:+e.premio||0},how:'Já creditada: ordem '+e.op+' · '+(e.tipo||'lançamento')+' (sem fatura na base)',quando:'pago em '+od[e.op].split('-').reverse().join('/')})})});
+  const lagL=eid=>(hist[eid]||[]).filter(i=>i.dt&&i.venc).map(i=>({x:Math.round((i.dt-pd(i.venc))/864e5),lim:/hapvida/i.test(i.operadora||'')?45:20})).filter(o=>o.x>-15&&o.x<o.lim).map(o=>o.x).sort((a,b)=>a-b); // a Hapvida paga cerca de 1 mês depois do vencimento
+  const lag=eid=>{const l=lagL(eid);return l.length?l[Math.floor(l.length/2)]:4};
+  const lagTxt=eid=>{const l=lagL(eid),n=lag(eid),dias=Math.abs(n)+(Math.abs(n)===1?' dia':' dias');return (n===0?'no dia do vencimento':n>0?dias+' depois do vencimento':dias+' antes do vencimento')+(l.length?' (é quando essa empresa costuma ser paga: mediana de '+l.length+' comissões)':' (sem histórico: prazo padrão)')};
+  const dm=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0');
+  const ref=r=>{const h=(hist[r.eid]||[]).slice().sort((a,b)=>a.compFat.localeCompare(b.compFat));if(!h.length)return null;
+    const lastC=h[h.length-1].compFat;const cand=h.filter(i=>i.compFat===lastC);return cand.sort((a,b)=>((+b.parcela>0)-(+a.parcela>0))||Math.abs(a.valorFat-r.valor)-Math.abs(b.valorFat-r.valor))[0]};
+  // situação do agenciamento de cada empresa
+  const agMemo={};
+  const agInfo=eid=>{if(agMemo[eid])return agMemo[eid];const cfg=agcfg[eid],im=impBy[eid]||null,imN=impN(im);
+    const h=(hist[eid]||[]).slice();const byP={};h.forEach(i=>{if(+i.parcela>0)(byP[i.parcela]=byP[i.parcela]||[]).push(i)});
+    const ps=Object.keys(byP).map(Number).sort((a,b)=>a-b);
+    const kP=p=>byP[p].some(isAg)?'ag':'vit';
+    const rec=ps.filter(p=>kP(p)==='ag').map(p=>({parcela:p,taxa:Math.max(...byP[p].map(i=>+i.taxa)),valor:byP[p].reduce((s,i)=>s+(+i.comissao||0),0),comp:byP[p][0].compFat}));
+    const last=ps.length?ps[ps.length-1]:0, lastComp=ps.length?byP[last][0].compFat:null;
+    const assum=ps.length&&kP(ps[0])==='ag'?ps[0]-1:0;
+    // taxa vitalícia: só dos meses em que a empresa NÃO recebeu agenciamento (a linha de 0,01% que o Bradesco paga junto com o agenciamento não é o vitalício de depois)
+    const agComps=new Set(h.filter(isAg).map(i=>i.compFat));
+    const vits=h.filter(i=>!isAg(i)&&!agComps.has(i.compFat)).sort((a,b)=>a.compFat.localeCompare(b.compFat)||a.parcela-b.parcela);
+    let vitRate=vits.length?+vits[vits.length-1].taxa:2, vitSrc=vits.length?'hist':'padrao';
+    if(im&&+im.vitPct>0&&!vits.length){vitRate=+im.vitPct;vitSrc='imp'}
+    let restantes,apos=last,auto=!cfg;
+    if(cfg){restantes=Math.max(0,+cfg.restantes||0);apos=+cfg.aposParcela||last}
+    else if(imN)restantes=ps.length&&kP(last)==='vit'?0:Math.max(0,imN-(assum+rec.length));
+    else restantes=!ps.length||kP(last)==='vit'?0:Math.max(0,3-(assum+rec.length));
+    const frac=k=>imN?(impFr(im,assum+rec.length+k)||1):1;
+    return agMemo[eid]={eid,restantes,apos,auto,rec,assum,vitRate,vitSrc,last,lastComp,cfg:cfg||null,im,imN,frac}};
+  const comFor=(r,comp)=>{const L=ref(r),A=agInfo(r.eid),val=+r.valor||0;
+    if(!L&&A.im){const q=mdiff(A.im.inicio,comp)+1,fr=impFr(A.im,q);
+      if(fr>0)return {v:val/1.0238*fr,taxa:100,parc:q,kind:'ag',ultima:q===A.imN,how:'Agenciamento da implantação ('+pctTx(A.im.agPct)+'): '+q+'ª fatura × '+pctTx(fr*100)+' sem IOF'};
+      const tv=+A.im.vitPct||2;return {v:val/1.0238*tv/100,taxa:tv,parc:q,kind:'vit',how:'Vitalício da implantação: fatura sem IOF × '+pctTx(tv)}}
+    if(!L)return {v:val*0.0195,taxa:2,parc:null,kind:'vit',semHist:true,how:'Empresa sem comissão na base: estimado 2% da fatura sem IOF. Fica fora da soma até a primeira comissão cair'};
+    const q=L.parcela+mdiff(L.compFat,comp);
+    if(q>A.apos&&q-A.apos<=A.restantes){const H_=(hist[r.eid]||[]).filter(isAg),La=H_.sort((a,b)=>b.parcela-a.parcela)[0];
+      // repete a última parcela paga: a desta mesma fatura/subfatura, senão a da última competência com valor de fatura mais parecido
+      const same_=H_.find(i=>String(i.titulo)===String(r.titulo)), lc=La&&La.compFat, near=H_.filter(i=>i.compFat===lc).sort((a,b)=>Math.abs((+a.valorFat||0)-(+r.valor0||val))-Math.abs((+b.valorFat||0)-(+r.valor0||val)))[0], Lb=same_||near||La;
+      const fr=A.frac(q-A.apos);
+      if(Lb)return {v:(+Lb.comissao||0)*fr,taxa:100,parc:q,kind:'ag',ultima:q-A.apos===A.restantes,how:'Agenciamento ('+q+'ª parcela, '+(!A.auto?'informado pela equipe: faltam '+A.restantes:A.im?'implantação de '+pctTx(A.im.agPct):'regra padrão de 3 parcelas')+'): repete a última parcela paga, R$ '+brl(Lb.comissao)+' ('+Lb.parcela+'ª, fatura de '+mesLabel(Lb.compFat)+')'+(fr<1?' × '+pctTx(fr*100)+' (parcela parcial)':'')};
+      const ra=1/1.0238;
+      return {v:val*ra*fr,taxa:100,parc:q,kind:'ag',ultima:q-A.apos===A.restantes,how:'Agenciamento ('+q+'ª parcela, '+(!A.auto?'informado pela equipe: faltam '+A.restantes:A.im?'implantação de '+pctTx(A.im.agPct):'regra padrão de 3 parcelas')+'): valor da fatura × '+(ra*100).toFixed(1).replace('.',',')+'%'+(fr<1?' × '+pctTx(fr*100)+' (parcela parcial)':'')+' — mesma proporção do último agenciamento pago'+(La?' (R$ '+brl(La.comissao)+' sobre fatura de R$ '+brl(La.valorFat)+')':'')}}
+    const taxa=A.vitRate, padrao=A.vitSrc==='padrao'&&isAg(L);
+    const same=+L.taxa===taxa&&L.valorFat;const v=same?val*(L.comissao/L.valorFat):val/1.0238*taxa/100;
+    return {v,taxa,parc:q,kind:'vit',vira:isAg(L),how:'Vitalício '+String(taxa).replace('.',',')+'%'+(padrao?' (taxa padrão: sem histórico de vitalício fora do agenciamento; confirme e informe na Implantação)':'')+': '+(same?'valor da fatura × '+(L.comissao/L.valorFat*100).toFixed(2).replace('.',',')+'% — mesma proporção da última comissão (R$ '+brl(L.comissao)+' sobre fatura de R$ '+brl(L.valorFat)+', '+mesLabel(L.compFat)+')':'fatura sem IOF × '+String(taxa).replace('.',',')+'%')};
+  };
+  const comOps=new Set(comissoes.flatMap(c=>c.ops||[c.operadora]));
+  const ultComp=fat.map(r=>r.comp).sort().pop();
+  const ultCom=comissoes.map(c=>c.comp).sort().pop()||ultComp;
+  const H=3;
+  const emp=[],com=[];
+  const cobs=c=>(c.parc?c.parc+'ª parcela · ':'')+c.taxa+'%'+(c.kind==='ag'&&c.ultima?' (último agenciamento)':'')+(c.kind==='vit'&&c.vira?' (já vitalício)':'');
+  // faturas emitidas
+  fat.forEach(r=>{const v=util(pd(r.venc));const pago=!/aberto|Boleto OK/i.test(r.boleto||'');
+    emp.push({tipo:pago?'real':'prev',op:r.operadora,eid:r.eid,empresa:r.empresa,titulo:r.titulo,data:v,valor:+r.valor||0,obs:pago?'boleto pago':'boleto em aberto'});
+    if(comOps.has(r.operadora)&&r.comp>=addM(ultCom,-1)&&!pagos.has(String(r.titulo)+'|'+r.comp)&&!pagos.has(String(r.titulo))){
+      const c=comFor(r,r.comp);let d=util(addD(pd(r.venc),lag(r.eid)));const atras=d<T,dPrev=d;if(atras)d=PROX;
+      com.push({tipo:'prev',semHist:!!c.semHist,atraso:atras,op:r.operadora,kind:c.kind,eid:r.eid,empresa:r.empresa,titulo:r.titulo,data:d,valor:c.v,parc:c.parc,comp:r.comp,taxa:c.taxa,how:c.how,base:{fat:r.titulo,comp:r.comp,valor:+r.valor||0,venc:r.venc},quando:atras?'previsto para '+dm(dPrev)+' e ainda não caiu: em atraso, jogado para '+dm(PROX):'vencimento '+r.venc.slice(0,5)+' + '+lagTxt(r.eid),obs:(atras?'em atraso (previsão era '+String(dPrev.getUTCDate()).padStart(2,'0')+'/'+String(dPrev.getUTCMonth()+1).padStart(2,'0')+') · ':'')+'fatura '+r.titulo+' · '+cobs(c)})}});
+  com.push(...real);
+  // projeção a partir das faturas da última competência
+  // proteção: se a última fatura da empresa veio mais de 30% abaixo da média dos 3 meses anteriores, projeta pela média
+  const totE={};fat.forEach(r=>{const o=totE[r.eid]=totE[r.eid]||{};o[r.comp]=(o[r.comp]||0)+(+r.valor||0)});
+  const fatorE={};Object.entries(totE).forEach(([e,o])=>{const cur=o[ultComp];if(!cur)return;const prev=[1,2,3].map(k=>o[addM(ultComp,-k)]).filter(x=>x>0);if(prev.length<2)return;const med=prev.reduce((a,b)=>a+b,0)/prev.length;if(cur<0.7*med)fatorE[e]={f:med/cur,cur,med}});
+  const base=fat.filter(r=>r.comp===ultComp).map(r=>{const F=fatorE[r.eid];return F?Object.assign({},r,{valor:(+r.valor||0)*F.f,valor0:+r.valor||0,fora:F}):r});
+  for(let k=1;k<=H;k++){const comp=addM(ultComp,k);
+    base.forEach(r=>{const v0=shiftM(pd(r.venc),k),v=util(v0);
+      emp.push({tipo:'proj',op:r.operadora,eid:r.eid,empresa:r.empresa,titulo:null,data:v,valor:+r.valor||0,comp,obs:r.fora?'fatura fora do normal em '+mesLabel(ultComp)+': usa a média dos 3 meses anteriores':'repete a fatura de '+ultComp.slice(5)+'/'+ultComp.slice(2,4)});
+      if(!comOps.has(r.operadora))return;const c=comFor(r,comp);com.push({tipo:'proj',semHist:!!c.semHist,fora:!!r.fora,op:r.operadora,kind:c.kind,eid:r.eid,empresa:r.empresa,data:util(addD(v0,lag(r.eid))),valor:c.v,parc:c.parc,comp,taxa:c.taxa,obs:cobs(c),how:c.how+(r.fora&&c.kind==='vit'?' · fatura fora do normal em '+mesLabel(ultComp)+' (R$ '+brl(r.fora.cur)+' contra média de R$ '+brl(r.fora.med)+'): projeta pela média; confira':''),base:{fat:null,comp,valor:+r.valor||0,venc:dm(v0)+'/'+v0.getUTCFullYear(),rep:r.titulo},quando:'vencimento previsto '+dm(v0)+' + '+lagTxt(r.eid)})})}
+  // implantações que ainda não têm fatura na base
+  const fatE=new Set(fat.map(r=>r.eid)), endC=addM(T.toISOString().slice(0,7),3);
+  const novas=imps.filter(im=>!(im.eid&&fatE.has(im.eid))&&+im.valor>0);
+  novas.forEach(im=>{const n=impN(im),tv=+im.vitPct||2,dia=+im.diaVenc||10,id='IMP:'+(im.id||im.empresa);
+    for(let comp=im.inicio,q=1;comp<=endC;comp=addM(comp,1),q++){const [a,m]=comp.split('-').map(Number);const v0=new Date(Date.UTC(a,m-1,Math.min(dia,new Date(Date.UTC(a,m,0)).getUTCDate())));
+      const val=+im.valor,fr=impFr(im,q),ag=fr>0,cv=ag?val/1.0238*fr:val/1.0238*tv/100;let d=util(addD(v0,4));const atras=d<T,dPrev=d;if(atras)d=PROX;
+      emp.push({tipo:'proj',op:im.operadora,eid:im.eid||'',empresa:im.empresa,titulo:null,data:util(v0),valor:val,comp,obs:'implantação nova · '+q+'ª fatura estimada'});
+      com.push({tipo:'proj',atraso:atras,op:im.operadora,kind:ag?'ag':'vit',eid:im.eid||'',imp:id,empresa:im.empresa,data:d,valor:cv,parc:q,comp,taxa:ag?100:tv,
+        how:ag?'Implantação nova ('+pctTx(im.agPct)+'): '+q+'ª fatura estimada de R$ '+brl(val)+' sem IOF × '+pctTx(fr*100):'Implantação nova, já vitalício: fatura estimada de R$ '+brl(val)+' sem IOF × '+pctTx(tv),
+        quando:atras?'previsto para '+dm(dPrev)+' e a fatura ainda não está na base: em atraso, jogado para '+dm(PROX):'vencimento dia '+dia+' + 4 dias (prazo padrão)',base:{fat:null,comp,valor:val,venc:dm(v0)+'/'+a},obs:'implantação · '+q+'ª fatura · '+(ag?pctTx(fr*100):pctTx(tv))})}});
+  // empresas em agenciamento (ou que acabaram de sair)
+  const eids=[...new Set(fat.filter(r=>r.comp===ultComp).map(r=>r.eid))];
+  const ag=eids.map(agInfo).filter(A=>(A.rec.length||A.im)&&(A.restantes>0||A.cfg||com.some(x=>x.eid===A.eid&&x.kind==='ag'&&x.tipo!=='real')))
+    .map(A=>{const nome=(fat.find(r=>r.eid===A.eid)||{}).empresa||A.eid;
+      const prox=com.filter(x=>x.eid===A.eid&&x.kind==='ag'&&x.tipo!=='real').sort((a,b)=>a.parc-b.parc);
+      const recR=real.filter(x=>x.eid===A.eid&&x.kind==='ag');
+      const vit=com.filter(x=>x.eid===A.eid&&x.kind==='vit'&&x.tipo!=='real'&&x.parc>A.apos).sort((a,b)=>a.parc-b.parc)[0];
+      return Object.assign({nome,prox,recR,vit},A)});
+  return {emp,com,ag,hoje:T,ultComp,iso,novas};
+}
+//</model>
+function wkStart(d){const x=new Date(d.getTime());const dw=(x.getUTCDay()+6)%7;return new Date(x.getTime()-dw*864e5)}
+function lineSVG(id,buckets,selKey,aria,series,opt){
+  opt=opt||{};const box=$(id);const n=buckets.length;if(!n){box.innerHTML='<p class="empty">Sem dados.</p>';return}
+  const PADL=50,W=Math.max(Math.round(box.clientWidth||900),PADL+n*(opt.minW||62)),H=250,top=30,bot=46;
+  const max=Math.max(1,...buckets.flatMap(b=>series.map(se=>se.get(b)||0)))*1.14;
+  const k=v=>v>=1e6?(v/1e6).toFixed(2).replace('.',',')+' mi':v>=1e3?Math.round(v/1000)+' mil':Math.round(v)+'';
+  const step=(()=>{const r=max/4,p=Math.pow(10,Math.floor(Math.log10(r)));return [1,2,2.5,5,10].map(m=>m*p).find(x=>x>=r)})();
+  const ymax=Math.ceil(max/step)*step, Y=v=>top+(H-top-bot)*(1-v/ymax);
+  const cw=(W-PADL)/n, cx=i=>PADL+cw*(i+.5), small=cw<70;
+  let s=`<svg viewBox="0 0 ${W} ${H}" style="width:${W}px" role="img" aria-label="${esc(aria)}">`;
+  for(let t=0;t<=ymax+1e-6;t+=step)s+=`<line class="grid" x1="${PADL-6}" x2="${W}" y1="${Y(t)}" y2="${Y(t)}"/><text class="axis" x="0" y="${Y(t)+4}">${t?k(t):'0'}</text>`;
+  buckets.forEach((b,i)=>{const sel=b.key===selKey;
+    if(b.now||sel)s+=`<rect x="${cx(i)-cw*.46}" y="${top-24}" width="${cw*.92}" height="${H-top-bot+24}" rx="8" fill="var(--accent-soft)" opacity="${sel?1:.6}"/>`;
+    s+=`<text class="axis" x="${cx(i)}" y="${H-bot+17}" text-anchor="middle" style="font-weight:${sel?800:600};fill:var(--fg);font-size:${small?10.5:12}px">${esc(b.label)}</text><text class="sub" x="${cx(i)}" y="${H-bot+33}" text-anchor="middle" style="font-size:${small?10:11.5}px">${esc(b.sub||'')}</text>`});
+  series.forEach((se,si)=>{
+    for(let i=1;i<n;i++){const a=se.get(buckets[i-1])||0,b=se.get(buckets[i])||0,dash=buckets[i].proj;
+      s+=`<line x1="${cx(i-1)}" y1="${Y(a)}" x2="${cx(i)}" y2="${Y(b)}" stroke="${se.color}" stroke-width="${si===0?3:2.25}" stroke-linecap="round"${dash?' stroke-dasharray="6 5"':''}/>`}
+    buckets.forEach((b,i)=>{const v=se.get(b)||0;s+=`<circle cx="${cx(i)}" cy="${Y(v)}" r="${si===0?4:3.2}" fill="${b.proj?'var(--surface)':se.color}" stroke="${se.color}" stroke-width="2"/>`});
+  });
+  const lead=series[0];
+  buckets.forEach((b,i)=>{const v=lead.get(b)||0;if(v>0)s+=`<text class="val" x="${cx(i)}" y="${Y(v)-10}" text-anchor="middle" style="font-size:${small?11:12.5}px">${k(v)}</text>`});
+  buckets.forEach((b,i)=>{s+=`<g class="barg" tabindex="0" role="button" data-pk="${b.key}" data-i="${i}" aria-label="${esc(b.title||b.label)}: ${series.map(se=>se.label+' R$ '+brl(se.get(b)||0)).join(', ')}"><rect class="hit" x="${cx(i)-cw*.46}" y="${top-24}" width="${cw*.92}" height="${H-top-bot+24}" rx="8"/></g>`});
+  s+='</svg><div class="tip" hidden></div>';box.innerHTML=s;
+  const tip=box.querySelector('.tip');
+  box.querySelectorAll('.barg').forEach(g=>{const b=buckets[+g.dataset.i];
+    const show=()=>{const r=g.querySelector('.hit').getBoundingClientRect(),pb=box.getBoundingClientRect();
+      const top_=Math.max(...series.map(se=>se.get(b)||0));
+      tip.innerHTML=`<b>${esc(b.title||b.label)}${b.proj?' (projetado)':''}</b>`+series.map(se=>`<br><span style="display:inline-block;width:.7rem;height:3px;background:${se.color};vertical-align:middle;margin-right:.35rem"></span>${esc(se.label)}: R$ <b>${brl(se.get(b)||0)}</b>`).join('');
+      tip.style.left=(r.left-pb.left+box.scrollLeft+r.width/2)+'px';tip.style.top=(Math.max(0,Y(top_)-14))+'px';tip.hidden=false};
+    g.addEventListener('mouseenter',show);g.addEventListener('focus',show);g.addEventListener('mouseleave',()=>tip.hidden=true);g.addEventListener('blur',()=>tip.hidden=true);g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new MouseEvent('click',{bubbles:true}))}})});
+}
+
+// ---------- filtros de seguradora ----------
+function applyOp(){const f=x=>S.op==='todas'||fam(x.operadora)===S.op;S.faturas=S._fat.filter(f);S.comissoes=mergeCom(S._com.filter(f));S._comAll=mergeCom(S._com)}
+function renderOpChips(){
+  const mk=list=>{const fs=famsIn(uniq(list.map(x=>fam(x.operadora))));if(S.op!=='todas'&&!fs.includes(S.op))fs.push(S.op);
+    return fs.length>1?['todas',...fs].map(o=>`<button type="button" data-op="${esc(o)}" aria-pressed="${S.op===o}">${o==='todas'?'Todas':`<i style="background:${FCOL[o]}"></i>${esc(o)}`}</button>`).join(''):''};
+  $('fops').innerHTML=mk(S._fat);$('cops').innerHTML=mk(S._com);$('pops').innerHTML=mk([...S._fat,...S._com]);
+}
+//<model>
+const fatItems=list=>list.flatMap(d=>(d.itens||[]).map(r=>Object.assign({comp:d.comp,operadora:d.operadora},r)));
+//</model>
+const aberto=r=>/aberto|Boleto OK/i.test(r.boleto||'');
+const bruto=c=>sum(c.ordens||[],o=>o.bruto);
+const empName={};
+function indexNames(){Object.keys(empName).forEach(k=>delete empName[k]);fatItems(S._fat).forEach(r=>{empName[r.eid]=empName[r.eid]||r.empresa})}
+const eidByName=(nome,op)=>{const n=norm(nome);if(!n)return null;const r=fatItems(S._fat).find(x=>norm(x.empresa)===n&&(!op||fam(x.operadora)===fam(op)));return r?r.eid:null};
+
+// ---------- topo ----------
+function renderTop(){
+  const need=S.tarefas.filter(t=>t.coluna==='precisa').length;
+  $('pendn').hidden=!need;$('pendn').textContent=need;
+  $('sub').textContent='Shaddai Seguros · '+new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+}
+
+// ---------- projeção (modelo + comissões sem fatura na base) ----------
+//<model>
+function projAll(fat,comMerged,o){o=o||{};
+  // comissões sem código de empresa (ex.: Hapvida) ganham o código da fatura de mesmo nome e seguradora, para usar o histórico da própria empresa
+  // e passam a apontar para a fatura daquela competência (título e vencimento), para não contar de novo como "a receber" e para medir o prazo real de pagamento
+  const nIdx={},tIdx={};fatItems(fat).forEach(r=>{const k=fam(r.operadora)+'|'+norm(r.empresa);if(!nIdx[k])nIdx[k]=r.eid;const t=r.eid+'|'+r.comp;if(!tIdx[t]||(+r.valor||0)>tIdx[t].v)tIdx[t]={t:r.titulo,v:+r.valor||0,venc:r.venc}});
+  comMerged=comMerged.map(c=>Object.assign({},c,{itens:(c.itens||[]).map(i=>{if(i.eid)return i;const e=nIdx[fam(i.operadora)+'|'+norm(i.empresa)];if(!e)return i;const f=tIdx[e+'|'+i.compFat];return Object.assign({},i,{eid:e},f?{titulo:f.t,venc:i.venc||f.venc}:{})})}));
+  const M=projModel(fat,comMerged,o.hoje||new Date(),o.agcfg,o.imps); if(!M)return null;
+  const T=M.hoje, util=d=>{const w=d.getUTCDay();return w===6?new Date(d.getTime()+2*864e5):w===0?new Date(d.getTime()+864e5):d};
+  const fatNames=new Set(fatItems(fat).map(r=>fam(r.operadora)+'|'+norm(r.empresa)));
+  const last={};
+  comMerged.forEach(c=>{const od={};(c.ordens||[]).forEach(o=>od[o.op]=o.dataISO);
+    (c.itens||[]).forEach(i=>{const k=fam(i.operadora)+'|'+norm(i.empresa);if(i.eid||fatNames.has(k))return;
+      const L=last[k]=last[k]||{comp:'',itens:[],op:i.operadora,empresa:i.empresa,dt:null};
+      if(c.comp>L.comp){L.comp=c.comp;L.itens=[];L.dt=null}
+      if(c.comp===L.comp){L.itens.push(i);if(od[i.op])L.dt=od[i.op]}})});
+  const extra=[], endM=addMonth(ckey(T),3);
+  const cmT=ckey(T);
+  Object.values(last).forEach(L=>{const vit=L.itens.filter(i=>!isAg(i));const v=sum(vit,i=>i.comissao);if(v<=0)return;
+    if(L.comp<addMonth(cmT,-2))return; // parou de pagar há mais de 2 meses: não projeta
+    const day=L.dt?+L.dt.slice(8,10):10;
+    for(let m=addMonth(L.comp,1)>cmT?addMonth(L.comp,1):cmT;m<=endM;m=addMonth(m,1)){const [a,mm]=m.split('-').map(Number);const last_=new Date(Date.UTC(a,mm,0)).getUTCDate();
+      let d=util(new Date(Date.UTC(a,mm-1,Math.min(day,last_))));const atras=d<T;if(atras)d=util(new Date(T.getTime()+864e5));
+      extra.push({tipo:'proj',atraso:atras,op:L.op,kind:'vit',empresa:L.empresa,eid:'',data:d,valor:v,comp:m,taxa:vit[0].taxa,parc:null,
+        how:`Repete a última comissão vitalícia paga (${mesLabel(L.comp)}, R$ ${brl(v)}). Empresa sem fatura na base`,quando:atras?'deveria ter caído e ainda não caiu: em atraso, jogado para o próximo dia útil':'mesmo dia do último pagamento',base:{fat:null,comp:m,valor:sum(vit,i=>i.valorFat),rep:vit[0].titulo}})}});
+  M.semHist=M.com.filter(x=>x.semHist); M.com=M.com.filter(x=>!x.semHist).concat(extra); M.extraN=Object.keys(last).length; return M;
+}
+//</model>
+
+// ---------- INÍCIO ----------
+function renderHome(){
+  const T=today(), cm=ckey(T), DS=['dom','seg','ter','qua','qui','sex','sáb'];
+  const d2=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+MES[d.getUTCMonth()];
+  const fitems=fatItems(S._fat), comps=uniq(fitems.map(r=>r.comp)).sort(), fm=comps[comps.length-1], pm=comps[comps.length-2];
+  const fr=fitems.filter(r=>r.comp===fm), prev=fitems.filter(r=>r.comp===pm), ftot=sum(fr,r=>r.valor);
+  // comparação justa: só as empresas que aparecem nos dois meses
+  const eNow=new Set(fr.map(r=>r.eid)), ePrev=new Set(prev.map(r=>r.eid));
+  const lfN=sum(fr.filter(r=>ePrev.has(r.eid)),r=>r.valor), lfP=sum(prev.filter(r=>eNow.has(r.eid)),r=>r.valor), dlt=lfP?(lfN-lfP)/lfP*100:0, ptt=sum(prev,r=>r.valor), dtt=ptt?(ftot-ptt)/ptt*100:0;
+  const cnt=L=>{const o={};L.forEach(r=>{const f=fam(r.operadora);o[f]=(o[f]||0)+1});return o}, cN=cnt(fr), cP=cnt(prev);
+  const faltF=famsIn(Object.keys(cP)).filter(f=>(cN[f]||0)<cP[f]), nFalt=sum(faltF,f=>cP[f]-(cN[f]||0)), faltTxt=faltF.map(f=>f+' −'+(cP[f]-(cN[f]||0))).join(', ');
+  const vid=r=>+(r.ativos||r.vidas)||0, vN=sum(fr,vid), vdl=sum(fr.filter(r=>ePrev.has(r.eid)),vid)-sum(prev.filter(r=>eNow.has(r.eid)),vid);
+  const novas=[...eNow].filter(e=>!ePrev.has(e)).length;
+  const M=projAll(S._fat,S._comAll,{agcfg:S.agcfg,imps:S.imps}), C=M?M.com:[];
+  const mCom=C.filter(x=>ckey(x.data)===cm), caiu=sum(mCom.filter(x=>x.tipo==='real'),x=>x.valor), falta=sum(mCom.filter(x=>x.tipo!=='real'),x=>x.valor);
+  const atrC=C.filter(x=>x.atraso&&x.tipo!=='real'), nm=addMonth(cm,1), pNext=sum(C.filter(x=>ckey(x.data)===nm),x=>x.valor);
+  // débitos que a seguradora descontou nas ordens do mês (ex.: parcela de empréstimo na Porto) e estimativas sem histórico deixadas fora da soma
+  const debM=sum(S._comAll.flatMap(c=>c.ordens||[]).filter(o=>String(o.dataISO||'').slice(0,7)===cm),o=>o.debcred), semH=M?sum((M.semHist||[]).filter(x=>ckey(x.data)===cm),x=>x.valor):0;
+  const need=S.tarefas.filter(t=>t.coluna==='precisa'), doing=S.tarefas.filter(t=>t.coluna==='andamento');
+  const pc_=v=>`<span class="${v>=0?'up':'down'}">${v>=0?'+':'−'}${pct(Math.abs(v))}</span>`, vAtr=sum(atrC,x=>x.valor);
+  $('hk').innerHTML=`
+   <button class="kpi" type="button" data-page="faturamento"><span class="kpi-l"><span>Carteira</span><span>${mesLabel(fm)}</span></span><span class="kpi-v">${int(eNow.size)} <span style="font-size:.85rem;color:var(--muted)">empresas</span></span><span class="kpi-s">${int(vN)} vidas${pm?` · <span class="${vdl>=0?'up':'down'}">${vdl>=0?'+':'−'}${int(Math.abs(vdl))}</span> vs ${mesLabel(pm)}`:''}${pm&&novas?` · ${novas} nova${novas>1?'s':''}`:''}</span></button>
+   <button class="kpi" type="button" data-page="faturamento"><span class="kpi-l"><span>Faturado</span><span>${mesLabel(fm)}</span></span><span class="kpi-v">R$ ${brl(ftot)}</span><span class="kpi-s">${pm?`${pc_(dlt)} nas mesmas empresas · ${pc_(dtt)} no total, vs ${mesLabel(pm)}`:''}${nFalt?`<br><span class="down">${nFalt} fatura${nFalt>1?'s':''} a menos</span> (${esc(faltTxt)})`:''}</span></button>
+   <button class="kpi" type="button" data-page="projecao"><span class="kpi-l"><span>Comissão que cai no mês</span><span>${mesLabel(cm)}</span></span><span class="kpi-v">R$ ${brl(caiu+falta)}</span><span class="kpi-s">R$ ${brl(caiu)} já caiu${debM?` · <b>R$ ${brl(caiu+debM)}</b> líquido, depois de R$ ${brl(-debM)} de débitos`:''}<br>R$ ${brl(falta)} a cair${vAtr?`, incluindo <b style="color:var(--bad-fg)">R$ ${brl(vAtr)} em atraso</b>`:''}${semH?`<br>R$ ${brl(semH)} sem histórico de comissão, fora da soma`:''}<br>bruto, pela data do crédito · ${mesLabel(nm)}: R$ ${brl(pNext)}</span></button>
+   <button class="kpi" type="button" data-page="pendencias"><span class="kpi-l"><span>Pendências</span></span><span class="kpi-v">${need.length} <span style="font-size:.85rem;color:var(--muted)">com você</span></span><span class="kpi-s">${doing.length} em andamento com os agentes</span></button>`;
+  // comissão: esta semana e a próxima, dia a dia
+  if(S.hday===undefined)S.hday=null;
+  const mon=wkStart(T);
+  const wk=k=>{const a=new Date(mon.getTime()+7*k*864e5),b=new Date(a.getTime()+7*864e5);return {a,fri:new Date(a.getTime()+4*864e5),it:C.filter(x=>x.data>=a&&x.data<b)}};
+  const ST=x=>x.tipo==='real'?['Caiu','p-ok']:x.atraso?['Em atraso','p-bad']:x.tipo==='prev'?['Previsto','p-info']:['Projetado','p-idle'];
+  const li=x=>{const s=ST(x);return `<li${x.eid?` class="click" data-emp="${esc(x.eid)}" tabindex="0" role="button"`:''}><span style="min-width:0"><b>${esc(x.empresa)}</b><small><span class="ktag ${x.kind}">${x.kind==='ag'?'Agenciamento':x.kind==='outro'?esc(x.obs||'Outro'):'Vitalício'}</span>${esc(fam(x.op))}</small></span><span class="r">R$ ${brl(x.valor)}<small><span class="pill ${s[1]}">${s[0]}</span></small></span></li>`};
+  const wHTML=(w,t)=>{const tot=sum(w.it,x=>x.valor), r=sum(w.it.filter(x=>x.tipo==='real'),x=>x.valor), ag=sum(w.it.filter(x=>x.kind==='ag'),x=>x.valor), na=w.it.filter(x=>x.atraso&&x.tipo!=='real').length;
+    const days=uniq(w.it.map(x=>x.data.toISOString().slice(0,10))).sort();
+    return `<div><div class="wk-h">${t?`<b>${t}</b>`:''}<span class="hint">${d2(w.a)} a ${d2(w.fri)}</span><span class="r">R$ ${brl(tot)}</span></div>
+      <div class="facts" style="margin-top:.45rem">${r?`<span><b>R$ ${brl(r)}</b> já caiu</span>`:''}<span>vitalício <b>R$ ${brl(tot-ag-sum(w.it.filter(x=>x.kind==='outro'),x=>x.valor))}</b></span><span>agenciamento <b>R$ ${brl(ag)}</b></span>${na?`<span style="color:var(--bad-fg)"><b>${na}</b> em atraso</span>`:''}</div>`+
+      (()=>{const dk=d=>d.toISOString().slice(0,10), wd=[0,1,2,3,4].map(i=>new Date(w.a.getTime()+i*864e5)), dv=d=>w.it.filter(x=>dk(x.data)===dk(d)), mxd=Math.max(1,...wd.map(d=>sum(dv(d),x=>x.valor)));
+    const strip=`<div class="dstrip">${wd.map(d=>{const k=dk(d),L=dv(d),v=sum(L,x=>x.valor),na=L.filter(x=>x.atraso&&x.tipo!=='real').length;
+      return `<button type="button" class="dcell${S.hday===k?' on':''}${+d===+T?' today':''}" data-hday="${k}" aria-pressed="${S.hday===k}" aria-label="${DS[d.getUTCDay()]} ${d2(d)}: R$ ${brl(v)} em ${L.length} créditos${na?', '+na+' em atraso':''}"><span class="dn">${DS[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,'0')}</span><span class="db"><i style="height:${(v/mxd*100).toFixed(1)}%"></i></span><span class="dv">${v?kfmt(v):'—'}</span><span class="dc${na?' late':''}">${L.length?L.length+(na?' · '+na+' atr.':''):'&nbsp;'}</span></button>`}).join('')}</div>`;
+    const sel=wd.some(d=>dk(d)===S.hday)?S.hday:null;let det;
+    if(sel){const L=w.it.filter(x=>dk(x.data)===sel).sort((p,q)=>q.valor-p.valor),top=L.slice(0,5),rest=L.slice(5),d=new Date(sel+'T00:00:00Z');
+      det=`<div class="day-h" style="margin-top:.75rem"><span>${DS[d.getUTCDay()]} ${d2(d)}</span><span>R$ ${brl(sum(L,x=>x.valor))} · ${L.length}</span></div>`+(L.length?`<ul class="rows">${top.map(li).join('')}</ul>${rest.length?`<details class="more"><summary>+ ${rest.length} menor${rest.length>1?'es':''} · R$ ${brl(sum(rest,x=>x.valor))}</summary><ul class="rows">${rest.map(li).join('')}</ul></details>`:''}`:'<p class="empty">Nada previsto neste dia.</p>')}
+    else det='<p class="hint" style="margin:.6rem 0 0">Clique num dia para ver as empresas.</p>';
+    return strip+det})()+'</div>'};
+  const w0=wk(0), w1=wk(1);
+  $('hwk').innerHTML=M?wHTML(w0,''):'<p class="empty">A projeção aparece depois da primeira rodada do Agente Faturas.</p>';
+  $('hwk-t').textContent=M?'Próxima semana: R$ '+brl(sum(w1.it,x=>x.valor)):'';
+  // vencimentos
+  const lim=new Date(T.getTime()+15*864e5);
+  const abAll=fitems.filter(aberto).map(r=>Object.assign({d:pdate(r.venc)},r)).filter(r=>r.d);const ab=abAll.filter(r=>r.d>=T&&r.d<=lim).sort((a,b)=>a.d-b.d), atr=abAll.filter(r=>r.d<T&&r.d>=new Date(T.getTime()-60*864e5));
+  const dd=d=>String(d.getUTCDate()).padStart(2,'0')+'<br>'+MES[d.getUTCMonth()];
+  $('hven').innerHTML=ab.length?ab.slice(0,7).map(r=>{const late=r.d<T, soon=!late&&r.d-T<=3*864e5;
+    return `<li class="click" data-emp="${esc(r.eid)}" data-emes="${r.comp}" tabindex="0" role="button"><div class="lrow"><span class="date${late?' late':soon?' soon':''}">${dd(r.d)}</span><span style="min-width:0"><b>${esc(r.empresa)}</b><small>${esc(r.operadora)}${late?' · vencido':''}</small></span><span class="r">R$ ${brl(r.valor)}</span></div></li>`}).join('')+(ab.length>7?`<li><span class="hint">Mais ${ab.length-7} até ${String(lim.getUTCDate()).padStart(2,'0')}/${MES[lim.getUTCMonth()]}</span></li>`:''):'<li><span class="empty">Nenhum boleto vencendo nos próximos 15 dias.</span></li>';
+  if(atr.length)$('hven').insertAdjacentHTML('beforeend',`<li class="click" data-page="faturamento" data-ffset="aberto"><span><b style="color:var(--bad-fg)">${atr.length} boletos vencidos ainda em aberto</b><small>R$ ${brl(sum(atr,r=>r.valor))} · vale confirmar se já foram pagos</small></span><span class="go">Ver boletos</span></li>`);
+  // movimentações
+  const mv=S.tarefas.filter(t=>t.agente==='movimentacoes'||t.tipo==='movimentacao');
+  const ma=mv.filter(t=>t.coluna!=='concluido'), mc=mv.filter(t=>t.coluna==='concluido');
+  $('hmov').innerHTML=mv.length?`<div class="facts"><span><b>${ma.length}</b> pedido${ma.length===1?'':'s'} de movimentação aberto${ma.length===1?'':'s'}</span><span><b>${mc.length}</b> concluído${mc.length===1?'':'s'}</span><button class="go" type="button" data-page="pendencias">Ver pedidos</button></div>`:'<p class="hint" style="margin:0">Nenhum pedido de movimentação ainda. Para pedir, abra uma empresa em Faturamento.</p>';
+  // agentes
+  const pend={};S.tarefas.forEach(t=>{if(t.coluna==='precisa')pend[t.agente]=(pend[t.agente]||0)+1});
+  $('hag').innerHTML=S.agentes.map(a=>{const n=pend[a.id]||0;const st=n?['Com você ('+n+')','p-warn']:(STATUS[a.status]||STATUS.em_dia);
+    return `<button class="agent" type="button" data-agf="${esc(a.id)}" title="${esc(a.atividade||'')}"><span class="ic"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[a.id]||ICON.faturas}</svg></span>${esc(a.nome.replace(/^Agente /,''))}<span class="pill ${st[1]}">${esc(st[0])}</span></button>`}).join('')||'<p class="empty">Os agentes aparecem aqui assim que a base responder.</p>';
+  $('hag-h').textContent='Clique para ver as tarefas de cada um';
+}
+
+// ---------- FATURAMENTO ----------
+function empRows(mes){
+  const it=fatItems(S.faturas), m=it.filter(r=>r.comp===mes), comps=uniq(it.map(r=>r.comp)).sort(), pm=comps[comps.indexOf(mes)-1];
+  const g={};m.forEach(r=>{const e=g[r.eid]=g[r.eid]||{eid:r.eid,nome:r.empresa,ops:new Set(),valor:0,vidas:0,itens:[],venc:null,ab:false,div:false,subs:1,pend:false};if((+r.subs||1)>e.subs)e.subs=+r.subs;if(r.grupoPendente)e.pend=true;
+    e.ops.add(r.operadora);e.valor+=+r.valor||0;e.vidas+=+(r.ativos??r.vidas)||0;e.itens.push(r);const d=pdate(r.venc);if(d&&(!e.venc||d<e.venc))e.venc=d;if(aberto(r))e.ab=true;if(r.confValor&&r.confValor!=='OK'&&r.confValor!=='Sem vidas')e.div=true});
+  const pv={};if(pm)it.filter(r=>r.comp===pm).forEach(r=>{pv[r.eid]=(pv[r.eid]||0)+(+r.valor||0)});
+  Object.values(g).forEach(e=>{e.prev=pm?(pv[e.eid]??null):undefined;e.d=e.prev==null?null:e.valor-e.prev;e.fam=fam([...e.ops][0])});
+  return {rows:Object.values(g),pm,comps};
+}
+function renderFat(){
+  const comps=uniq(fatItems(S.faturas).map(r=>r.comp)).sort();
+  if(!comps.length){$('fmes').innerHTML='';$('fk').innerHTML='';$('flist').innerHTML='<li class="empty" style="padding:.5rem">As faturas aparecem depois da primeira rodada do Agente Faturas.</li>';$('ficha').innerHTML='';return}
+  if(!S.mes||!comps.includes(S.mes))S.mes=comps[comps.length-1];
+  $('fmes').innerHTML=comps.map(m=>`<button type="button" data-mes="${m}" aria-pressed="${m===S.mes}">${mesLabel(m)}</button>`).join('');
+  const sb=$('fmes').querySelector('[aria-pressed="true"]');if(sb)$('fmes').scrollLeft=sb.offsetLeft-$('fmes').clientWidth+sb.offsetWidth+8;
+  const {rows,pm}=empRows(S.mes), tot=sum(rows,e=>e.valor), docs=S.faturas.filter(f=>f.comp===S.mes);
+  const nab=rows.filter(e=>e.ab), pIt=pm?fatItems(S.faturas).filter(r=>r.comp===pm):[], ptot=sum(pIt,r=>r.valor), dl=ptot?(tot-ptot)/ptot*100:0;
+  const eN=new Set(rows.map(e=>e.eid)), eP=new Set(pIt.map(r=>r.eid)), sN=sum(rows.filter(e=>eP.has(e.eid)),e=>e.valor), sP=sum(pIt.filter(r=>eN.has(r.eid)),r=>r.valor), dlS=sP?(sN-sP)/sP*100:0, pc_=v=>`<span class="${v>=0?'up':'down'}">${v>=0?'+':'−'}${pct(Math.abs(v))}</span>`;
+  $('fk').innerHTML=`
+   <div class="kpi"><span class="kpi-l">Faturado em ${mesLabel(S.mes)}</span><span class="kpi-v">R$ ${brl(tot)}</span><span class="kpi-s">${pm?`${pc_(dlS)} nas mesmas empresas · ${pc_(dl)} no total, vs ${mesLabel(pm)}`:'primeiro mês na base'}</span></div>
+   <div class="kpi"><span class="kpi-l">Empresas</span><span class="kpi-v">${rows.length}</span><span class="kpi-s">${docs.length} arquivos de ${uniq(docs.map(d=>fam(d.operadora))).length} seguradoras</span></div>
+   <div class="kpi"><span class="kpi-l">Vidas</span><span class="kpi-v">${int(sum(rows,e=>e.vidas))}</span><span class="kpi-s">custo médio R$ ${brl(tot/Math.max(1,sum(rows,e=>e.vidas)))} por vida</span></div>
+   <div class="kpi"><span class="kpi-l">Boletos em aberto</span><span class="kpi-v">${nab.length}</span><span class="kpi-s">R$ ${brl(sum(nab,e=>e.valor))}</span></div>`;
+  const pend=docs.flatMap(d=>d.pendentes||[]);
+  $('fpend').hidden=!pend.length;$('fpend').textContent=pend.length?'Ainda sem fatura em '+mesLabel(S.mes)+': '+pend.map(p=>p.empresa+' — '+p.motivo).join('; ')+'.':'';
+  const up=docs.map(d=>d.atualizadoEm).filter(Boolean).sort().pop();
+  $('f-sub').textContent=(up?'Atualizado em '+new Date(up).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})+'. ':'')+'Clique numa empresa para ver faturas, vidas e situação.';
+  renderFList(rows,tot);
+  renderFicha();
+}
+function renderFList(rows,tot){
+  document.querySelectorAll('[data-ff]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.ff===S.ff)));
+  let L=rows.slice();const q=norm(S.fq)||S.fq.trim().toUpperCase();
+  if(S.fq.trim())L=L.filter(e=>e.nome.toUpperCase().includes(S.fq.trim().toUpperCase())||e.eid.toUpperCase().includes(S.fq.trim().toUpperCase()));
+  if(S.ff==='aberto')L=L.filter(e=>e.ab);else if(S.ff==='variou')L=L.filter(e=>e.d!=null&&Math.abs(e.d)>.009);else if(S.ff==='div')L=L.filter(e=>e.div);
+  const so={valor:(a,b)=>b.valor-a.valor,nome:(a,b)=>a.nome.localeCompare(b.nome),venc:(a,b)=>(a.venc||0)-(b.venc||0),var:(a,b)=>Math.abs(b.d||0)-Math.abs(a.d||0)}[S.fsort];L.sort(so);
+  $('flist').innerHTML=L.map(e=>{const st=e.div?['dv','divergência']:e.ab?['ab','em aberto']:['','pago'];const dv=e.d==null?'novo':Math.abs(e.d)<.01?'igual':(e.d>0?'+':'−')+'R$ '+brl(Math.abs(e.d));
+    return `<li><button class="ei" type="button" data-emp="${esc(e.eid)}" aria-current="${S.emp===e.eid}"><span class="dot" style="background:${FCOL[e.fam]}"></span><b><span class="nm">${esc(e.nome)}</span></b><span class="v">R$ ${brl(e.valor)}</span><small>${e.subs>1?`<span class="subn" title="${e.subs} subestipulantes">${e.subs} subs</span> `:''}${e.pend?'<span class="subn pend">a confirmar</span> ':''}${esc(e.eid)} · ${esc([...e.ops].join(', '))} · ${int(e.vidas)} vidas</small><span class="s ${st[0]}">${S.ff==='variou'?dv:st[1]}</span></button><button class="vbtn" type="button" data-vd="${esc(e.eid)}" data-vdc="${esc(S.mes)}" title="Distribuição de vidas" aria-label="Distribuição de vidas de ${esc(e.nome)}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON.vidas}<path d="M16 3.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg></button></li>`}).join('')||'<li class="empty" style="padding:.5rem .4rem">Nenhuma empresa neste filtro.</li>';
+  $('flist-n').textContent=`${L.length} de ${rows.length} empresas`;
+}
+const FAIXAS=[[0,18,'0–18'],[19,23,'19–23'],[24,28,'24–28'],[29,33,'29–33'],[34,38,'34–38'],[39,43,'39–43'],[44,48,'44–48'],[49,53,'49–53'],[54,58,'54–58'],[59,200,'59+']];
+function renderFicha(){
+  const box=$('ficha');
+  if(!S.emp){ // visão geral do mês
+    const comps=uniq(fatItems(S.faturas).map(r=>r.comp)).sort(), fk=famsIn(uniq(fatItems(S.faturas).map(r=>fam(r.operadora))));
+    box.innerHTML=`<section class="card"><div class="card-h"><h2>Faturado por competência</h2><span class="hint">Clique num mês para trocar</span></div><ul class="legend" id="fev-lg"></ul><div class="chart" id="fev"></div></section>
+      <section class="card"><div class="card-h"><h2>Maiores variações em ${mesLabel(S.mes)}</h2><span class="hint">Comparado ao mês anterior</span></div><div class="hbars" id="fvar"></div></section>
+      <div class="card overview-empty">Escolha uma empresa na lista para abrir a ficha com faturas, vidas, idades e movimentações.</div>`;
+    famLegend('fev-lg',fk);
+    barsSVG('fev',comps.map(c=>{const v={};const it=fatItems(S.faturas).filter(r=>r.comp===c);it.forEach(r=>{const f=fam(r.operadora);v[f]=(v[f]||0)+(+r.valor||0)});return {key:c,label:mesLabel(c),sub:it.length+' fat.',title:'Faturado em '+mesLabel(c),vals:v}}),{keys:fk,sel:S.mes,subs:true,aria:'Faturado por competência',onClick:c=>{S.mes=c;renderFat()}});
+    const {rows}=empRows(S.mes);const vr=rows.filter(e=>e.d!=null&&Math.abs(e.d)>.009).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,8);
+    $('fvar').innerHTML=vr.length?vr.map(e=>`<button type="button" class="hbar" data-emp="${esc(e.eid)}"><span class="hb-name">${esc(e.nome)}</span><span class="hb-track"><span style="width:${Math.max(2,Math.abs(e.d)/Math.abs(vr[0].d)*100).toFixed(1)}%;background:${e.d>0?'var(--s1)':'var(--s2)'}"></span></span><span class="hb-val"><span class="${e.d>0?'up':'down'}">${e.d>0?'+':'−'}R$ ${brl(Math.abs(e.d))}</span><small>${e.prev?pct(e.d/e.prev*100):''}</small></span></button>`).join(''):'<p class="empty">Nenhuma empresa mudou de valor.</p>';
+    return;
+  }
+  const eid=S.emp, all=fatItems(S._fat).filter(r=>r.eid===eid);
+  if(!all.length){box.innerHTML='<div class="card overview-empty">Empresa sem faturas na base.</div>';return}
+  const nome=all[0].empresa, comps=uniq(all.map(r=>r.comp)).sort(), cur=all.filter(r=>r.comp===S.mes), last=cur.length?cur:all.filter(r=>r.comp===comps[comps.length-1]);
+  const lc=last[0].comp, ops=uniq(all.map(r=>r.operadora)), vtot=sum(last,r=>r.valor), vv=sum(last,r=>r.ativos??r.vidas);
+  const n_=norm(nome), cit=S._comAll.flatMap(c=>(c.itens||[]).map(i=>Object.assign({ext:c.comp},i))).filter(i=>i.eid===eid||(!i.eid&&norm(i.empresa)===n_&&ops.some(o=>fam(o)===fam(i.operadora))));
+  const c12=cit.filter(i=>i.ext>=addMonth(ckey(today()),-11)), v=S.vcache[eid];
+  const venc=last.map(r=>r.venc).filter(Boolean).sort()[0]||'—', abr=last.some(aberto);
+  box.innerHTML=`<section class="card"><div class="fh"><div><h2>${esc(nome)}${last.some(r=>r.grupoPendente)?'<span class="pill p-warn">Agrupamento a confirmar</span>':''}</h2><p>${esc(eid)} · ${esc(ops.join(', '))}${v&&v.cnpj?' · CNPJ '+esc(v.cnpj):''}${v&&v.diaVenc?' · vence todo dia '+esc(v.diaVenc):''}</p></div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap"><button class="btn ghost" type="button" data-vd="${esc(eid)}" data-vdc="${esc(lc)}">Distribuição de vidas</button><button class="btn" type="button" data-mov="${esc(eid)}" ${S.canEdit?'':'disabled title="Só quem pode editar a Central faz pedidos"'}>Solicitar movimentação</button><button class="btn ghost" type="button" data-emp="">Fechar</button></div></div>
+      <div class="mini-k" style="margin-top:1rem">
+        <div><span class="kpi-l">Fatura ${mesLabel(lc)}</span><div class="kpi-v">R$ ${brl(vtot)}</div><span class="kpi-s">vence ${esc(venc)} · <span class="pill ${abr?'p-warn':'p-idle'}">${abr?'em aberto':'pago'}</span></span></div>
+        <div><span class="kpi-l">Vidas</span><div class="kpi-v">${int(vv)}</div><span class="kpi-s">R$ ${brl(vtot/Math.max(1,vv))} por vida</span></div>
+        <div><span class="kpi-l">Comissão 12 meses</span><div class="kpi-v">R$ ${brl(sum(c12,i=>i.comissao))}</div><span class="kpi-s">${c12.length?pct(sum(c12,i=>i.comissao)/Math.max(1,sum(all.filter(r=>r.comp>=addMonth(ckey(today()),-12)),r=>r.valor))*100)+' do faturado':'sem comissão encontrada'}</span></div>
+        <div><span class="kpi-l">Na base desde</span><div class="kpi-v">${mesLabel(comps[0])}</div><span class="kpi-s">${comps.length} meses faturados</span></div>
+      </div></section>
+    ${subsCard(last)}
+    <section class="card"><div class="card-h"><h2>Faturas</h2><span class="hint">Uma linha por mês · clique em "N faturas" para abrir</span></div>
+      <div class="tbl"><table><thead><tr><th>Mês</th><th>Fatura</th><th>Vencimento</th><th class="num" title="Clique no número para ver a distribuição">Vidas</th><th class="num">Mov.</th><th class="num">Valor (R$)</th><th>Boleto</th><th>Conferência</th></tr></thead><tbody>${
+        (()=>{const conf=r=>{const ok=r.confValor==='OK'&&(r.confVidas==='OK'||!r.confVidas);return ok?['OK','p-ok',0]:r.confValor==='Sem vidas'?['Sem vidas','p-idle',1]:r.confValor==='OK'?['Vidas divergem','p-bad',2]:['Divergência','p-bad',3]};
+          const line=(r,sub)=>{const h_=v&&v.hist&&v.hist[r.comp],c=conf(r);return `<tr class="${sub?'subf':''}"${!sub&&r.comp===S.mes?' style="font-weight:700"':''}><td>${sub?'':mesLabel(r.comp)}</td><td style="font-variant-numeric:tabular-nums">${esc(r.titulo)}<small>${esc(r.operadora)}${r.nfs>1?' · +'+(r.nfs-1)+' NF'+(r.nfs>2?'s':'')+' das subs':''}</small></td><td>${esc(r.venc||'—')}</td><td class="num"><button class="lnk" type="button" data-vd="${esc(eid)}" data-vdc="${esc(r.comp)}" title="Distribuição de vidas de ${mesLabel(r.comp)}">${int(r.ativos??r.vidas)}</button></td><td class="num">${!sub&&h_&&(h_.incl||h_.excl)?`<span class="up">+${h_.incl}</span> <span class="down">−${h_.excl}</span>`:'—'}</td><td class="num">${brl(r.valor)}</td><td><span class="pill ${aberto(r)?'p-warn':'p-idle'}">${aberto(r)?'Em aberto':'Pago'}</span></td><td><span class="pill ${c[1]}">${c[0]}</span></td></tr>`};
+          return comps.slice().reverse().map(cp=>{const G=all.filter(r=>r.comp===cp).sort((a,b)=>(+b.valor||0)-(+a.valor||0));if(G.length===1)return line(G[0]);
+            const op_=S.fexp[eid+'|'+cp], h_=v&&v.hist&&v.hist[cp], ab=G.some(aberto), w=G.map(conf).sort((a,b)=>b[2]-a[2])[0], vs=G.map(r=>r.venc).filter(Boolean).sort((a,b)=>pdate(a)-pdate(b))[0];
+            return `<tr${cp===S.mes?' style="font-weight:700"':''}><td>${mesLabel(cp)}</td><td><button class="lnk" type="button" data-fx="${esc(eid+'|'+cp)}" aria-expanded="${!!op_}">${G.length} faturas</button></td><td>${esc(vs||'—')}</td><td class="num"><button class="lnk" type="button" data-vd="${esc(eid)}" data-vdc="${esc(cp)}">${int(sum(G,r=>r.ativos??r.vidas))}</button></td><td class="num">${h_&&(h_.incl||h_.excl)?`<span class="up">+${h_.incl}</span> <span class="down">−${h_.excl}</span>`:'—'}</td><td class="num">${brl(sum(G,r=>r.valor))}</td><td><span class="pill ${ab?'p-warn':'p-idle'}">${ab?'Em aberto':'Pago'}</span></td><td><span class="pill ${w[1]}">${w[0]}</span></td></tr>`+(op_?G.map(r=>line(r,true)).join(''):'')}).join('')})()}</tbody></table></div></section>
+    <section class="card" id="fe-vidas"><div class="card-h"><h2>Vidas</h2><span class="hint" id="fe-vh"></span><button class="go" type="button" data-vd="${esc(eid)}" data-vdc="${esc(lc)}">Distribuição completa</button></div><div id="fe-vb"><p class="empty">Carregando as vidas…</p></div></section>
+    <section class="card" id="fe-movw" hidden><div class="card-h"><h2>Movimentações pedidas</h2></div><div id="fe-mov"></div></section>`;
+  const fk=famsIn(ops.map(fam));
+  const mv=S.tarefas.filter(t=>t.mov&&t.mov.eid===eid);
+  $('fe-movw').hidden=!mv.length;
+  $('fe-mov').innerHTML=mv.length?'<ul class="rows">'+mv.map(t=>`<li><span><b>${esc(t.titulo)}</b><small>${esc(t.detalhe||'')}</small></span><span class="pill ${t.coluna==='concluido'?'p-ok':'p-info'}">${t.coluna==='concluido'?'Concluída':'Na fila'}</span></li>`).join('')+'</ul>':'<p class="empty">Nenhum pedido para esta empresa.</p>';
+  if(v)renderVidas(v);else loadVidas(eid);
+}
+// quadro de subestipulantes da empresa principal no mês (subsDet vem do Agente Faturas)
+function subsCard(last){
+  const it=last.find(r=>r.subsDet&&r.subsDet.length>1);if(!it)return '';
+  const L=it.subsDet, own=L.filter(s=>s.titulo), tv=sum(own,s=>s.valor), vd=s=>s.vidasSub!=null?s.vidasSub:s.vidas, tvid=sum(L,vd);
+  const totP=sum(last,r=>r.valor), bate=Math.abs(tv-totP)<0.02;
+  const pb=s=>s.boleto?`<span class="pill ${/aberto/i.test(s.boleto)?'p-warn':s.boleto==='Sem boleto'?'p-bad':'p-idle'}">${esc(s.boleto)}</span>`:'<span class="hint">na NF da principal</span>';
+  const pc=s=>s.confValor?`<span class="pill ${s.confValor==='OK'?'p-ok':s.confValor==='Sem vidas'?'p-idle':'p-bad'}">${esc(s.confValor)}</span>`:'<span class="hint">—</span>';
+  return `<section class="card"><div class="card-h"><h2>Subestipulantes</h2><span class="hint">${L.length} em ${mesLabel(it.comp)} · ${own.length} com NF própria</span>${it.grupoPendente?'<span class="pill p-warn">Agrupamento a confirmar</span>':''}</div>
+    <div class="tbl"><table><thead><tr><th>Código</th><th>Empresa</th><th>Fatura</th><th>Vencimento</th><th class="num">Vidas</th><th class="num">Valor (R$)</th><th>Boleto</th><th>Conferência</th></tr></thead><tbody>${L.map((s,i)=>`<tr><td style="font-variant-numeric:tabular-nums">${esc(s.cod)}${i===0?'<small>principal</small>':''}</td><td class="emp">${esc(s.nome||'—')}${s.cnpj?`<small>CNPJ ${esc(s.cnpj)}</small>`:''}</td><td style="font-variant-numeric:tabular-nums">${s.titulo?esc(s.titulo):'—'}</td><td>${esc(s.venc||'—')}</td><td class="num">${int(vd(s))}</td><td class="num">${s.valor!=null?brl(s.valor):'—'+(s.valorVidas?`<small>prêmio das vidas ${brl(s.valorVidas)}</small>`:'')}</td><td>${pb(s)}</td><td>${pc(s)}</td></tr>`).join('')}
+    <tr class="tot"><td>Total</td><td>${own.length} NF${own.length===1?'':'s'}</td><td></td><td></td><td class="num">${int(tvid)}</td><td class="num">${brl(tv)}</td><td colspan="2">${bate?'<span class="pill p-ok">bate com a fatura da empresa</span>':`<span class="pill p-warn">fatura da empresa: R$ ${brl(totP)}</span>`}</td></tr></tbody></table></div>
+    <p class="note">Sem NF própria: a subestipulante é cobrada dentro da fatura da principal. Nesses casos aparecem as vidas dela e o prêmio dessas vidas.</p></section>`}
+async function loadVidas(eid){
+  if(!S.db){$('fe-vb').innerHTML='<p class="empty">Sem conexão com a base.</p>';return}
+  try{const sn=await S.db.doc('vidas/'+eid).get();S.vcache[eid]=sn.exists?sn.data():{none:true}}catch(e){S.vcache[eid]={none:true}}
+  if(S.emp===eid)renderFicha();
+}
+function renderVidas(v){
+  const box=$('fe-vb');if(!box)return;
+  $('fe-vidas').hidden=!!(v.none||!(v.vidas||[]).length);
+  if(v.none||!(v.vidas||[]).length){box.innerHTML=`<p class="empty">A relação de vidas desta empresa ainda não está nesta ficha. Abra a <button class="lnk" type="button" data-vd="${esc(S.emp)}">distribuição de vidas</button> para ver o que o Agente Vidas já tem e o que falta baixar.</p>`;$('fe-vh').textContent='';return}
+  const L=v.vidas, at=L.filter(x=>x.sit!=='Excluído'), tit=at.filter(x=>x.td==='T'), dep=at.filter(x=>x.td!=='T');
+  const idades=at.map(x=>+x.id).filter(x=>x>=0), media=idades.length?sum(idades,x=>x)/idades.length:0;
+  const fx=FAIXAS.map(([a,b,l])=>({l,n:idades.filter(x=>x>=a&&x<=b).length})), mx=Math.max(1,...fx.map(f=>f.n));
+  const pl={};at.forEach(x=>{const k=x.plano||'Sem plano';pl[k]=pl[k]||{n:0,v:0};pl[k].n++;pl[k].v+=+x.tot||0});
+  const incl=L.filter(x=>+x.pr>0), exc=L.filter(x=>x.sit==='Excluído');
+  $('fe-vh').textContent='Relação de '+mesLabel(v.comp);
+  box.innerHTML=`<div class="facts" style="margin-bottom:1rem"><span><b>${at.length}</b> ativas</span><span><b>${tit.length}</b> titulares</span><span><b>${dep.length}</b> dependentes</span><span>idade média <b>${media.toFixed(0)}</b></span><span>mais velho <b>${idades.length?Math.max(...idades):'—'}</b></span>${incl.length?`<span><b class="up">+${incl.length}</b> inclusões no mês</span>`:''}${exc.length?`<span><b class="down">−${exc.length}</b> exclusões no mês</span>`:''}</div>
+    <div class="grid g2" style="gap:1.25rem;margin-bottom:1.1rem">
+      <div><div class="kpi-l" style="margin-bottom:.2rem">Faixas etárias da ANS</div><div class="ages">${fx.map(f=>`<div style="height:${(f.n/mx*100).toFixed(1)}%;${f.l==='59+'?'background:var(--s2)':''}" title="${f.l} anos: ${f.n} vidas"><span>${f.n||''}</span></div>`).join('')}</div><div class="ages-l">${fx.map(f=>`<span>${f.l}</span>`).join('')}</div></div>
+      <div><div class="kpi-l" style="margin-bottom:.5rem">Planos</div><div class="hbars">${Object.entries(pl).sort((a,b)=>b[1].n-a[1].n).slice(0,6).map(([k,o])=>`<div class="hbar" style="grid-template-columns:minmax(0,1fr) auto"><span class="hb-name" title="${esc(k)}">${esc(k.replace(/^\d+\s+/,''))}</span><span class="hb-val">${o.n} vidas<small>R$ ${brl(o.v)}</small></span></div>`).join('')}</div></div>
+    </div>
+    <input class="search" id="vq" type="search" placeholder="Buscar beneficiário" aria-label="Buscar beneficiário" value="${esc(S.vq)}" style="max-width:280px;margin-bottom:.6rem">
+    <div class="tbl scroll"><table><thead><tr><th>Beneficiário</th><th>Parentesco</th><th class="num">Idade</th><th>Plano</th><th>Adesão</th><th class="num">Valor (R$)</th></tr></thead><tbody id="vrows"></tbody></table></div>
+    <p class="note">Ordenado por família: o titular primeiro e os dependentes logo abaixo. Riscado = excluído no mês.</p>`;
+  renderVRows(v);
+}
+function renderVRows(v){
+  const q=S.vq.trim().toUpperCase(), fams_={};
+  v.vidas.forEach(x=>{(fams_[x.fam||x.n]=fams_[x.fam||x.n]||[]).push(x)});
+  let groups=Object.values(fams_).map(g=>g.sort((a,b)=>(a.td==='T'?0:1)-(b.td==='T'?0:1)));
+  if(q)groups=groups.filter(g=>g.some(x=>String(x.n).toUpperCase().includes(q)));
+  groups.sort((a,b)=>String(a[0].n).localeCompare(String(b[0].n)));
+  const dt=s=>s?s.split('-').reverse().join('/'):'—';
+  $('vrows').innerHTML=groups.map(g=>g.map((x,i)=>`<tr class="${x.sit==='Excluído'?'excl':''}"><td style="${i?'padding-left:1.6rem':''}"><span class="emp">${esc(x.n)}</span>${+x.pr>0?' <span class="pill p-info">inclusão</span>':''}</td><td>${esc(x.par||(x.td==='T'?'Titular':'Dependente'))}</td><td class="num">${x.id??'—'}</td><td><span title="${esc(x.plano)}">${esc(String(x.plano||'—').replace(/^\d+\s+/,'').slice(0,34))}</span></td><td>${dt(x.ades)}</td><td class="num">${brl(x.tot)}${+x.cop>0?`<small>copart ${brl(x.cop)}</small>`:''}</td></tr>`).join('')).join('')||'<tr><td colspan="6" class="empty">Ninguém com esse nome.</td></tr>';
+}
+
+// ---------- POPUP: DISTRIBUIÇÃO DE VIDAS (Agente Vidas, coleção vidasdist) ----------
+async function openVD(eid,comp){if(!eid)return;S.vdE=eid;S.vdC=comp||null;S._vdFocus=document.activeElement;
+  $('vdt').textContent='Distribuição de vidas · '+(empName[eid]||eid);$('vds').textContent=eid;
+  $('vdm').hidden=false;renderVD();setTimeout(()=>$('vdbox').focus(),20);
+  if(!S.vd[eid]){if(!S.db){S.vd[eid]={none:true,off:true};renderVD();return}
+    try{const sn=await S.db.doc('vidasdist/'+eid).get();S.vd[eid]=sn.exists?sn.data():{none:true}}catch(e){S.vd[eid]={none:true}}
+    if(S.vdE===eid&&!$('vdm').hidden)renderVD()}}
+function closeVD(){$('vdm').hidden=true;S.vdE=null;if(S._vdFocus&&S._vdFocus.focus)try{S._vdFocus.focus()}catch(e){}}
+function renderVD(){
+  const box=$('vdb'),eid=S.vdE,d=S.vd[eid];if(!eid)return;
+  if(!d){box.innerHTML='<p class="empty">Carregando a distribuição…</p>';return}
+  const fits=fatItems(S._fat).filter(r=>r.eid===eid);
+  if(d.none){const ms=uniq(fits.map(r=>r.comp)).sort().reverse().slice(0,6);
+    box.innerHTML=`<p class="offline" style="margin:0">${d.off?'Sem conexão com a base.':'O Agente Vidas ainda não tem a relação de vidas desta empresa. A fatura existe, mas a lista de beneficiários não foi baixada.'}</p>`+(ms.length?`<p class="hint" style="margin:0">Vidas informadas nas faturas: ${ms.map(m=>mesLabel(m)+' '+int(sum(fits.filter(r=>r.comp===m),r=>r.vidas))).join(' · ')}</p>`:'');return}
+  $('vds').textContent=eid+' · '+(d.op||'')+(d.atualizadoEm?' · atualizado em '+new Date(d.atualizadoEm).toLocaleDateString('pt-BR'):'');
+  const all=Object.keys(d.comps||{}).sort(), comps=all.filter(k=>d.comps[k].at>0);
+  let cur=S.vdC&&d.comps[S.vdC]?S.vdC:(d.ult||comps[comps.length-1]);S.vdC=cur;
+  const c=d.comps[cur]||{}, FX=d.faixas||['0–18','19–23','24–28','29–33','34–38','39–43','44–48','49–53','54–58','59+'];
+  const seg=`<div class="seg" role="group" aria-label="Competência" style="align-self:flex-start">${all.map(m=>`<button type="button" data-vdm="${m}" aria-pressed="${m===cur}"${d.comps[m].at>0?'':' style="opacity:.55" title="Sem relação de vidas"'}>${mesLabel(m)}</button>`).join('')}</div>`;
+  const stOk=!c.st||/^✅/.test(c.st), st=c.st?c.st.replace(/^\S+\s/,''):'';
+  const alerta=!stOk?`<p class="offline" style="margin:0"><b>${esc(st)}</b>${c.acao?' — '+esc(c.acao):''}</p>`:'';
+  if(!(c.at>0)){box.innerHTML=seg+alerta+'<p class="empty">Sem relação de vidas nesta competência.'+(c.inf?' A fatura informa '+int(c.inf)+' vidas.':'')+'</p>';scrollSeg();return}
+  const pi=comps.indexOf(cur), pc=pi>0?d.comps[comps[pi-1]]:null;
+  const tot=FX.map((_,i)=>(c.fT[i]||0)+(c.fD[i]||0)), ptot=pc?FX.map((_,i)=>(pc.fT[i]||0)+(pc.fD[i]||0)):null, mx=Math.max(1,...tot), n=c.at;
+  const p59=n?tot[9]/n*100:0;
+  const sxBtn=c.sx?`<button type="button" class="btn ghost" data-vdsx="1" aria-pressed="${!!S.vdSx}" style="min-height:28px;padding:0 .6rem;font-size:.72rem;text-transform:none;letter-spacing:0;margin-left:auto">${S.vdSx?'Visão simples':'Detalhar por sexo'}</button>`:'';
+  const dl=v=>v>0?`<b class="up">+${v}</b>`:v<0?`<b class="down">−${-v}</b>`:'<b class="hint" style="font-weight:600">0</b>';
+  const facts=`<div class="facts"><span><b>${int(n)}</b> vidas ativas</span><span><b>${int(c.T)}</b> titulares</span><span><b>${int(c.D)}</b> dependentes</span>${c.media!=null?`<span>idade média <b>${String(c.media).replace('.',',')}</b></span>`:''}${c.max!=null?`<span>de <b>${c.min}</b> a <b>${c.max}</b> anos</span>`:''}<span><b>${pct(p59)}</b> com 59+</span>${c.sem?`<span><b>${c.sem}</b> sem idade</span>`:''}${c.inf!=null?`<span>fatura informa <b>${int(c.inf)}</b></span>`:''}${pc?`<span>vs ${mesLabel(comps[pi-1])}: ${dl(n-pc.at)}</span>`:''}${S.vdSx&&c.sx?(()=>{const t=k=>sum(c.sx[k],x=>x),m=t('TM')+t('DM'),f=t('TF')+t('DF'),ni=t('TN')+t('DN');return `<span><b>${m}</b> masculino</span><span><b>${f}</b> feminino</span>${ni?`<span><b>${ni}</b> sem sexo identificado</span>`:''}`})():''}</div>`;
+  const fxS=`<div><div class="vd-sec">Faixas etárias da ANS ${sxBtn}<span><i style="display:inline-block;width:.6rem;height:.6rem;border-radius:2px;background:var(--accent);margin-right:.3rem"></i>titulares <i style="display:inline-block;width:.6rem;height:.6rem;border-radius:2px;background:var(--s4);margin:0 .3rem 0 .6rem"></i>dependentes</span></div>
+    <div class="fxr h"><span>Faixa</span><span></span><span>Tit.</span><span>Dep.</span><span>Total</span><span>${pc?'vs '+mesLabel(comps[pi-1]):'%'}</span></div>
+    ${FX.map((f,i)=>`<div class="fxr" title="${f} anos: ${tot[i]} vidas (${pct(n?tot[i]/n*100:0)})"><span class="fxl">${f}</span><span class="fxb"><i style="width:${(c.fT[i]/mx*100).toFixed(1)}%;background:var(--accent)"></i><i style="width:${(c.fD[i]/mx*100).toFixed(1)}%;background:var(--s4)"></i></span><span>${c.fT[i]}</span><span>${c.fD[i]}</span><span><b>${tot[i]}</b></span><span>${pc?dl(tot[i]-ptot[i]):pct(n?tot[i]/n*100:0,0)}</span></div>`).join('')}
+    <div class="fxr tot"><span>Total</span><span></span><span>${sum(c.fT,x=>x)}</span><span>${sum(c.fD,x=>x)}</span><span>${sum(tot,x=>x)}</span><span>${pc?dl(sum(tot,x=>x)-sum(ptot,x=>x)):'100%'}</span></div></div>`;
+  const fx=S.vdSx&&c.sx?fxSexo(c,pc,FX,dl):fxS;
+  const pl=(c.planos||[]);
+  const planos=`<div><div class="vd-sec">Planos <span>${pl.length} plano${pl.length===1?'':'s'}</span></div><div class="tbl"><table style="min-width:0"><thead><tr><th>Plano</th><th class="num">Tit.</th><th class="num">Dep.</th><th class="num">Total</th><th class="num">R$</th></tr></thead><tbody>${pl.map(p=>`<tr><td><span title="${esc(p[0])}">${esc(String(p[0]).replace(/^\d+\s+/,'').slice(0,46))}</span></td><td class="num">${p[1]}</td><td class="num">${p[2]}</td><td class="num"><b>${p[1]+p[2]}</b></td><td class="num">${p[3]?brl(p[3]):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const evm=Math.max(1,...comps.map(k=>d.comps[k].at)), cols=`grid-template-columns:repeat(${comps.length},minmax(0,1fr))`;
+  const ev=`<div><div class="vd-sec">Vidas por competência <span>clique para trocar</span></div><div class="vd-ev" style="${cols}">${comps.map(k=>`<button type="button" data-vdm="${k}" class="${k===cur?'on':''}" style="height:${(d.comps[k].at/evm*100).toFixed(1)}%" aria-label="${mesLabel(k)}: ${d.comps[k].at} vidas"><span>${d.comps[k].at}</span></button>`).join('')}</div><div class="vd-evl" style="${cols}">${comps.map(k=>`<span>${mesLabel(k)}</span>`).join('')}</div></div>`;
+  const mv=(d.mov||[]).slice().sort((a,b)=>b.comp.localeCompare(a.comp));
+  const mov=`<div><div class="vd-sec">Entradas e saídas <span>mesma pessoa = mesmo CPF entre os meses</span></div>${mv.length?`<div class="tbl"><table style="min-width:0"><thead><tr><th>Mês</th><th class="num">Antes</th><th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Agora</th><th>Quem</th></tr></thead><tbody>${mv.map(m=>`<tr${m.comp===cur?' style="font-weight:700"':''}><td>${mesLabel(m.comp)}<small>vs ${mesLabel(m.de)}</small></td><td class="num">${m.antes}</td><td class="num">${m.ent?`<span class="up">+${m.ent}</span>`:'0'}</td><td class="num">${m.sai?`<span class="down">−${m.sai}</span>`:'0'}</td><td class="num">${m.agora}</td><td style="min-width:200px">${m.ent||m.sai?`<details class="vd-mov"><summary class="lnk" style="font-size:.76rem">ver nomes</summary>${m.entN.length?`<div class="nm"><b class="up">Entraram:</b> ${esc(m.entN.join(', '))}</div>`:''}${m.saiN.length?`<div class="nm"><b class="down">Saíram:</b> ${esc(m.saiN.join(', '))}</div>`:''}</details>`:'<span class="hint">sem mudança</span>'}${m.obs?`<small style="color:var(--warn-fg)">${esc(m.obs)}</small>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">Só uma competência na base: o movimento aparece a partir do 2º mês.</p>'}</div>`;
+  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:1rem">${seg}${alerta}${facts}<div class="grid g2" style="gap:1.25rem">${fx}${ev}</div>${planos}${mov}<p class="note" style="margin:0">Só vidas ativas. Faixas pela idade informada pela operadora. Dados do Agente Vidas, a partir da relação de vidas de cada fatura.</p></div>`;
+  scrollSeg();
+}
+// visão detalhada: titular masculino / feminino e dependente masculino / feminino por faixa
+const SXC=[['TM','Tit. masc.','var(--s1)',1],['TF','Tit. fem.','var(--s5)',1],['DM','Dep. masc.','var(--s1)',.45],['DF','Dep. fem.','var(--s5)',.45]];
+function fxSexo(c,pc,FX,dl){
+  const G=c.sx, ni=k=>(G.TN[k]||0)+(G.DN[k]||0), temNI=G.TN.concat(G.DN).some(x=>x>0), temSI=['TM','TF','TN','DM','DF','DN'].some(k=>G[k][10]>0);
+  const rows=FX.map((f,i)=>({l:f,i})).concat(temSI?[{l:'s/ idade',i:10}]:[]);
+  const tot=i=>SXC.reduce((s,[k])=>s+(G[k][i]||0),0)+ni(i), mx=Math.max(1,...rows.map(r=>tot(r.i)));
+  const cols=`--n:${4+(temNI?1:0)}`;
+  const sw=(col,op)=>`<i style="display:inline-block;width:.6rem;height:.6rem;border-radius:2px;background:${col};opacity:${op};margin:0 .3rem 0 .6rem"></i>`;
+  const ptot=pc&&pc.sx?(i=>SXC.reduce((s,[k])=>s+(pc.sx[k][i]||0),0)+(pc.sx.TN[i]||0)+(pc.sx.DN[i]||0)):null;
+  const T=k=>sum(G[k],x=>x);
+  return `<div><div class="vd-sec">Faixas etárias da ANS por sexo <button type="button" class="btn ghost" data-vdsx="1" aria-pressed="true" style="min-height:28px;padding:0 .6rem;font-size:.72rem;text-transform:none;letter-spacing:0;margin-left:auto">Visão simples</button></div>
+    <div class="vd-sec" style="justify-content:flex-start;margin-top:-.2rem"><span>${SXC.map(([k,l,col,op])=>sw(col,op)+l).join('')}${temNI?sw('var(--faint)',1)+'não identificado':''}</span></div>
+    <div class="fxr sx h" style="${cols}"><span>Faixa</span><span></span>${SXC.map(([,l])=>`<span title="${l}">${l.replace('Tit. ','T.').replace('Dep. ','D.').replace('masc.','♂').replace('fem.','♀')}</span>`).join('')}${temNI?'<span title="sexo não identificado">?</span>':''}<span>Total</span></div>
+    ${rows.map(r=>`<div class="fxr sx" style="${cols}" title="${r.l}: ${SXC.map(([k,l])=>l+' '+(G[k][r.i]||0)).join(' · ')}${ni(r.i)?' · não identificado '+ni(r.i):''}${ptot?' · vs mês anterior '+(tot(r.i)-ptot(r.i)>=0?'+':'')+(tot(r.i)-ptot(r.i)):''}"><span class="fxl">${r.l}</span><span class="fxb">${SXC.map(([k,,col,op])=>`<i style="width:${((G[k][r.i]||0)/mx*100).toFixed(1)}%;background:${col};opacity:${op}"></i>`).join('')}${ni(r.i)?`<i style="width:${(ni(r.i)/mx*100).toFixed(1)}%;background:var(--faint)"></i>`:''}</span>${SXC.map(([k])=>`<span>${G[k][r.i]||0}</span>`).join('')}${temNI?`<span>${ni(r.i)}</span>`:''}<span><b>${tot(r.i)}</b></span></div>`).join('')}
+    <div class="fxr sx tot" style="${cols}"><span>Total</span><span></span>${SXC.map(([k])=>`<span>${T(k)}</span>`).join('')}${temNI?`<span>${T('TN')+T('DN')}</span>`:''}<span>${rows.reduce((s,r)=>s+tot(r.i),0)}</span></div>
+    <p class="note" style="margin:.4rem 0 0">Sexo pela operadora quando ela informa (Bradesco); nos demais, pelo parentesco ou pelo primeiro nome. Nomes não identificados ficam em Vidas/Sexo_por_nome.csv para a equipe completar.</p></div>`;
+}
+function scrollSeg(){const sg=$('vdb').querySelector('.seg'),sb=sg&&sg.querySelector('[aria-pressed="true"]');if(sb)sg.scrollLeft=sb.offsetLeft-sg.clientWidth+sb.offsetWidth+8}
+
+// ---------- COMISSÕES ----------
+function renderCom(){
+  const comps=uniq(S.comissoes.map(c=>c.comp)).sort();
+  if(!comps.length){$('ck').innerHTML='';$('cmes').innerHTML='';$('cchart').innerHTML='<p class="empty">Aparece depois da primeira rodada do Agente Comissão.</p>';return}
+  if(!S.cmes||!comps.includes(S.cmes))S.cmes=comps[comps.length-1];
+  $('cmes').innerHTML=comps.map(m=>`<button type="button" data-cmes="${m}" aria-pressed="${m===S.cmes}">${mesLabel(m)}</button>`).join('');
+  const sb=$('cmes').querySelector('[aria-pressed="true"]');if(sb)$('cmes').scrollLeft=sb.offsetLeft;
+  const raw=S._com.filter(c=>c.comp===S.cmes&&(S.op==='todas'||fam(c.operadora)===S.op));
+  const d=S.comissoes.find(c=>c.comp===S.cmes)||{}, it=d.itens||[], ords=d.ordens||[];
+  const br=sum(ords,o=>o.bruto), ap=sum(ords,o=>o.apagar), deb=sum(ords,o=>o.debcred), ag=it.filter(isAg), vit=it.filter(i=>!isAg(i));
+  const extrasV=sum(d.extras||[],e=>e.comissao);
+  const empN=uniq(it.map(i=>fam(i.operadora)+'|'+norm(i.empresa))).length;
+  const pi=comps.indexOf(S.cmes), pd=pi>0?S.comissoes.find(c=>c.comp===comps[pi-1]):null, pb=pd?sum(pd.ordens||[],o=>o.bruto):0, dl=pb?(br-pb)/pb*100:0;
+  // quanto ainda falta cair no mês corrente (mesma conta da Projeção)
+  const PM=projAll(S.faturas,S.comissoes,{agcfg:S.agcfg,imps:S.imps.filter(i=>S.op==='todas'||fam(i.operadora)===S.op)});
+  let falta='';if(PM){const T=PM.hoje,cmT=ckey(T),L=PM.com.filter(x=>ckey(x.data)===cmT),fC=L.filter(x=>x.tipo!=='real'),aT=fC.filter(x=>x.atraso),fim=new Date(Date.UTC(T.getUTCFullYear(),T.getUTCMonth()+1,0));
+    falta=`<button class="kpi kpi-main" type="button" data-page="projecao"><span class="kpi-l"><span>Falta cair até ${String(fim.getUTCDate()).padStart(2,'0')}/${MES[fim.getUTCMonth()]}</span></span><span class="kpi-v">R$ ${brl(sum(fC,x=>x.valor))}</span><span class="kpi-s">${fC.length} crédito${fC.length===1?'':'s'}${aT.length?` · inclui <b style="color:var(--bad-fg)">R$ ${brl(sum(aT,x=>x.valor))} em atraso</b>`:''}<br>R$ ${brl(sum(L.filter(x=>x.tipo==='real'),x=>x.valor))} já caiu em ${mesLabel(cmT)}</span></button>`}
+  $('ck').innerHTML=falta+`
+   <div class="kpi"><span class="kpi-l">Comissão bruta ${mesLabel(S.cmes)}</span><span class="kpi-v">R$ ${brl(br)}</span><span class="kpi-s">${pd?`<span class="${dl>=0?'up':'down'}">${dl>=0?'+':'−'}${pct(Math.abs(dl))}</span> vs ${mesLabel(comps[pi-1])} · `:''}pelo mês do extrato</span></div>
+   <div class="kpi"><span class="kpi-l">A receber</span><span class="kpi-v">R$ ${brl(ap)}</span><span class="kpi-s">${deb?'depois de R$ '+brl(Math.abs(deb))+' de débitos':'sem débitos'}</span></div>
+   <div class="kpi"><span class="kpi-l">Vitalício</span><span class="kpi-v">R$ ${brl(sum(vit,i=>i.comissao))}</span><span class="kpi-s">${vit.length} lançamentos</span></div>
+   <div class="kpi"><span class="kpi-l">Agenciamento</span><span class="kpi-v">R$ ${brl(sum(ag,i=>i.comissao))}</span><span class="kpi-s">${ag.length} parcelas de contratos novos</span></div>
+   <div class="kpi"><span class="kpi-l">Empresas pagantes</span><span class="kpi-v">${empN}</span><span class="kpi-s">${extrasV?'+ R$ '+brl(extrasV)+' sem fatura na base':''}</span></div>`;
+  $('cobsw').hidden=!d.obs;$('cobs').textContent=d.obs||'';
+  // gráfico por mês (no mês atual, o que ainda vai cair fica empilhado em cima, em cor clara)
+  const cmNow=PM?ckey(PM.hoje):null, faltaV=PM?sum(PM.com.filter(x=>ckey(x.data)===cmNow&&x.tipo!=='real'),x=>x.valor):0;
+  const src=S._com.filter(c=>S.op==='todas'||fam(c.operadora)===S.op), ck=famsIn(uniq(src.map(c=>fam(c.operadora))));
+  famLegend('cchart-lg',ck,faltaV?'<li><i style="background:var(--faint)"></i>A cair no mês</li>':'');
+  barsSVG('cchart',comps.map(m=>{const v={};src.filter(c=>c.comp===m).forEach(c=>{const f=fam(c.operadora);v[f]=(v[f]||0)+bruto(c)});if(m===cmNow&&faltaV)v['A cair']=faltaV;const ia=src.filter(c=>c.comp===m).flatMap(c=>c.itens||[]);return {key:m,label:mesLabel(m),title:'Extrato de '+mesLabel(m)+(v['A cair']?' + o que falta cair':''),vals:v,extra:'Agenciamento: R$ <b>'+brl(sum(ia.filter(isAg),i=>i.comissao))+'</b>'}}),{keys:faltaV?[...ck,'A cair']:ck,sel:S.cmes,h:240,aria:'Comissão bruta por mês',onClick:m=>{S.cmes=m;renderCom()}});
+  // por empresa
+  const g={};it.forEach(i=>{const k=fam(i.operadora)+'|'+norm(i.empresa);const e=g[k]=g[k]||{nome:i.empresa,op:i.operadora,f:fam(i.operadora),eid:i.eid||null,com:0,fat:{},taxas:new Set(),ag:null,n:0};
+    e.com+=+i.comissao||0;e.fat[i.titulo]=+i.valorFat||0;e.taxas.add(+i.taxa);e.n++;if(isAg(i))e.ag=Math.max(e.ag||0,+i.parcela||0);if(i.eid)e.eid=i.eid});
+  const E=Object.values(g).map(e=>Object.assign(e,{fv:sum(Object.values(e.fat),x=>x),eid:e.eid||eidByName(e.nome,e.op)})).sort((a,b)=>b.com-a.com);
+  // por seguradora
+  const sg={};raw.forEach(c=>{const f=fam(c.operadora);sg[f]=(sg[f]||0)+bruto(c)});const st=Object.values(sg).reduce((a,b)=>a+b,0)||1;
+  $('cseg-h').textContent=mesLabel(S.cmes);
+  $('cseg').innerHTML=famsIn(Object.keys(sg)).map(f=>({label:f,v:sg[f],col:FCOL[f],sub:pct(sg[f]/st*100)+' do mês'})).sort((a,b)=>b.v-a.v).length?hbars(famsIn(Object.keys(sg)).map(f=>({label:f,v:sg[f],col:FCOL[f],sub:pct(sg[f]/st*100)+' do mês',attrs:`data-op="${esc(f)}"`})).sort((a,b)=>b.v-a.v)):'<p class="empty">Sem extrato neste mês.</p>';
+  $('cbridge').innerHTML=`Bruto <b>R$ ${brl(br)}</b>${deb?` − débitos <b>R$ ${brl(Math.abs(deb))}</b>`:''} = a receber <b>R$ ${brl(ap)}</b>`;
+  // tabela
+  const q=S.cq.trim().toUpperCase();const ER=q?E.filter(e=>e.nome.toUpperCase().includes(q)):E;
+  const tx=e=>e.taxas.size===1?pct([...e.taxas][0],[...e.taxas][0]%1?2:0):'várias';
+  $('crows').innerHTML=ER.map(e=>`<tr${e.eid?` class="click" data-emp="${esc(e.eid)}"`:''}><td class="emp">${esc(e.nome)}${e.eid?`<small>${esc(e.eid)}</small>`:''}</td><td><span style="display:inline-block;width:.55rem;height:.55rem;border-radius:2px;background:${FCOL[e.f]};margin-right:.35rem"></span>${esc(e.op)}</td><td>${e.ag?`<span class="ktag ag">Agenciamento</span><small>${e.ag}ª parcela</small>`:'<span class="ktag vit">Vitalício</span>'}</td><td class="num">${e.fv?brl(e.fv):'—'}</td><td class="num">${tx(e)}</td><td class="num"><b>${brl(e.com)}</b></td></tr>`).join('')+(ER.length?`<tr class="tot"><td>Total</td><td></td><td></td><td class="num">${brl(sum(ER,e=>e.fv))}</td><td></td><td class="num">${brl(sum(ER,e=>e.com))}</td></tr>`:'<tr><td colspan="6" class="empty">Nenhuma empresa.</td></tr>');
+  const ndiv=it.filter(i=>i.conf&&i.conf!=='OK'&&i.conf!=='Aceita').length;
+  $('cnote').innerHTML=ndiv?`${ndiv} lançamento${ndiv>1?'s':''} com diferença na conferência. <button class="go" type="button" data-page="pendencias">Ver em Pendências</button>`:'Todos os lançamentos do mês conferem com a fatura ou com o extrato.';
+  $('cord-h').textContent=ords.length+' ordens em '+mesLabel(S.cmes);
+  $('cord').innerHTML=ords.slice().sort((a,b)=>String(a.dataISO).localeCompare(String(b.dataISO))).map(o=>`<tr><td style="font-variant-numeric:tabular-nums">${esc(o.op)}<small>${int(o.lanc)} lançamentos</small></td><td>${esc(o.data)}</td><td>${esc(o.operadora||'')}<small>${esc(o.empresa||'')}</small></td><td class="num">${brl(o.bruto)}</td><td class="num">${o.debcred?brl(o.debcred):'—'}</td><td class="num">${brl(o.apagar)}</td></tr>`).join('');
+  const gx={};(d.extras||[]).forEach(e=>{const k=e.tipo||'Outros';const o=gx[k]=gx[k]||{n:0,v:0,nomes:new Set()};o.n++;o.v+=+e.comissao||0;o.nomes.add(String(e.hist||'').split(' · ')[0])});
+  $('cextra').innerHTML=Object.entries(gx).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>`<li><span><b>${esc(k)}</b><small>${o.n} lançamentos · ${esc([...o.nomes].slice(0,4).join(', '))}${o.nomes.size>4?'…':''}</small></span><span class="r">R$ ${brl(o.v)}</span></li>`).join('')||'<li><span class="empty">Nada fora das faturas neste mês.</span></li>';
+}
+
+// ---------- PROJEÇÃO ----------
+function projSeriesF(L){const fs=famsIn(uniq(L.map(x=>fam(x.op))));const tot={label:'Total',color:'var(--fg)',get:b=>sum(b.it||[],x=>x.valor)};
+  return fs.length>1?[tot,...fs.map(f=>({label:f,color:FCOL[f],get:b=>sum((b.it||[]).filter(x=>fam(x.op)===f),x=>x.valor)}))]:[Object.assign(tot,{color:'var(--accent)'})]}
+function renderProj(){
+  if(S.page!=='projecao')return;
+  document.querySelectorAll('[data-pv]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pv===S.pv)));
+  const M=projAll(S.faturas,S.comissoes,{agcfg:S.agcfg,imps:S.imps.filter(i=>S.op==='todas'||fam(i.operadora)===S.op)});
+  if(!M){$('phero').innerHTML='<p class="empty">A projeção aparece depois da primeira rodada do Agente Faturas.</p>';['pmes','pweek','pdet'].forEach(id=>$(id).innerHTML='');return}
+  const com=S.pv==='com', L=com?M.com:M.emp, T=M.hoje, d2=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+MES[d.getUTCMonth()];
+  const cm=ckey(T), inM=(x,m)=>ckey(x.data)===m, S_=f=>sum(L.filter(f),x=>x.valor);
+  const MESF=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  // destaque: como está o mês atual
+  const caiu=S_(x=>inM(x,cm)&&x.tipo==='real'), atrM=L.filter(x=>inM(x,cm)&&x.atraso&&x.tipo!=='real'), vAt=sum(atrM,x=>x.valor), aCair=S_(x=>inM(x,cm)&&x.tipo!=='real')-vAt, tot=caiu+aCair+vAt;
+  const w_=v=>(v/Math.max(1,tot)*100).toFixed(2), seg=(v,c,o)=>v>0?`<i style="width:${w_(v)}%;background:${c};opacity:${o||1}"></i>`:'';
+  const leg=(c,o,t,v,x)=>`<li><i style="background:${c};opacity:${o||1}"></i>${t} <b>R$ ${brl(v)}</b>${x||''}</li>`;
+  if(!S.pmk)S.pmk=cm;
+  $('phero').innerHTML=`<div><span class="ph-l">${com?'Comissão que cai em ':'Pagamentos das empresas em '}${MESF[T.getUTCMonth()]}</span><span class="ph-v">R$ ${brl(tot)}</span>
+    <div class="ph-bar" role="img" aria-label="${com?'Já caiu':'Já pago'} R$ ${brl(caiu)}, ${com?'a cair':'a pagar'} R$ ${brl(aCair)}${vAt?', em atraso R$ '+brl(vAt):''}">${seg(caiu,'var(--accent)')}${seg(aCair,'var(--accent)',.35)}${seg(vAt,'var(--bad-fg)')}</div>
+    <ul class="ph-leg">${leg('var(--accent)',1,com?'Já caiu':'Já pago',caiu)}${leg('var(--accent)',.35,com?'A cair no prazo':'A pagar',aCair)}${vAt?leg('var(--bad-fg)',1,'Em atraso',vAt,` <span>(${atrM.length})</span>`):''}</ul>
+    ${com?(()=>{const db_=sum(S.comissoes.flatMap(c=>c.ordens||[]).filter(o=>String(o.dataISO||'').slice(0,7)===cm),o=>o.debcred),sh=sum((M.semHist||[]).filter(x=>inM(x,cm)),x=>x.valor);
+      return `<p class="note" style="margin:.6rem 0 0">Valores brutos.${db_?` Já descontados R$ ${brl(-db_)} de débitos nas ordens do mês: o que caiu líquido foi R$ ${brl(caiu+db_)}.`:''}${sh?` R$ ${brl(sh)} de empresas sem histórico de comissão ficam fora da soma até a primeira comissão delas cair.`:''}</p>`})():''}</div>
+    <div class="ph-next"><span class="ph-l">Próximos meses</span>${[1,2,3].map(k=>{const m=addMonth(cm,k),v=S_(x=>inM(x,m)),ag=S_(x=>inM(x,m)&&x.kind==='ag');
+      return `<button type="button" class="ph-m" data-pmk="${m}" aria-pressed="${S.pmk===m}"><span>${mesLabel(m)}</span><b>R$ ${brl(v)}</b>${com&&ag?`<small>R$ ${brl(ag)} de agenciamento</small>`:''}</button>`}).join('')}</div>`;
+  // mês a mês
+  const fk=famsIn(uniq(L.map(x=>fam(x.op)))), first=L.map(x=>ckey(x.data)).sort()[0];
+  const months=[];for(let m=addMonth(cm,-5)>first?addMonth(cm,-5):first;m<=addMonth(cm,3);m=addMonth(m,1))months.push(m);
+  famLegend('pmes-lg',fk,'<li><i class="hz" style="width:.9rem"></i>projetado</li>');
+  $('pmes-h').textContent=com?'Comissão mês a mês':'Pagamentos mês a mês';
+  if(!months.includes(S.pmk))S.pmk=cm;
+  barsSVG('pmes',months.map(m=>{const v={};L.filter(x=>inM(x,m)).forEach(x=>{const f=fam(x.op);v[f]=(v[f]||0)+x.valor});return {key:m,label:mesLabel(m),title:mesLabel(m)+(m===cm?' (mês atual)':''),vals:v,proj:m>cm}}),{keys:fk,sel:S.pmk,h:230,aria:'Projeção por mês e seguradora',onClick:m=>{S.pmk=m;S.pwk=null;renderProj()}});
+  // semanas do mês escolhido
+  const [ya,ma]=S.pmk.split('-').map(Number), m0=new Date(Date.UTC(ya,ma-1,1)), m1=new Date(Date.UTC(ya,ma,0));
+  const weeks=[];for(let w=wkStart(m0);w<=m1;w=new Date(w.getTime()+7*864e5)){const a=w<m0?m0:w, e0=new Date(w.getTime()+6*864e5), b=e0>m1?m1:e0;
+    const it=L.filter(x=>x.data>=a&&x.data<=new Date(b.getTime()+864e5-1));weeks.push({key:a.toISOString().slice(0,10),label:+a===+b?d2(a):d2(a).slice(0,2)+'–'+d2(b),dias:+a===+b?d2(a).slice(0,2):d2(a).slice(0,2)+'–'+d2(b).slice(0,2),title:'Semana de '+d2(a)+' a '+d2(b),it,now:T>=a&&T<=b,proj:it.length>0&&it.every(x=>x.tipo==='proj')})}
+  if(!S.pwk||!weeks.find(b=>b.key===S.pwk))S.pwk=(weeks.find(b=>b.now)||weeks.find(b=>b.it.length)||weeks[0]).key;
+  $('pweek-h').textContent='Semanas de '+MESF[ma-1];
+  const mxw=Math.max(1,...weeks.map(w=>sum(w.it,x=>x.valor)));
+  $('pweek').style.gridTemplateColumns=`repeat(${weeks.length},minmax(0,1fr))`;
+  $('pweek').innerHTML=weeks.map(w=>{const v=sum(w.it,x=>x.valor),na=w.it.filter(x=>x.atraso&&x.tipo!=='real').length,on=S.pwk===w.key;
+    return `<button type="button" class="dcell${on?' on':''}${w.now?' today':''}${w.proj?' proj':''}" data-pwk="${w.key}" aria-pressed="${on}" aria-label="${esc(w.title)}: R$ ${brl(v)}${na?', '+na+' em atraso':''}"><span class="dn">${esc(w.dias)}</span><span class="db"><i style="height:${(v/mxw*100).toFixed(1)}%"></i></span><span class="dv">${v?kfmt(v):'—'}</span><span class="dc${na?' late':''}">${na?na+' atraso'+(na>1?'s':''):w.it.length?w.it.length+(com?' créd.':' bol.'):'&nbsp;'}</span></button>`}).join('');
+  // empresas da semana escolhida
+  const sw=weeks.find(b=>b.key===S.pwk), it=sw.it.slice().sort((a,b)=>b.valor-a.valor), top=it.slice(0,8), rest=it.slice(8);
+  const PILL={real:[com?'Caiu':'Pago','p-ok'],prev:[com?'A receber':'Programado','p-info'],proj:['Projetado','p-idle']};
+  const dd=d=>String(d.getUTCDate()).padStart(2,'0')+'<br>'+MES[d.getUTCMonth()];
+  const row=x=>{const st=x.atraso&&x.tipo!=='real'?['Em atraso','p-bad']:(PILL[x.tipo]||PILL.proj), why=com?x.how:x.obs;
+    return `<li><details class="prow"><summary><span class="date${x.atraso&&x.tipo!=='real'?' late':''}">${dd(x.data)}</span><span style="min-width:0"><b>${esc(x.empresa)}</b><small>${com?`<span class="ktag ${x.kind}">${x.kind==='ag'?'Agenciamento':x.kind==='outro'?esc(x.obs||'Outro'):'Vitalício'}</span>`:''}${esc(fam(x.op))}</small></span><span class="r">R$ ${brl(x.valor)}<small><span class="pill ${st[1]}">${st[0]}</span></small></span></summary>
+      <div class="pwhy">${why?esc(why):'Sem detalhe do cálculo.'}${x.quando?`<br>Data: ${esc(x.quando)}`:''}${x.eid?`<br><button class="lnk" type="button" data-emp="${esc(x.eid)}">Abrir a empresa</button>`:''}</div></details></li>`};
+  $('pdet').innerHTML=`<div class="day-h" style="margin-top:1rem"><span>${esc(sw.title)}${sw.now?' (esta semana)':''}</span><span>R$ ${brl(sum(it,x=>x.valor))} · ${it.length} ${com?'créditos':'boletos'}</span></div>`+
+    (it.length?`<ul class="rows plist">${top.map(row).join('')}</ul>${rest.length?`<details class="more"><summary>+ ${rest.length} menor${rest.length>1?'es':''} · R$ ${brl(sum(rest,x=>x.valor))}</summary><ul class="rows plist">${rest.map(row).join('')}</ul></details>`:''}<p class="note">Clique numa linha para ver como o valor foi calculado.</p>`:'<p class="empty">Nada nesta semana.</p>');
+  // como é calculado
+  $('pparams').innerHTML=[
+    ['Horizonte',`Até ${mesLabel(addMonth(cm,3))}. Repete as faturas de ${mesLabel(M.ultComp)}, a última competência na base.`],
+    ['Data de cada valor',com?'Vencimento da fatura + o prazo que a seguradora costuma levar para pagar aquela empresa (mediana do histórico; sem histórico, 4 dias). Fim de semana vai para segunda. O que já devia ter caído e não caiu conta como atraso e vai para o próximo dia útil.':'Vencimento da fatura. Fim de semana vai para o dia útil seguinte.'],
+    ...(com?[['Valor do vitalício','Mesma proporção comissão ÷ fatura da última comissão vitalícia paga pela empresa. A taxa vem só de meses sem agenciamento: a linha de 0,01% que o Bradesco paga junto com o agenciamento não conta. Sem histórico de vitalício: % da implantação ou 2% (marcado para conferir). Empresas que já pagam só 0,01% fora do agenciamento continuam em 0,01%.'],['Fatura fora do normal','Se a última fatura da empresa veio mais de 30% abaixo da média dos 3 meses anteriores, os meses seguintes usam a média e a linha avisa para conferir.'],
+      ['Agenciamento','Repete o valor da última parcela paga (da mesma fatura ou subfatura). Quantas parcelas: pelo % da implantação cadastrada (300% = 3 faturas; 250% = 2 inteiras + 50% da 3ª) ou 3 pela regra padrão, a menos que a equipe informe outro número em Agenciamentos em andamento. Depois da última parcela vira vitalício sobre a fatura.'],
+      ['Implantações novas',(M.novas||[]).length?`${M.novas.length} sem fatura na base ainda: usa o valor mensal estimado, vencimento informado + 4 dias.`:'Nenhuma cadastrada sem fatura na base. Use Nova implantação.'],
+      ['Sem histórico de comissão',`${(M.semHist||[]).length} faturas de empresas que nunca tiveram comissão nos extratos ficam fora da projeção (seria um chute de 2%). Entram sozinhas quando a primeira comissão cair.`],
+      ['Empresas sem fatura na base',`${M.extraN} empresas (Amil, Hapvida, SulAmérica e outras): repete a última comissão vitalícia paga, no mesmo dia do mês.`]]:[]),
+    ['Não considera','Reajuste anual e inclusões ou exclusões de vidas. Empresas novas só entram se forem cadastradas em Implantações.']].map(([a,b])=>`<div class="param"><b>${a}</b><span>${b}</span></div>`).join('');
+  renderImp(M);renderAcc(M);
+  const ni=S.imps.filter(i=>(S.op==='todas'||fam(i.operadora)===S.op)&&i.status!=='Cancelada').length;
+  $('pimp-h').textContent=ni?ni+' ativa'+(ni>1?'s':''):'nenhuma cadastrada';
+  $('pagwrap').hidden=!com;
+  if(com){const ord=n=>n+'ª';
+    $('pag-h').textContent=M.ag.length?M.ag.length+' empresa'+(M.ag.length>1?'s':''):'nenhuma agora';
+    $('pag').innerHTML=M.ag.length?M.ag.map(A=>{const recV=sum(A.recR,x=>x.valor);
+      const prox=A.prox.length?A.prox.map(x=>`<div>${ord(x.parc)} · ${mesLabel(x.comp)} · R$ ${brl(x.valor)}</div>`).join(''):'<span class="hint">nenhuma</span>';
+      const opts=['auto',0,1,2,3,4].map(v=>`<option value="${v}"${(v==='auto'?A.auto:(!A.auto&&+A.restantes===v))?' selected':''}>${v==='auto'?'Automático ('+A.restantes+')':v}</option>`).join('');
+      return `<tr><td class="emp">${esc(A.nome)}<small>${esc(A.eid)}</small></td><td>${A.rec.map(p=>ord(p.parcela)+' '+p.taxa+'%').join(' · ')}<small>R$ ${brl(recV)} recebidos</small></td><td>${prox}</td><td><select class="agsel" data-agcfg="${esc(A.eid)}" data-last="${A.last}" aria-label="Agenciamentos que faltam para ${esc(A.nome)}" ${S.canEdit?'':'disabled'}>${opts}</select></td><td>${A.vit?`${ord(A.vit.parc)} · ${mesLabel(A.vit.comp)}<small>R$ ${brl(A.vit.valor)}/mês</small>`:'<span class="hint">fora do horizonte</span>'}</td></tr>`}).join(''):'<tr><td colspan="5" class="empty">Nenhuma empresa em agenciamento agora.</td></tr>'}
+}
+
+function renderImp(M){
+  const L=S.imps.filter(i=>S.op==='todas'||fam(i.operadora)===S.op).slice().sort((a,b)=>String(b.inicio).localeCompare(String(a.inicio)));
+  const pv=M?M.com.filter(x=>x.tipo!=='real'):[];
+  const agOf=i=>sum(pv.filter(x=>x.kind==='ag'&&((x.imp&&x.imp==='IMP:'+(i.id||i.empresa))||(i.eid&&x.eid===i.eid))),x=>x.valor);
+  const stp={Prevista:'p-info',Implantada:'p-ok',Cancelada:'p-idle'};
+  $('imp-new').disabled=!S.canEdit;$('imp-new').title=S.canEdit?'':'Só quem pode editar a Central cadastra';
+  $('pimp').innerHTML=L.length?'<ul class="rows">'+L.map(i=>`<li class="click" data-impe="${esc(i.id)}" tabindex="0"><span><b>${esc(i.empresa)}</b><small>${esc(i.operadora)} · 1ª fatura ${mesLabel(i.inicio)} · R$ ${brl(i.valor)}/mês · ${esc(String(+i.agPct||0))}% + ${esc(String(i.vitPct??2).replace('.',','))}% vitalício</small></span><span class="r">${i.status==='Cancelada'?'—':'R$ '+brl(agOf(i))}<small><span class="pill ${stp[i.status]||'p-info'}">${esc(i.status||'Prevista')}</span> ${i.status==='Cancelada'?'':'agenc. a receber'}</small></span></li>`).join('')+'</ul>':'<p class="empty">Nenhuma implantação cadastrada. Toda empresa nova que entrar, cadastre aqui com o % de agenciamento do contrato.</p>';
+}
+function renderAcc(M){
+  const cm=ckey(M.hoje), real={};M.com.filter(x=>x.tipo==='real').forEach(x=>{const m=ckey(x.data);real[m]=(real[m]||0)+x.valor});
+  const F=S.fotos.slice().sort((a,b)=>String(a.geradoEm).localeCompare(String(b.geradoEm)));
+  const val=(f,m)=>{const mm=(f.meses||[]).find(x=>x.comp===m);if(!mm)return null;return S.op==='todas'?mm.total:((mm.porSeg||{})[S.op]||{}).total||0};
+  const rows=[];
+  for(let m=addMonth(cm,-5);m<=cm;m=addMonth(m,1)){
+    const antes=F.filter(f=>f.mesAtual<m&&val(f,m)!=null).pop(), dentro=F.filter(f=>f.mesAtual===m&&val(f,m)!=null)[0], f=antes||dentro;if(!f)continue;
+    const p=val(f,m), r=real[m]||0, d=r-p;rows.push({m,p,r,d,f,dentro:!antes,parcial:m===cm})}
+  $('pacc-h').textContent=F.length?F.length+' rodada'+(F.length>1?'s':'')+' do Agente Projeção':'';
+  $('pacc').innerHTML=rows.length?`<div class="tbl"><table style="min-width:0"><thead><tr><th>Mês</th><th class="num">Projetado</th><th class="num">Realizado</th><th class="num">Diferença</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${mesLabel(x.m)}</b><small>foto de ${new Date(x.f.geradoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}${x.dentro?' (já dentro do mês)':''}</small></td><td class="num">${brl(x.p)}</td><td class="num">${brl(x.r)}${x.parcial?'<small>até hoje</small>':''}</td><td class="num">${x.parcial?'<span class="hint">em aberto</span>':`<span class="${x.d>=0?'up':'down'}">${x.d>=0?'+':'−'}${brl(Math.abs(x.d))}</span><small>${x.p?pct(x.d/x.p*100):''}</small>`}</td></tr>`).join('')}</tbody></table></div><p class="note">Projetado = a última rodada feita antes do mês começar. Realizado = comissões creditadas no mês (data da ordem de pagamento).</p>`:'<p class="empty">A comparação aparece depois da primeira rodada do Agente Projeção. Cada rodada fica guardada para conferir com o que entrou.</p>';
+}
+function openImp(id){S._mFocus=document.activeElement;const i=id?S.imps.find(x=>x.id===id):null;S.impEdit=i?i.id:null;
+  $('impt').textContent=i?'Editar implantação':'Nova implantação';
+  const ems=Object.entries(empName).sort((a,b)=>a[1].localeCompare(b[1]));
+  $('imp-eid').innerHTML='<option value="">Ainda não (empresa nova)</option>'+ems.map(([k,n])=>`<option value="${esc(k)}">${esc(n)} · ${esc(k)}</option>`).join('');
+  const nx=addMonth(ckey(today()),1);
+  $('imp-emp').value=i?i.empresa:'';$('imp-eid').value=i?(i.eid||''):'';$('imp-op').value=i?i.operadora:'Porto Saúde';$('imp-ini').value=i?i.inicio:nx;$('imp-dia').value=i?(i.diaVenc||''):10;
+  $('imp-val').value=i?i.valor:'';$('imp-vid').value=i?(i.vidas||''):'';$('imp-ag').value=i?i.agPct:300;$('imp-vit').value=i?(i.vitPct??2):2;$('imp-st').value=i?(i.status||'Prevista'):'Prevista';$('imp-obs').value=i?(i.obs||''):'';
+  $('impm').hidden=false;setTimeout(()=>$('imp-emp').focus(),30)}
+$('imp-new').addEventListener('click',()=>{if(S.canEdit)openImp(null)});
+$('imp-cancel').addEventListener('click',()=>{$('impm').hidden=true});
+$('impm').addEventListener('click',ev=>{if(ev.target.id==='impm')$('impm').hidden=true});
+$('imp-eid').addEventListener('change',()=>{const k=$('imp-eid').value;if(k&&!$('imp-emp').value.trim())$('imp-emp').value=empName[k]||''});
+$('impf').addEventListener('submit',async ev=>{ev.preventDefault();if(!S.db||!S.canEdit){toast('Só quem pode editar a Central cadastra implantações.');return}
+  const now=new Date().toISOString(),id=S.impEdit||('IMP-'+now.slice(0,10).replace(/-/g,'')+'-'+Math.random().toString(36).slice(2,6));
+  const d={id,empresa:$('imp-emp').value.trim(),eid:$('imp-eid').value||'',operadora:$('imp-op').value,inicio:$('imp-ini').value,diaVenc:+$('imp-dia').value||10,valor:+$('imp-val').value||0,vidas:+$('imp-vid').value||0,agPct:+$('imp-ag').value||0,vitPct:+$('imp-vit').value||0,status:$('imp-st').value,obs:$('imp-obs').value.trim(),atualizadoEm:now,por:S.me||null};
+  const old=S.imps.find(x=>x.id===id);d.criadaEm=old&&old.criadaEm||now;d.origem=old&&old.origem||'Central';
+  $('imp-ok').disabled=true;
+  try{await S.db.doc('implantacoes/'+id).set(d);await logEvent('projecao',old?`teve a implantação de ${d.empresa} atualizada (${d.status}).`:`recebeu uma implantação nova: ${d.empresa} (${d.operadora}, 1ª fatura ${mesLabel(d.inicio)}, ${d.agPct}% de agenciamento).`,now);
+    $('impm').hidden=true;toast('Implantação salva. A projeção já considera.')}catch(e){toast('Não salvou. Tente de novo.')}
+  $('imp-ok').disabled=false});
+
+// ---------- PENDÊNCIAS ----------
+function tcard(t,act){return `<article class="tcard"><span class="tag">${esc(nomeAg(t.agente))}</span><h4>${esc(t.titulo)}</h4><p>${esc(t.detalhe||'')}</p><span class="who">${esc(t.quem||'')}</span>${act&&t.acao?`<div><button class="btn ghost" type="button" data-ok="${esc(t.id)}" ${S.canEdit?'':'disabled title="Só quem pode editar a Central marca tarefas"'}>${esc(t.acao)}</button></div>`:''}${t.coluna==='concluido'&&t.concluidaPor?`<span class="done-by">Resolvido por ${esc(t._nome||'alguém da equipe')}</span>`:''}</article>`}
+function renderPend(){
+  const usados=uniq(S.tarefas.map(t=>t.agente));
+  $('agfilter').innerHTML=`<button type="button" data-agf="" aria-pressed="${!S.filtro}">Todos</button>`+S.agentes.filter(a=>usados.includes(a.id)).map(a=>`<button type="button" data-agf="${esc(a.id)}" aria-pressed="${S.filtro===a.id}">${esc(a.nome.replace(/^Agente /,''))}</button>`).join('');
+  const vis=S.tarefas.filter(t=>!S.filtro||t.agente===S.filtro);
+  const P=vis.filter(t=>t.coluna==='precisa').sort((a,b)=>String(a.criadaEm).localeCompare(String(b.criadaEm)));
+  const A=vis.filter(t=>t.coluna==='andamento'), C=vis.filter(t=>t.coluna==='concluido').sort((a,b)=>String(b.concluidaEm||'').localeCompare(String(a.concluidaEm||''))).slice(0,12);
+  $('tn-p').textContent=P.length;$('tn-a').textContent=A.length;$('tn-c').textContent=C.length+' mais recentes';
+  $('tprec').innerHTML=P.map(t=>tcard(t,true)).join('')||'<p class="empty">Nada esperando por você.</p>';
+  $('tand').innerHTML=A.map(t=>tcard(t,false)).join('')||'<p class="empty">Nenhuma tarefa em andamento.</p>';
+  $('tconc').innerHTML=C.map(t=>tcard(t,false)).join('')||'<p class="empty">Nada concluído ainda.</p>';
+  const ms=uniq(S.faturas.map(f=>f.comp)).sort().reverse();
+  const frow=m=>{const s=statusMes(m);return `<div class="fr"><div class="fr-m"><b>${mesLabel(m)}</b><span class="pill ${s.st[1]}">${s.st[0]}</span><span class="tot">${s.n} faturas · R$ ${brl(s.v)}</span></div><div>${s.L.length?'<ul>'+s.L.map(x=>`<li${x.lvl==='falta'?' class="falta"':''}>${esc(x.t)}</li>`).join('')+'</ul>':'<span class="hint">Todas as faturas baixadas, valores e vidas batendo.</span>'}</div></div>`};
+  $('fech-now').innerHTML=ms.length?(()=>{const s=statusMes(ms[0]),F=s.L.filter(x=>x.lvl!=='info'),I=s.L.filter(x=>x.lvl==='info');
+    return `<div class="card-h"><h2>Fechamento de ${mesLabel(ms[0])}</h2><span class="pill ${s.st[1]}">${s.st[0]}</span><span class="hint">${s.n} faturas · R$ ${brl(s.v)}</span></div><div class="fr fnow">${F.length?'<ul>'+F.map(x=>`<li${x.lvl==='falta'?' class="falta"':''}${x.t.length>230?` title="${esc(x.t)}"`:''}>${esc(x.t.length>230?x.t.slice(0,220).replace(/,[^,]*$/,'')+'…':x.t)}</li>`).join('')+'</ul>':'<span class="hint">Nada impedindo o fechamento.</span>'}${I.length?`<details class="more"><summary>+ ${I.length} observaç${I.length>1?'ões':'ão'} sem pendência</summary><ul>${I.map(x=>`<li>${esc(x.t)}</li>`).join('')}</ul></details>`:''}</div>`})():'<p class="empty">Sem faturas na base.</p>';
+  $('fech').innerHTML=ms.slice(1).map(frow).join('')||'<p class="empty">Nenhum mês anterior.</p>';
+  const ev=S.eventos.flatMap(d=>d.itens||[]).filter(e=>!S.filtro||e.agente===S.filtro).sort((a,b)=>String(b.ts).localeCompare(String(a.ts))).slice(0,30);
+  $('feed').innerHTML=ev.map(e=>{const d=new Date(e.ts);const td=d.toDateString()===new Date().toDateString();return `<li><time>${td?d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</time><span><b>${esc(nomeAg(e.agente))}</b> ${esc(e.texto)}</span></li>`}).join('')||'<li><span></span><span class="empty">Nada registrado ainda.</span></li>';
+}
+async function resolveNames(){if(!S.user)return;const ids=uniq(S.tarefas.map(t=>t.concluidaPor).filter(Boolean));if(!ids.length)return;
+  try{const ps=await S.user.profiles(ids);S.tarefas.forEach(t=>{if(t.concluidaPor)t._nome=(ps[t.concluidaPor]&&ps[t.concluidaPor].name)||''});if(S.page==='pendencias')renderPend()}catch(e){}}
+
+// ---------- navegação ----------
+const PAGES=['inicio','faturamento','comissoes','projecao','pendencias'];
+function showPage(pg,push){
+  if(!PAGES.includes(pg))pg='inicio';S.page=pg;
+  document.querySelectorAll('[data-pg]').forEach(el=>{el.hidden=el.dataset.pg!==pg});
+  document.querySelectorAll('.top [data-page]').forEach(b=>{if(b.dataset.page===pg)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  if(push){try{history.replaceState(null,'','#'+pg)}catch(e){}window.scrollTo({top:0})}
+  renderPage();
+}
+function renderPage(){renderTop();renderOpChips();
+  if(S.page==='inicio')renderHome();else if(S.page==='faturamento')renderFat();else if(S.page==='comissoes')renderCom();else if(S.page==='projecao')renderProj();else renderPend()}
+let _rz;window.addEventListener('resize',()=>{clearTimeout(_rz);_rz=setTimeout(renderPage,180)});
+
+function openEmp(eid,mes){S.emp=eid||null;S.vq='';if(mes)S.mes=mes;if(S.page!=='faturamento')showPage('faturamento',true);else{renderFat()}
+  if(eid&&window.innerWidth<960)setTimeout(()=>{const f=$('ficha');if(f)f.scrollIntoView({behavior:'smooth',block:'start'})},50)}
+
+document.addEventListener('click',async ev=>{
+  const t=ev.target;
+  const hd=t.closest('[data-hday]'); if(hd){S.hday=S.hday===hd.dataset.hday?null:hd.dataset.hday;renderHome();return}
+  const fx=t.closest('[data-fx]'); if(fx){S.fexp[fx.dataset.fx]=!S.fexp[fx.dataset.fx];renderFicha();return}
+  const vd=t.closest('[data-vd]'); if(vd){openVD(vd.dataset.vd,vd.dataset.vdc);return}
+  if(t.closest('[data-vdsx]')){S.vdSx=!S.vdSx;try{localStorage.setItem('vdSx',S.vdSx?'1':'')}catch(e){}renderVD();return}
+  const vdc=t.closest('[data-vdm]'); if(vdc){S.vdC=vdc.dataset.vdm;renderVD();return}
+  if(t.closest('#vd-close')||t.id==='vdm'){closeVD();return}
+  const emp=t.closest('[data-emp]'); if(emp&&!t.closest('[data-ok]')){openEmp(emp.dataset.emp,emp.dataset.emes);return}
+  const pg=t.closest('[data-page]'); if(pg){if(pg.dataset.ffset){S.ff=pg.dataset.ffset;S.emp=null}showPage(pg.dataset.page,true);return}
+  const op=t.closest('[data-op]'); if(op){S.op=op.dataset.op;applyOp();renderPage();return}
+  const m=t.closest('[data-mes]'); if(m){S.mes=m.dataset.mes;renderFat();return}
+  const cm=t.closest('[data-cmes]'); if(cm){S.cmes=cm.dataset.cmes;renderCom();return}
+  const pv=t.closest('[data-pv]'); if(pv){S.pv=pv.dataset.pv;renderProj();return}
+  const pwk=t.closest('[data-pwk]'); if(pwk){S.pwk=pwk.dataset.pwk;renderProj();return}
+  const pmk=t.closest('[data-pmk]'); if(pmk){S.pmk=pmk.dataset.pmk;S.pwk=null;renderProj();return}
+  const ff=t.closest('[data-ff]'); if(ff){S.ff=ff.dataset.ff;renderFat();return}
+  const agf=t.closest('[data-agf]'); if(agf){S.filtro=agf.dataset.agf||null;showPage('pendencias',true);return}
+  const mv=t.closest('[data-mov]'); if(mv){openMov(mv.dataset.mov);return}
+  const ie=t.closest('[data-impe]'); if(ie){if(S.canEdit)openImp(ie.dataset.impe);else toast('Só quem pode editar a Central altera implantações.');return}
+  const ok=t.closest('[data-ok]'); if(ok&&S.db&&S.canEdit){ok.disabled=true;const tk=S.tarefas.find(x=>x.id===ok.dataset.ok);const now=new Date().toISOString();
+    try{await S.db.doc('tarefas/'+tk.id).update({coluna:'concluido',concluidaEm:now,concluidaPor:S.me||null});await logEvent(tk.agente,tk.textoAoResolver||('teve a tarefa "'+tk.titulo+'" marcada como resolvida.'),now)}catch(e){ok.disabled=false;ok.textContent='Não salvou. Tente de novo'}}
+});
+document.addEventListener('keydown',ev=>{const li=ev.target.closest&&ev.target.closest('li[data-emp]');if(li&&(ev.key==='Enter'||ev.key===' ')){ev.preventDefault();openEmp(li.dataset.emp,li.dataset.emes)}if(ev.key==='Escape'&&!$('vdm').hidden)closeVD();if(ev.key==='Escape'&&!$('movm').hidden)$('movm').hidden=true;if(ev.key==='Escape'&&!$('impm').hidden)$('impm').hidden=true;const ie=ev.target.closest&&ev.target.closest('li[data-impe]');if(ie&&(ev.key==='Enter'||ev.key===' ')){ev.preventDefault();ie.click()}});
+document.addEventListener('input',ev=>{
+  if(ev.target.id==='fq'){S.fq=ev.target.value;const {rows}=empRows(S.mes);renderFList(rows)}
+  if(ev.target.id==='cq'){S.cq=ev.target.value;renderCom()}
+  if(ev.target.id==='vq'){S.vq=ev.target.value;const v=S.vcache[S.emp];if(v&&!v.none)renderVRows(v)}
+});
+document.addEventListener('change',async ev=>{
+  if(ev.target.id==='fsort'){S.fsort=ev.target.value;const {rows}=empRows(S.mes);renderFList(rows);return}
+  if(ev.target.id==='mov-tipo'){movFields();return}
+  const sel=ev.target.closest&&ev.target.closest('select[data-agcfg]');if(!sel||!S.db||!S.canEdit)return;
+  const eid=sel.dataset.agcfg,v=sel.value,now=new Date().toISOString();sel.disabled=true;
+  try{if(v==='auto')await S.db.doc('agenciamentos/'+eid).delete();else await S.db.doc('agenciamentos/'+eid).set({restantes:+v,aposParcela:+sel.dataset.last,atualizadoEm:now,por:S.me||null});
+    const nome=empName[eid]||eid;await logEvent('comissoes',v==='auto'?`voltou o agenciamento de ${nome} para a regra padrão (300%).`:`recebeu da equipe: ${nome} ainda tem ${v} parcela${+v===1?'':'s'} de agenciamento depois da ${sel.dataset.last}ª.`,now)}catch(e){sel.disabled=false;toast('Não salvou. Tente de novo.')}
+});
+async function logEvent(agente,texto,now){const dia=now.slice(0,10),ref=S.db.doc('eventos/'+dia),snap=await ref.get();await ref.set({dia,itens:(snap.exists?(snap.data().itens||[]):[]).concat([{ts:now,agente,texto}])})}
+
+// ---------- pedido de movimentação ----------
+function openMov(eid){S._mFocus=document.activeElement;S.movEid=eid;const v=S.vcache[eid];const nome=empName[eid]||eid;
+  $('movs').textContent=nome+' · '+eid;
+  const at=v&&!v.none?(v.vidas||[]).filter(x=>x.sit!=='Excluído').sort((a,b)=>String(a.n).localeCompare(String(b.n))):[];
+  $('mov-benef').innerHTML=at.length?at.map(x=>`<option value="${esc(x.n)}">${esc(x.n)} · ${esc(x.par||'')}${x.id!=null?' · '+x.id+' anos':''}</option>`).join(''):'<option value="">Vidas não carregadas: descreva na observação</option>';
+  $('mov-tipo').value='Inclusão';$('mov-nome').value='';$('mov-obs').value='';$('mov-data').value='';movFields();
+  $('movm').hidden=false;setTimeout(()=>$('mov-tipo').focus(),30)}
+function movFields(){const inc=$('mov-tipo').value==='Inclusão';$('mov-benef-l').hidden=inc;$('mov-nome-l').hidden=!inc}
+$('mov-cancel').addEventListener('click',()=>{$('movm').hidden=true});
+$('movm').addEventListener('click',ev=>{if(ev.target.id==='movm')$('movm').hidden=true});
+$('movf').addEventListener('submit',async ev=>{ev.preventDefault();if(!S.db||!S.canEdit){toast('Só quem pode editar a Central faz pedidos.');return}
+  const eid=S.movEid,nome=empName[eid]||eid,tipo=$('mov-tipo').value,inc=tipo==='Inclusão',quem_=inc?$('mov-nome').value.trim():$('mov-benef').value,data=$('mov-data').value,obs=$('mov-obs').value.trim(),now=new Date().toISOString();
+  if(inc&&!quem_){$('mov-nome').focus();return}
+  const ops=uniq(fatItems(S._fat).filter(r=>r.eid===eid).map(r=>r.operadora)).join(', ');
+  const det=[quem_?(inc?'Entra: ':'Beneficiário: ')+quem_:'',data?'a partir de '+data.split('-').reverse().join('/'):'',obs].filter(Boolean).join(' · ');
+  $('mov-ok').disabled=true;
+  try{await S.db.doc('tarefas/mov-'+Date.now()).set({agente:'movimentacoes',tipo:'movimentacao',coluna:'andamento',titulo:tipo+' · '+nome,detalhe:det,quem:eid+' · '+ops,criadaEm:now,pedidoPor:S.me||null,mov:{tipo,eid,empresa:nome,beneficiario:quem_,data,obs}});
+    await logEvent('movimentacoes',`recebeu um pedido de ${tipo.toLowerCase()} para ${nome}${quem_?' ('+quem_+')':''}.`,now);
+    $('movm').hidden=true;toast('Pedido enviado para a fila de movimentações.')}catch(e){toast('Não salvou. Tente de novo.')}
+  $('mov-ok').disabled=false});
+
+// janelas: o Tab fica dentro da janela aberta e o foco volta para quem abriu
+document.addEventListener('keydown',ev=>{if(ev.key!=='Tab')return;const m=[...document.querySelectorAll('.modal')].find(x=>!x.hidden);if(!m)return;
+  const f=[...m.querySelectorAll('button,select,input,textarea,summary,a[href],[tabindex]:not([tabindex="-1"])')].filter(e=>!e.disabled&&e.getClientRects().length);if(!f.length)return;
+  const a=f[0],z=f[f.length-1],ae=document.activeElement;
+  if(!m.contains(ae)||ae===m.firstElementChild){ev.preventDefault();(ev.shiftKey?z:a).focus();return}
+  if(ev.shiftKey&&ae===a){ev.preventDefault();z.focus()}else if(!ev.shiftKey&&ae===z){ev.preventDefault();a.focus()}});
+['movm','impm'].forEach(id=>new MutationObserver(()=>{if($(id).hidden&&S._mFocus){const f=S._mFocus;S._mFocus=null;try{f.focus()}catch(e){}}}).observe($(id),{attributes:true,attributeFilter:['hidden']}));
+showPage((location.hash||'').slice(1)||'inicio');
+(async()=>{
+  const db=window.claude&&await claude.use('db');
+  if(!db){$('offline').hidden=false;return}
+  S.db=db;const user=await claude.use('user');S.user=user;
+  try{S.canEdit=user?await user.canEdit():false;S.me=user?await user.id():null}catch(e){}
+  const err=()=>{$('offline').hidden=false};
+  let _t;const later=()=>{clearTimeout(_t);_t=setTimeout(renderPage,60)};
+  db.collection('agentes').orderBy('ordem').onSnapshot(s=>{S.agentes=s.docs.map(d=>Object.assign({id:d.id},d.data()));later()},err);
+  db.collection('tarefas').onSnapshot(s=>{S.tarefas=s.docs.map(d=>Object.assign({id:d.id},d.data()));later();resolveNames()},err);
+  db.collection('eventos').orderBy('dia','desc').limit(10).onSnapshot(s=>{S.eventos=s.docs.map(d=>Object.assign({id:d.id},d.data()));later()},err);
+  db.collection('faturas').onSnapshot(s=>{S._fat=s.docs.map(d=>Object.assign({id:d.id},d.data()));indexNames();applyOp();later()},err);
+  db.collection('agenciamentos').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.agcfg=m;later()},()=>{});
+  db.collection('implantacoes').onSnapshot(s=>{S.imps=s.docs.map(d=>Object.assign({id:d.id},d.data()));later()},()=>{});
+  db.collection('projecoes').onSnapshot(s=>{S.fotos=s.docs.map(d=>Object.assign({id:d.id},d.data()));later()},()=>{});
+  db.collection('comissoes').onSnapshot(s=>{S._com=s.docs.map(d=>Object.assign({id:d.id},d.data()));applyOp();later()},err);
+})();
+})();
+</script>
+
+</body></html>
