@@ -102,6 +102,10 @@ export type Vida = {
   situacao: string | null;
   movimento: string | null;
   valor_total: number | null;
+  idade?: number | null;
+  premio_base?: number | null;
+  pro_rata?: number | null;
+  copart_total?: number | null;
 };
 
 export type Documento = {

@@ -27,6 +27,16 @@ export function quando(iso: string) {
 export const cnpj = (c: string | null | undefined) =>
   c && /^\d{14}$/.test(c) ? c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : c ?? '—';
 
+// Idade da vida: pela data de nascimento; sem ela (Porto, Amil, Santa Helena), a idade que veio na fatura
+export const idadeVida = (v: { nascimento: string | null; idade?: number | null }) => idade(v.nascimento) ?? v.idade ?? null;
+
+// Valor da vida no mês: o total da fatura quando vem; senão, prêmio + pró-rata + coparticipação
+export function valorVida(v: { valor_total: number | null; premio_base?: number | null; pro_rata?: number | null; copart_total?: number | null }) {
+  if (v.valor_total) return v.valor_total;
+  const p = [v.premio_base, v.pro_rata, v.copart_total].filter((x): x is number => x != null);
+  return p.length ? Math.round(p.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+}
+
 export function idade(nasc: string | null) {
   if (!nasc) return null;
   const n = new Date(nasc), h = new Date();

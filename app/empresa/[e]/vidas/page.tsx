@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cliente, exigirEmpresa } from '@/lib/servidor';
-import { competencia, data, idade, moeda, num, seg } from '@/lib/formato';
+import { competencia, data, idadeVida, moeda, num, seg, valorVida } from '@/lib/formato';
 import { FAIXAS, faixaDe } from '@/lib/contas';
 import type { Fatura, Vida } from '@/lib/tipos';
 
@@ -21,7 +21,7 @@ export default async function Vidas({ params, searchParams }: P) {
   const { data: linhas } = await q;
   const vs = (linhas ?? []) as (Vida & { dependente_num?: number })[];
   const faixas = Array(10).fill(0) as number[];
-  for (const v of vs) { const i = idade(v.nascimento); if (i != null) faixas[faixaDe(i)]++; }
+  for (const v of vs) { const i = idadeVida(v); if (i != null) faixas[faixaDe(i)]++; }
   const max = Math.max(1, ...faixas);
   const titulares = vs.filter((v) => v.titular).length;
   const novas = vs.filter((v) => v.movimento && v.movimento !== '-');
@@ -65,8 +65,8 @@ export default async function Vidas({ params, searchParams }: P) {
                   {vs.map((v) => (
                     <tr key={v.id}>
                       <td style={v.titular ? { fontWeight: 700 } : { paddingLeft: '1.6rem' }}>{v.nome}<small>nasc. {data(v.nascimento)}</small></td>
-                      <td>{v.parentesco ?? '—'}</td><td className="num">{idade(v.nascimento) ?? '—'}</td><td>{v.plano ?? '—'}</td><td>{seg(v.seguradora_id)}</td>
-                      <td>{v.movimento && v.movimento !== '-' ? v.movimento : '—'}</td><td className="num">{moeda(v.valor_total)}</td>
+                      <td>{v.parentesco ?? '—'}</td><td className="num">{idadeVida(v) ?? '—'}</td><td>{v.plano ?? '—'}</td><td>{seg(v.seguradora_id)}</td>
+                      <td>{v.movimento && v.movimento !== '-' ? v.movimento : '—'}</td><td className="num">{moeda(valorVida(v))}</td>
                     </tr>
                   ))}
                 </tbody>
