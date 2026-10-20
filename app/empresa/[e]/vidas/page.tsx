@@ -23,6 +23,14 @@ export default async function Vidas({ params, searchParams }: P) {
   const faixas = Array(10).fill(0) as number[];
   for (const v of vs) { const i = idadeVida(v); if (i != null) faixas[faixaDe(i)]++; }
   const max = Math.max(1, ...faixas);
+  // Preço por pessoa: no plano mais usado, o prêmio mais comum de cada faixa.
+  // Se for igual em todas as faixas, a empresa é de taxa média.
+  const moda = (xs: number[]) => { const c = new Map<number, number>(); xs.forEach((x) => c.set(x, (c.get(x) ?? 0) + 1)); return [...c].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null; };
+  const contaPlano = new Map<string, number>(); vs.forEach((v) => v.plano && contaPlano.set(v.plano, (contaPlano.get(v.plano) ?? 0) + 1));
+  const planoPrincipal = [...contaPlano].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const precoFaixa = FAIXAS.map((_, f) => moda(vs.filter((v) => v.plano === planoPrincipal && v.premio_base && idadeVida(v) != null && faixaDe(idadeVida(v)!) === f).map((v) => Math.round(v.premio_base! * 100) / 100)));
+  const precos = precoFaixa.filter((x): x is number => x != null);
+  const taxaMedia = precos.length > 1 && Math.max(...precos) - Math.min(...precos) < 1 ? precos[0] : null;
   const titulares = vs.filter((v) => v.titular).length;
   const novas = vs.filter((v) => v.movimento && v.movimento !== '-');
 
@@ -48,6 +56,14 @@ export default async function Vidas({ params, searchParams }: P) {
               {faixas.map((n, i) => <div key={i} style={{ height: `${(n / max) * 100}%` }}><span>{n || ''}</span></div>)}
             </div>
             <div className="faixas-l">{FAIXAS.map((f) => <span key={f}>{f}</span>)}</div>
+            {precos.length > 0 && (taxaMedia != null ? (
+              <p className="hint" style={{ marginTop: '.8rem' }}>Taxa média: <b>{moeda(taxaMedia)}</b> por pessoa em todas as idades{contaPlano.size > 1 ? ` (plano ${planoPrincipal})` : ''}.</p>
+            ) : (
+              <>
+                <div className="faixas-l faixas-v" aria-label="Valor por pessoa em cada faixa">{precoFaixa.map((x, i) => <span key={i}>{x != null ? moeda(x).replace('R$', '').trim() : '—'}</span>)}</div>
+                <p className="hint" style={{ marginTop: '.4rem' }}>Valor por pessoa em cada faixa (R$){contaPlano.size > 1 ? `, no plano ${planoPrincipal}` : ''}.</p>
+              </>
+            ))}
           </section>
           <section className="card">
             <div className="card-h">

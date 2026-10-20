@@ -171,6 +171,7 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .faixas { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; align-items: end; height: 120px; padding-top: 1.2rem; }
 .faixas div { position: relative; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
 .faixas div span { position: absolute; top: -1.15rem; left: 0; right: 0; text-align: center; font-size: .7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.faixas-v { font-weight: 700; color: var(--fg) !important; font-variant-numeric: tabular-nums; }
 .faixas-l { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; font-size: .64rem; color: var(--muted); text-align: center; margin-top: .3rem; }
 
 /* barras horizontais */
