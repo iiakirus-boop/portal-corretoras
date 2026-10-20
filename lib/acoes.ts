@@ -96,9 +96,12 @@ export async function criarOrdem(f: FormData) {
   const s = await exigirSessao();
   if (!ehMaster(s)) volta(de, 'erro', 'Só o master pede execuções.');
   const db = await cliente();
+  // Pasta ou arquivos no PC (o vigia usa): Faturas Bradesco = pasta dos kits; Comissão = arquivos do extrato, separados por ;
+  const local = txt(f, 'local');
+  const parametros = !local ? {} : txt(f, 'agente') === 'comissao' ? { arquivos: local.split(';').map((x) => x.trim()).filter(Boolean) } : { entrada: local };
   const { error } = await db.from('ordens_execucao').insert({
     corretora_id: txt(f, 'corretora_id'), agente: txt(f, 'agente'), seguradora_id: txt(f, 'seguradora_id') || null,
-    competencia: txt(f, 'competencia') || null, origem: 'manual', criada_por: s.userId,
+    competencia: txt(f, 'competencia') || null, origem: 'manual', criada_por: s.userId, parametros,
   });
   if (error) volta(de, 'erro', traduzir(error.message));
   revalidatePath('/master');

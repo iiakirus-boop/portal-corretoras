@@ -106,8 +106,12 @@ export default async function Agentes({ searchParams }: P) {
               </label>
               <label className="campo">Competência<input type="month" name="competencia" defaultValue={comp} /></label>
             </div>
+            <label className="campo">Pasta ou arquivos no PC (opcional)
+              <input name="local" placeholder="Ex.: C:\Users\bruno\Downloads\kits bradesco" />
+              <small className="hint">Faturas Bradesco: a pasta dos kits. Comissão: os arquivos do extrato, separados por ponto e vírgula. Sem isso, o PC deixa o pedido esperando alguém entrar no portal.</small>
+            </label>
             <div><button className="btn">Colocar na fila</button></div>
-            <p className="note">Faturas sempre dispara Vidas em seguida, e Comissões sempre dispara Projeção.</p>
+            <p className="note">Faturas sempre dispara Vidas em seguida, e Comissões sempre dispara Projeção. Projeção roda na nuvem; os outros, no PC (o vigia pega em até 2 minutos).</p>
           </form>
         </section>
         <section className="card">
