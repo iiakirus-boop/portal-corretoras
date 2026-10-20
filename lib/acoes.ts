@@ -61,7 +61,7 @@ export async function criarCorretora(f: FormData) {
   const admin = txt(f, 'admin').toLowerCase();
   if (admin) await db.from('convites').insert({ email: admin, papel: 'admin_corretora', corretora_id: data.id });
   revalidatePath('/master');
-  volta(`/master/corretoras/${data.id}`, 'ok', `${nome} cadastrada.${admin ? ` Convite enviado para ${admin}.` : ''}`);
+  volta(`/master/corretoras/${data.id}`, 'ok', `${nome} cadastrada.${admin ? ` Convite criado para ${admin}: avise a pessoa para entrar no portal com esse e-mail.` : ''}`);
 }
 
 export async function criarOrdem(f: FormData) {
