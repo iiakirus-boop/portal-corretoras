@@ -29,13 +29,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ c: strin
   const css = `<style>
 .cx-link{text-decoration:none}
 .cx-link .pl{display:none!important}
+.nav a.cx-tab{box-sizing:border-box;display:flex;align-items:center;padding:0 .85rem;color:var(--navy-muted);font-weight:700;font-size:.88rem;white-space:nowrap;text-decoration:none;border-bottom:3px solid transparent;border-top:3px solid transparent}
+.nav a.cx-tab:hover{color:var(--navy-fg)}
 @media (min-width:821px){.nav{flex:1 0 auto}}
 @media (max-width:1180px){.brand-txt{display:none}.top .wrap{gap:.5rem}.cx-link{padding-inline:.55rem}}
 ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[data-page="projecao"],section.card:has(#hwk),.page[data-pg="comissoes"],.page[data-pg="projecao"]{display:none!important}`}
 </style>`;
   const links = [
-    ['/corretora/' + c + '/pedidos', 'Pedidos', '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'],
-    ['/corretora/' + c + '/empresas', 'Empresas e acessos', '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>'],
     ...(a.admin ? [['/corretora/' + c + '/usuarios', 'Equipe', '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>']] : []),
     ...(a.master ? [['/master', 'Master', '<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>']] : []),
     ['/conta/senha', 'Trocar senha', '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'],
@@ -44,10 +44,15 @@ ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[
     .map(([href, txt, ic]) => `<a class="pend-btn cx-link" href="${href}" aria-label="${txt}" title="${txt}">${ICONE(ic)}<span class="pl">${txt}</span></a>`)
     .join('');
 
+  // Empresas e Pedidos entram como abas do mesmo menu da Central
+  const abas = [['/corretora/' + c + '/empresas', 'Empresas'], ['/corretora/' + c + '/pedidos', 'Pedidos']]
+    .map(([href, txt]) => `<a class="cx-tab" href="${href}">${txt}</a>`).join('');
+
   let html = modelo
     .replace('<title>Central de Agentes</title>', `<title>Central de Agentes · ${nome}</title>`)
     .replaceAll('Shaddai Seguros', nome)
     .replaceAll('Comissão da Shaddai', 'Comissão da corretora')
+    .replace('<button type="button" data-page="projecao">Projeção</button>', (m) => m + abas)
     .replace('<span class="badge" id="pendn" hidden></span></button>', (m) => m + links);
   // config e shim antes do script principal, que já chama window.claude.use
   const shim = `${css}<script>window.__CENTRAL=${JSON.stringify(cfg).replace(/</g, '\\u003c')}</script><script src="/central-shim.js"></script>`;
