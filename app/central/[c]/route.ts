@@ -28,6 +28,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ c: strin
 
   const css = `<style>
 .cx-link{text-decoration:none}
+.cx-link .pl{display:none!important}
+@media (min-width:821px){.nav{flex:1 0 auto}}
+@media (max-width:1180px){.brand-txt{display:none}.top .wrap{gap:.5rem}.cx-link{padding-inline:.55rem}}
 ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[data-page="projecao"],section.card:has(#hwk),.page[data-pg="comissoes"],.page[data-pg="projecao"]{display:none!important}`}
 </style>`;
   const links = [
@@ -37,7 +40,7 @@ ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[
     ...(a.master ? [['/master', 'Master', '<path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>']] : []),
     ['/sair', 'Sair', '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'],
   ]
-    .map(([href, txt, ic]) => `<a class="pend-btn cx-link" href="${href}" aria-label="${txt}">${ICONE(ic)}<span class="pl">${txt}</span></a>`)
+    .map(([href, txt, ic]) => `<a class="pend-btn cx-link" href="${href}" aria-label="${txt}" title="${txt}">${ICONE(ic)}<span class="pl">${txt}</span></a>`)
     .join('');
 
   let html = modelo
