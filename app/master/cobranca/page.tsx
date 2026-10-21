@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
 import { competencia, moeda, num } from '@/lib/formato';
-import { mensalidade, somarPor, ultimas, type Contrato } from '@/lib/contas';
+import { mensalidade, vidasCarteiraPor, type Contrato, type FaturaUltima } from '@/lib/contas';
 import { Pill } from '@/components/Pill';
-import type { Corretora, Fatura } from '@/lib/tipos';
+import type { Corretora } from '@/lib/tipos';
 
 type Fechamento = { id: string; corretora_id: string; competencia: string; vidas_ativas: number; valor: number; status: string };
 
@@ -11,11 +11,11 @@ export default async function Cobranca() {
   const db = await cliente();
   const [{ data: corretoras }, { data: faturas }, { data: fech }] = await Promise.all([
     db.from('corretoras').select('*').order('nome'),
-    db.from('faturas').select('*'),
+    db.from('faturas_ultimas').select('*'),
     db.from('cobranca_fechamentos').select('*').order('competencia', { ascending: false }),
   ]);
   const cs = (corretoras ?? []) as Corretora[];
-  const vidas = somarPor(ultimas((faturas ?? []) as Fatura[]), (f) => f.corretora_id, (f) => f.vidas_informadas ?? 0);
+  const vidas = vidasCarteiraPor((faturas ?? []) as FaturaUltima[]);
   const linhas = cs.map((c) => {
     const ct = (c.contrato ?? {}) as Contrato;
     const v = vidas.get(c.id) ?? 0;

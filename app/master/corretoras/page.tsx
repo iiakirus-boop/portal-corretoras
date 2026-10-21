@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
 import { cnpj, num } from '@/lib/formato';
-import { somarPor, ultimas } from '@/lib/contas';
+import { somarPor, vidasCarteiraPor, type FaturaUltima } from '@/lib/contas';
 import { criarCorretora } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
 import { Pill } from '@/components/Pill';
-import type { Corretora, Empresa, Fatura, Membro, Pedido } from '@/lib/tipos';
+import type { Corretora, Empresa, Membro, Pedido } from '@/lib/tipos';
 import { ABERTOS } from '@/lib/formato';
 
 type P = { searchParams: Promise<Record<string, string | undefined>> };
@@ -16,13 +16,13 @@ export default async function Corretoras({ searchParams }: P) {
   const [{ data: corretoras }, { data: empresas }, { data: faturas }, { data: membros }, { data: pedidos }] = await Promise.all([
     db.from('corretoras').select('*').order('nome'),
     db.from('empresas').select('*').eq('ativa', true),
-    db.from('faturas').select('*'),
+    db.from('faturas_ultimas').select('*'),
     db.from('membros').select('*').eq('ativo', true),
     db.from('pedidos').select('*').in('status', ABERTOS),
   ]);
   const cs = (corretoras ?? []) as Corretora[];
   const nEmp = somarPor((empresas ?? []) as Empresa[], (e) => e.corretora_id, () => 1);
-  const vidas = somarPor(ultimas((faturas ?? []) as Fatura[]), (f) => f.corretora_id, (f) => f.vidas_informadas ?? 0);
+  const vidas = vidasCarteiraPor((faturas ?? []) as FaturaUltima[]);
   const nUsu = somarPor(((membros ?? []) as Membro[]).filter((m) => m.corretora_id), (m) => m.corretora_id!, () => 1);
   const nPed = somarPor((pedidos ?? []) as Pedido[], (p) => p.corretora_id, () => 1);
 

@@ -12,6 +12,12 @@ export function ultimas(faturas: Fatura[]) {
   return [...m.values()];
 }
 
+// Linha da view faturas_ultimas: a fatura mais recente de cada empresa/seguradora, já somada
+export type FaturaUltima = { corretora_id: string; empresa_id: string; seguradora_id: string; competencia: string; vidas: number; valor: number; vencimento: string | null; faturas: number; comp_carteira: string };
+// Vidas da carteira = soma do mês mais recente de cada corretora (mesma conta da Central); empresas sem fatura nesse mês ficam fora
+export const vidasCarteira = (us: FaturaUltima[]) => us.reduce((t, u) => t + (u.competencia === u.comp_carteira ? u.vidas : 0), 0);
+export const vidasCarteiraPor = (us: FaturaUltima[]) => somarPor(us.filter((u) => u.competencia === u.comp_carteira), (u) => u.corretora_id, (u) => u.vidas);
+
 // Vidas ativas = vidas da fatura mais recente de cada empresa/seguradora
 export const vidasAtivas = (faturas: Fatura[]) => ultimas(faturas).reduce((t, f) => t + (f.vidas_informadas ?? 0), 0);
 

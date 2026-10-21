@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { cliente, exigirCorretora } from '@/lib/servidor';
 import { ABERTOS, competencia, moeda, num, seg } from '@/lib/formato';
-import { somarPor, ultimas } from '@/lib/contas';
+import { somarPor, type FaturaUltima } from '@/lib/contas';
 import { criarEmpresa } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
-import type { Empresa, Fatura, Pedido } from '@/lib/tipos';
+import type { Empresa, Pedido } from '@/lib/tipos';
 
 type P = { params: Promise<{ c: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
@@ -17,15 +17,15 @@ export default async function Empresas({ params, searchParams }: P) {
   if (sp.q) q = q.ilike('razao_social', `%${sp.q}%`);
   const [{ data: empresas }, { data: faturas }, { data: pedidos }] = await Promise.all([
     q,
-    db.from('faturas').select('*').eq('corretora_id', c),
+    db.from('faturas_ultimas').select('*').eq('corretora_id', c),
     db.from('pedidos').select('*').eq('corretora_id', c).in('status', ABERTOS),
   ]);
   const es = (empresas ?? []) as Empresa[];
-  const ult = ultimas((faturas ?? []) as Fatura[]);
-  const vidas = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas_informadas ?? 0);
-  const valor = somarPor(ult, (f) => f.empresa_id, (f) => f.valor_total ?? 0);
+  const ult = (faturas ?? []) as FaturaUltima[];
+  const vidas = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas);
+  const valor = somarPor(ult, (f) => f.empresa_id, (f) => Number(f.valor));
   const ped = somarPor((pedidos ?? []) as Pedido[], (p) => p.empresa_id, () => 1);
-  const segs = new Map<string, Fatura[]>();
+  const segs = new Map<string, FaturaUltima[]>();
   for (const f of ult) segs.set(f.empresa_id, [...(segs.get(f.empresa_id) ?? []), f]);
 
   return (

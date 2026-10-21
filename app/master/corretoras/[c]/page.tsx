@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cliente, exigirSessao } from '@/lib/servidor';
 import { cnpj, competencia, data, moeda, num, seg } from '@/lib/formato';
-import { mensalidade, somarPor, ultimas, vidasAtivas, type Contrato } from '@/lib/contas';
+import { mensalidade, somarPor, vidasCarteira, type Contrato, type FaturaUltima } from '@/lib/contas';
 import { Aviso } from '@/components/Aviso';
 import { Pessoas } from '@/components/Pessoas';
 import { Pill } from '@/components/Pill';
-import type { CodigoSeguradora, Convite, Corretora, Empresa, Fatura, Membro } from '@/lib/tipos';
+import type { CodigoSeguradora, Convite, Corretora, Empresa, Membro } from '@/lib/tipos';
 
 type P = { params: Promise<{ c: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
@@ -22,18 +22,17 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
     db.from('corretora_cnpjs').select('*').eq('corretora_id', c),
     db.from('corretora_codigos').select('*').eq('corretora_id', c),
     db.from('empresas').select('*').eq('corretora_id', c).order('razao_social'),
-    db.from('faturas').select('*').eq('corretora_id', c),
+    db.from('faturas_ultimas').select('*').eq('corretora_id', c),
     db.from('membros').select('*').eq('corretora_id', c).eq('ativo', true),
     db.from('convites').select('*').eq('corretora_id', c),
   ]);
   const es = (empresas ?? []) as Empresa[];
-  const fs = (faturas ?? []) as Fatura[];
-  const ult = ultimas(fs);
-  const vidasE = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas_informadas ?? 0);
+  const ult = (faturas ?? []) as FaturaUltima[];
+  const vidasE = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas);
   const segsE = new Map<string, string[]>();
   for (const f of ult) segsE.set(f.empresa_id, [...(segsE.get(f.empresa_id) ?? []), seg(f.seguradora_id)]);
-  const ultimaComp = fs.reduce((m, f) => (f.competencia > m ? f.competencia : m), '');
-  const vidas = vidasAtivas(fs);
+  const ultimaComp = ult[0]?.comp_carteira ?? '';
+  const vidas = vidasCarteira(ult);
   const contrato = (k.contrato ?? {}) as Contrato;
   const preco = mensalidade(vidas, contrato);
 
