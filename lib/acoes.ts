@@ -97,7 +97,10 @@ export async function criarOrdem(f: FormData) {
   if (!ehMaster(s)) volta(de, 'erro', 'Só o master pede execuções.');
   const db = await cliente();
   // Pasta ou arquivos no PC (o vigia usa): Faturas Bradesco = pasta dos kits; Comissão = arquivos do extrato, separados por ;
-  const local = txt(f, 'local');
+  // aspas do "Copiar como caminho" do Windows saem
+  const local = txt(f, 'local').replace(/"/g, '').trim();
+  const ag = txt(f, 'agente');
+  if ((ag === 'faturas' || ag === 'comissao') && !txt(f, 'seguradora_id')) volta(de, 'erro', 'Escolha a seguradora: Faturas e Comissão rodam uma seguradora por vez.');
   const parametros = !local ? {} : txt(f, 'agente') === 'comissao' ? { arquivos: local.split(';').map((x) => x.trim()).filter(Boolean) } : { entrada: local };
   const { error } = await db.from('ordens_execucao').insert({
     corretora_id: txt(f, 'corretora_id'), agente: txt(f, 'agente'), seguradora_id: txt(f, 'seguradora_id') || null,
