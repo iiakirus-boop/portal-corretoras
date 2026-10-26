@@ -207,6 +207,30 @@ export type Ordem = {
   custo_usd?: number | null;
 };
 
+// Cadastro dos agentes (tabela agentes) e o calendário que o supervisor aprendeu (view supervisor_previsao)
+export type Agente = {
+  id: string;
+  agente: string;
+  seguradora_id: string | null;
+  cobre: string[];
+  nome: string;
+  onde: 'nuvem' | 'pc';
+  automatico: boolean;
+  como: string | null;
+  situacao: 'ativo' | 'rascunho' | 'pausado';
+  criado_por: string;
+};
+
+export type Previsao = {
+  corretora_id: string;
+  agente: string;
+  seguradora_id: string | null;
+  competencia: string;
+  esperado_em: string;
+  atrasado: boolean;
+  motivo: string;
+};
+
 // O que o Agente Conferência achou numa competência (tabela conferencias)
 export type Conferencia = {
   id: string;

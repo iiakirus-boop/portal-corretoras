@@ -5,7 +5,7 @@ import { alternarRotina, cancelarOrdem, criarOrdem, repetirOrdem } from '@/lib/a
 import { AutoAtualiza } from '@/components/AutoAtualiza';
 import { Aviso } from '@/components/Aviso';
 import { Pill } from '@/components/Pill';
-import type { Conferencia, Corretora, Maquina, Ordem, Rotina } from '@/lib/tipos';
+import type { Agente, Conferencia, Corretora, Maquina, Ordem, Previsao, Rotina } from '@/lib/tipos';
 
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 
@@ -24,7 +24,7 @@ export default async function Agentes({ searchParams }: P) {
   const sp = await searchParams;
   const db = await cliente();
   const mes = new Date(Date.now() - 30 * 864e5).toISOString();
-  const [{ data: maquinas }, { data: rotinas }, { data: ordens }, { data: corretoras }, { data: rodadas }, { data: conferencias }] = await Promise.all([
+  const [{ data: maquinas }, { data: rotinas }, { data: ordens }, { data: corretoras }, { data: rodadas }, { data: conferencias }, { data: agentes }, { data: previsao }] = await Promise.all([
     db.from('maquinas').select('*').order('nome'),
     db.from('rotinas').select('*').order('nome'),
     db.from('ordens_execucao').select('*').order('criada_em', { ascending: false }).limit(100),
@@ -32,6 +32,8 @@ export default async function Agentes({ searchParams }: P) {
     // custo dos últimos 30 dias: só o que terminou
     db.from('ordens_execucao').select('agente, modo, tokens_entrada, tokens_saida, custo_usd').in('status', ['concluida', 'erro']).gte('terminada_em', mes),
     db.from('conferencias').select('*').is('resolvida_em', null).order('competencia', { ascending: false }).order('gravidade', { ascending: false }).limit(200),
+    db.from('agentes').select('*').order('agente').order('nome'),
+    db.from('supervisor_previsao').select('*').order('esperado_em'),
   ]);
   const cs = (corretoras ?? []) as Corretora[];
   const nomeC = (id: string | null) => (id ? cs.find((c) => c.id === id)?.nome ?? '—' : 'Todas');
@@ -53,6 +55,8 @@ export default async function Agentes({ searchParams }: P) {
   const usd = (v: number) => `US$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const como = (o: Ordem) => o.modo ? `${MODO_ROTULO[o.modo]}${o.custo_usd != null && o.modo !== 'codigo' ? ' · ' + usd(Number(o.custo_usd)) : ''}` : '—';
   const cf = (conferencias ?? []) as Conferencia[];
+  const ags = (agentes ?? []) as Agente[];
+  const pv = ((previsao ?? []) as Previsao[]).sort((a, b) => Number(b.atrasado) - Number(a.atrasado));
   const cfErros = cf.filter((c) => c.gravidade === 'erro').length;
   const sessao = (o: Ordem) => o.sessao_url ? <a className="go" href={o.sessao_url} target="_blank" rel="noreferrer">Ver passo a passo</a> : null;
 
@@ -127,7 +131,7 @@ export default async function Agentes({ searchParams }: P) {
               <small className="hint">Faturas Bradesco: a pasta dos kits. Comissão: os arquivos do extrato, separados por ponto e vírgula. Sem isso, o PC deixa o pedido esperando alguém entrar no portal.</small>
             </label>
             <div><button className="btn">Colocar na fila</button></div>
-            <p className="note">Faturas sempre dispara Vidas em seguida, e Comissões sempre dispara Projeção. Faturas, Vidas e Comissões disparam também a Conferência. Projeção e Conferência rodam na nuvem, como código; os outros, no PC (o vigia pega em até 2 minutos).</p>
+            <p className="note">Faturas sempre dispara Vidas em seguida, e Comissões sempre dispara Projeção. Faturas, Vidas e Comissões disparam também a Conferência. Projeção, Conferência e Supervisor rodam na nuvem, como código; os outros, no PC (o vigia pega em até 2 minutos). Você não precisa pedir: o Supervisor põe na fila o que estiver atrasado.</p>
           </form>
         </section>
         <section className="card">
@@ -145,6 +149,42 @@ export default async function Agentes({ searchParams }: P) {
           </ul>
         </section>
       </div>
+
+      <section className="card">
+        <div className="card-h"><h2>Supervisor: o que ele está vigiando</h2>
+          <span className="hint">a cada 30 min, das 7h às 20h · o que está atrasado vai sozinho para a fila (no máximo um pedido por dia para cada um)</span></div>
+        {pv.length === 0 ? <p className="note">Ainda sem histórico suficiente para prever as próximas faturas e comissões.</p> : (
+          <div className="tbl scroll">
+            <table>
+              <thead><tr><th>Agente</th><th>Seguradora</th><th>Corretora</th><th>Competência</th><th>Esperado em</th><th>Situação</th><th>Por quê</th></tr></thead>
+              <tbody>
+                {pv.map((p) => (
+                  <tr key={`${p.corretora_id}-${p.agente}-${p.seguradora_id}-${p.competencia}`}>
+                    <td><b>{AGENTE[p.agente] ?? p.agente}</b></td><td>{seg(p.seguradora_id)}</td><td>{nomeC(p.corretora_id)}</td><td>{p.competencia}</td>
+                    <td>{data(p.esperado_em)}</td><td>{p.atrasado ? <Pill tom="warn">Atrasado</Pill> : <Pill tom="ok">Em dia</Pill>}</td><td>{p.motivo}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {ags.length > 0 && (
+          <>
+            <h3 style={{ margin: '1rem 0 .5rem', fontSize: '.95rem' }}>Agentes cadastrados</h3>
+            <div className="tbl scroll">
+              <table>
+                <thead><tr><th>Agente</th><th>Onde roda</th><th>Sozinho?</th><th>De onde vêm os dados</th><th>Situação</th></tr></thead>
+                <tbody>
+                  {ags.map((a) => (
+                    <tr key={a.id}><td><b>{a.nome}</b>{a.cobre?.length ? <small> · também {a.cobre.map(seg).join(', ')}</small> : null}</td>
+                      <td>{a.onde === 'nuvem' ? 'Nuvem' : 'PC'}</td><td>{a.automatico ? 'Sim' : 'Precisa de alguém'}</td><td>{a.como ?? '—'}</td>
+                      <td>{a.situacao === 'ativo' ? <Pill tom="ok">Ativo</Pill> : a.situacao === 'rascunho' ? <Pill tom="warn">Rascunho{a.criado_por === 'supervisor' ? ' (criado pelo supervisor)' : ''}</Pill> : <Pill tom="idle">Pausado</Pill>}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="card">
         <div className="card-h"><h2>Conferência: o que não bate</h2>

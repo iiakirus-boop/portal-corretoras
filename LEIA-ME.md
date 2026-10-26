@@ -57,6 +57,10 @@ Cada ordem grava como rodou (`modo`: código, Claude ou os dois) e, quando houve
 
 **Agente Conferência** (migration `supabase/migrations/20261026_p19_custo_conferencia.sql`): depois de Faturas, Vidas e Comissões, confere a competência e grava em `conferencias` o que não bate: fatura duplicada, valor da fatura × soma das vidas, nº de vidas × lista, vidas que sumiram, fatura que faltou em relação ao mês anterior, comissão × prêmio e taxa, classe × taxa (acima de 50% agenciamento, até 10% vitalício) e comissão de quem não está no cadastro. Nada é apagado: o que deixa de aparecer ganha `resolvida_em`. Divergência de comissão só o administrador da corretora vê.
 
+**Agente Supervisor** (migration `supabase/migrations/20261026_p20_supervisor.sql`): decide sozinho o que precisa rodar. A view `supervisor_previsao` aprende o calendário pelo histórico. Para faturas, a próxima de cada empresa sai por volta da última emissão + 1 mês. Para comissão, ela vê de quantos em quantos dias cada seguradora paga e quando foi a última importação. A cada 30 minutos (7h às 20h), `supervisionar()` põe na fila o que está atrasado (origem `supervisor`, no máximo um pedido por dia para cada agente + seguradora + competência). Ela também cancela os pedidos dela que não precisam mais. Para seguradora com dados no banco e sem agente, cria um rascunho na tabela `agentes` e um pedido "criar agente" para alguém montar com a skill `criar-agente-seguradora`.
+
+A tabela `agentes` é o cadastro: quem existe, onde roda (nuvem ou PC), se roda sozinho e quais seguradoras cada um também atende (Amil → Amil Dental e Santa Helena). `agente_fila` só entrega ao PC o que roda no PC.
+
 ## Arquivos
 
 - Faturas, boletos e anexos ficam no bucket privado `documentos`. O download passa por `/arquivo/<id>`, que confere o acesso e gera um link de 60 segundos.
