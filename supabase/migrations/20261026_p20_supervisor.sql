@@ -135,6 +135,11 @@ begin
   insert into maquinas (nome, descricao, ultimo_sinal) values ('Nuvem (Supabase)', 'Agentes que rodam na nuvem, sem depender do PC', now())
     on conflict (nome) do update set ultimo_sinal = now() returning id into v_maq;
 
+  -- Supervisor pausado no cadastro: só a previsão aparece no master, nada vai para a fila
+  if not exists (select 1 from agentes where agente = 'supervisor' and situacao = 'ativo') then
+    return jsonb_build_object('pausado', true, 'atrasados', (select count(*) from supervisor_previsao where atrasado), 'em', now());
+  end if;
+
   -- a. o que está atrasado vira pedido (um por agente + seguradora + competência; no máximo um por dia)
   for r in
     select p.* from supervisor_previsao p
