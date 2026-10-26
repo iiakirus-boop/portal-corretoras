@@ -40,6 +40,7 @@ function regras(uid: string | null) {
     membros: (r) => r.user_id === uid || daCorretora(r.corretora_id, true) || (!!r.empresa_id && daEmpresa(r.empresa_id, ['gestor_empresa'])),
     convites: (r) => daCorretora(r.corretora_id, true) || (!!r.empresa_id && daEmpresa(r.empresa_id, ['gestor_empresa'])),
     ordens_execucao: (r) => daCorretora(r.corretora_id),
+    conferencias: (r) => daCorretora(r.corretora_id, r.tipo.startsWith('comissao')),
     rotinas: (r) => !!r.corretora_id && daCorretora(r.corretora_id, true),
     maquinas: () => false,
     login_status: () => false,

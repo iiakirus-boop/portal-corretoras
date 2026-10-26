@@ -201,6 +201,25 @@ export type Ordem = {
   mensagem: string | null;
   sessao_url?: string | null; // a sessão do Claude que executou (para ver passo a passo)
   ordem_pai_id?: string | null;
+  modo?: 'codigo' | 'claude' | 'misto' | null; // como rodou: código (sem tokens) ou com o Claude
+  tokens_entrada?: number | null;
+  tokens_saida?: number | null;
+  custo_usd?: number | null;
+};
+
+// O que o Agente Conferência achou numa competência (tabela conferencias)
+export type Conferencia = {
+  id: string;
+  corretora_id: string;
+  competencia: string;
+  seguradora_id: string | null;
+  empresa_id: string | null;
+  tipo: string;
+  gravidade: 'erro' | 'aviso';
+  mensagem: string;
+  primeira_vez: string;
+  ultima_vez: string;
+  resolvida_em: string | null;
 };
 
 export type Rotina = {

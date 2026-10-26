@@ -46,6 +46,17 @@ npm run dev      # http://localhost:3000
 - /master/agentes mostra o que está rodando, a fila e o que espera você, e se atualiza sozinha. Também tem o botão "Ver passo a passo" (abre a sessão), "Tentar de novo" ou "Já resolvi, continuar", "Tirar da fila", "Pausar" ou "Ligar" em cada rotina e "Colocar na fila".
 - Os botões só escrevem no banco. Quem obedece é o agente, na próxima rodada.
 
+## Código primeiro, Claude só na exceção
+
+Para o custo de tokens não crescer com o número de corretoras, cada tarefa roda no degrau mais barato que resolve:
+
+1. **Código, sem tokens.** Tudo o que é conta ou regra fixa: ler arquivo, gravar, projetar, conferir. Hoje: Projeção (função `agente-projecao`), Conferência (função `conferir` no banco, pg_cron a cada 10 min) e os scripts do PC chamados pelo vigia (`rodar.py`).
+2. **Claude só para o que o código não faz:** navegar num portal que mudou de tela, ler um layout novo, explicar uma divergência que a Conferência achou.
+
+Cada ordem grava como rodou (`modo`: código, Claude ou os dois) e, quando houver, `tokens_entrada`, `tokens_saida` e `custo_usd` (parâmetros opcionais de `agente_fim`). O /master/agentes soma o custo dos últimos 30 dias. Sem `modo` informado, `agente_fim` usa "claude" quando a ordem tem link de sessão e "código" quando não tem.
+
+**Agente Conferência** (migration `supabase/migrations/20261026_p19_custo_conferencia.sql`): depois de Faturas, Vidas e Comissões, confere a competência e grava em `conferencias` o que não bate: fatura duplicada, valor da fatura × soma das vidas, nº de vidas × lista, vidas que sumiram, fatura que faltou em relação ao mês anterior, comissão × prêmio e taxa, classe × taxa (acima de 50% agenciamento, até 10% vitalício) e comissão de quem não está no cadastro. Nada é apagado: o que deixa de aparecer ganha `resolvida_em`. Divergência de comissão só o administrador da corretora vê.
+
 ## Arquivos
 
 - Faturas, boletos e anexos ficam no bucket privado `documentos`. O download passa por `/arquivo/<id>`, que confere o acesso e gera um link de 60 segundos.

@@ -41,7 +41,7 @@ export function criarBanco(): Banco {
     ],
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
-    maquinas: [], rotinas: [], ordens_execucao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [],
+    maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();
@@ -201,6 +201,17 @@ export function criarBanco(): Banco {
       status, criada_em: iso(menosMin(min)), iniciada_em: status === 'pendente' ? null : iso(menosMin(min - 1)),
       terminada_em: status === 'concluida' || status === 'erro' ? iso(menosMin(min - 8)) : null, mensagem: msg,
       // demonstração: o endereço real é o da sessão do Claude que rodou a ordem
-      sessao_url: status === 'pendente' ? null : 'https://claude.ai/code' });
+      sessao_url: status === 'pendente' ? null : 'https://claude.ai/code', modo: status === 'concluida' || status === 'erro' ? 'claude' : null });
+  db.ordens_execucao.push({ id: uid('ord'), corretora_id: 'c-shaddai', agente: 'conferencia', seguradora_id: null, competencia: '2026-10', origem: 'encadeamento',
+    prioridade: 3, status: 'concluida', criada_em: iso(menosMin(160)), iniciada_em: iso(menosMin(160)), terminada_em: iso(menosMin(160)),
+    mensagem: 'Conferência 2026-10: 0 erros e 3 avisos (3 novos).', sessao_url: null, modo: 'codigo', custo_usd: 0 });
+  const confs: [string, string, 'erro' | 'aviso', string][] = [
+    ['hapvida', 'vidas_divergem', 'aviso', 'ALFA LOGÍSTICA: a fatura 88231 diz 42 vidas e a lista tem 41'],
+    ['porto_saude', 'fatura_faltando', 'aviso', 'BETA ENGENHARIA: tinha fatura em 2026-09 e ainda não tem nesta competência'],
+    ['amil', 'comissao_sem_empresa', 'aviso', 'GAMA SERVIÇOS LTDA: 2 lançamentos de comissão (R$ 1.204,70) sem empresa cadastrada'],
+  ];
+  for (const [seguradora_id, tipo, gravidade, mensagem] of confs)
+    db.conferencias.push({ id: uid('conf'), corretora_id: 'c-shaddai', competencia: '2026-10', seguradora_id, empresa_id: null, tipo, gravidade, mensagem,
+      primeira_vez: iso(menosMin(160)), ultima_vez: iso(menosMin(160)), resolvida_em: null });
   return db;
 }
