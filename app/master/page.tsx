@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
 import { ABERTOS, AGENTE, data, num, plural, ORDEM_ROTULO, ORDEM_TOM, quando, seg, TIPO_PEDIDO } from '@/lib/formato';
-import { sinal, vidasCarteira, type FaturaUltima } from '@/lib/contas';
+import { sinal, vidasCarteira, type VidaCarteira } from '@/lib/contas';
 import { Pill, StatusPill } from '@/components/Pill';
 import type { Corretora, Empresa, LoginStatus, Maquina, Ordem, Pedido } from '@/lib/tipos';
 
 export default async function Master() {
   const db = await cliente();
-  const [{ data: corretoras }, { data: empresas }, { data: faturas }, { data: pedidos }, { data: ordens }, { data: maquinas }, { data: logins }] = await Promise.all([
+  const [{ data: corretoras }, { data: empresas }, { data: vidasC }, { data: pedidos }, { data: ordens }, { data: maquinas }, { data: logins }] = await Promise.all([
     db.from('corretoras').select('*').order('nome'),
     db.from('empresas').select('*').eq('ativa', true),
-    db.from('faturas_ultimas').select('*'),
+    db.from('vidas_carteira').select('*'),
     db.from('pedidos').select('*').in('status', ABERTOS).order('prazo'),
     db.from('ordens_execucao').select('*').order('criada_em', { ascending: false }).limit(30),
     db.from('maquinas').select('*').order('nome'),
@@ -18,7 +18,7 @@ export default async function Master() {
   ]);
   const cs = (corretoras ?? []) as Corretora[];
   const es = (empresas ?? []) as Empresa[];
-  const fs = (faturas ?? []) as FaturaUltima[];
+  const vc = (vidasC ?? []) as VidaCarteira[];
   const ps = (pedidos ?? []) as Pedido[];
   const os = (ordens ?? []) as Ordem[];
   const ms = (maquinas ?? []) as Maquina[];
@@ -43,7 +43,7 @@ export default async function Master() {
 
       <div className="kpis">
         <Link href="/master/corretoras" className="kpi"><span className="kpi-l">Corretoras ativas</span><span className="kpi-v">{num(cs.filter((c) => c.ativa).length)}</span><span className="kpi-s">{num(es.length)} empresas na carteira</span></Link>
-        <Link href="/master/cobranca" className="kpi"><span className="kpi-l">Vidas ativas</span><span className="kpi-v">{num(vidasCarteira(fs))}</span><span className="kpi-s">pelas faturas do mês mais recente, como na Central</span></Link>
+        <Link href="/master/cobranca" className="kpi"><span className="kpi-l">Vidas ativas</span><span className="kpi-v">{num(vidasCarteira(vc))}</span><span className="kpi-s">último mês faturado, mais entradas e menos saídas</span></Link>
         <div className="kpi"><span className="kpi-l">Pedidos em andamento</span><span className="kpi-v">{num(ps.length)}</span><span className="kpi-s">{atrasados.length ? `${atrasados.length} passaram do prazo` : 'nenhum atrasado'}</span></div>
         <Link href="/master/agentes" className={`kpi${precisa.length + caidos.length ? ' alerta' : ''}`}><span className="kpi-l">Precisa de você</span><span className="kpi-v">{num(precisa.length + caidos.length)}</span><span className="kpi-s">{plural(caidos.length, 'login caído', 'logins caídos')}, {plural(precisa.length, 'execução parada', 'execuções paradas')}</span></Link>
       </div>
