@@ -20,12 +20,12 @@ export function TabelaFaturas({ faturas, conferencia = false }: { faturas: Fatur
               <td>{data(f.vencimento)}</td>
               <td className="num">{num(f.vidas_informadas)}</td>
               <td className="num">{moeda(f.valor_boleto ?? f.valor_total)}</td>
-              <td>{f.data_pagamento ? <Pill tom="ok">Pago</Pill> : f.vencimento && f.vencimento < h ? <Pill tom="idle">Sem baixa</Pill> : <Pill tom="warn">Em aberto</Pill>}</td>
-              {conferencia && <td>{f.conferencia_valor === 'OK' ? <Pill tom="ok">Bateu</Pill> : f.conferencia_valor ? <Pill tom="warn">{f.conferencia_valor}</Pill> : '—'}</td>}
+              <td>{f.data_pagamento || f.pago_pela_comissao ? <Pill tom="ok">Pago</Pill> : f.vencimento && f.vencimento < h ? <Pill tom="idle">Sem baixa</Pill> : <Pill tom="warn">Em aberto</Pill>}</td>
+              {conferencia && <td>{f.pago_pela_comissao && !f.data_pagamento && <small>pago, a comissão caiu em {data(f.pago_pela_comissao)}</small>}{f.conferencia_valor === 'OK' ? <Pill tom="ok">Bateu</Pill> : f.conferencia_valor ? <Pill tom="warn">{f.conferencia_valor}</Pill> : '—'}</td>}
               <td>
                 <span className="acoes">
                   {f.fatura_doc_id && <a href={`/arquivo/${f.fatura_doc_id}`} target="_blank" rel="noopener">Fatura</a>}
-                  {f.boleto_doc_id && !f.data_pagamento && <a href={`/arquivo/${f.boleto_doc_id}`} target="_blank" rel="noopener">Boleto</a>}
+                  {f.boleto_doc_id && !f.data_pagamento && !f.pago_pela_comissao && <a href={`/arquivo/${f.boleto_doc_id}`} target="_blank" rel="noopener">Boleto</a>}
                 </span>
               </td>
             </tr>

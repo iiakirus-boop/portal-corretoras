@@ -83,7 +83,7 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
             <ul className="rows">
               {fs.slice(0, 5).map((f) => (
                 <li key={f.id}>
-                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : `${f.vencimento && f.vencimento < h ? 'venceu' : 'vence'} ${data(f.vencimento)}`}</small></div>
+                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : f.pago_pela_comissao ? 'paga' : `${f.vencimento && f.vencimento < h ? 'venceu' : 'vence'} ${data(f.vencimento)}`}</small></div>
                   <span className="r">{moeda(f.valor_boleto ?? f.valor_total)}</span>
                 </li>
               ))}
