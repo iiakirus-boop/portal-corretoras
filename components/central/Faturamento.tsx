@@ -7,6 +7,7 @@ import {
 } from '@/lib/central/modelo';
 import { plural } from '@/lib/formato';
 import { Barras } from './Barras';
+import { DistribuicaoVidas } from './DistribuicaoVidas';
 
 type Filtro = 'todas' | 'aberto' | 'variou' | 'div';
 type Ordem = 'valor' | 'venc' | 'nome' | 'var';
@@ -191,6 +192,7 @@ type Vidas = { none?: boolean; comp?: string; cnpj?: string; diaVenc?: string; h
 function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: string; todas: Item[]; mes: string; comissoes: Doc[] | null; fechar: () => void }) {
   const [v, setV] = useState<Vidas | null>(null);
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
+  const [vd, setVd] = useState(false);
   useEffect(() => {
     let vivo = true;
     fetch(`/api/central/${encodeURIComponent(c)}?col=vidas&doc=${encodeURIComponent(eid)}`, { cache: 'no-store' })
@@ -238,7 +240,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
             <h2>{nome}{last.some((r) => r.grupoPendente) && <span className="pill p-warn">Agrupamento a confirmar</span>}</h2>
             <p>{eid} · {ops.join(', ')}{v?.cnpj ? ` · CNPJ ${v.cnpj}` : ''}{v?.diaVenc ? ` · vence todo dia ${v.diaVenc}` : ''}</p>
           </div>
-          <div className="acoes"><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
+          <div className="acoes"><button className="btn ghost" type="button" onClick={() => setVd(true)}>Distribuição de vidas</button><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
         </div>
         <div className="mini-k">
           <div><span className="kpi-l">Fatura {mesLabel(lc)}</span><div className="kpi-v">R$ {brl(vtot)}</div>
@@ -282,7 +284,8 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
         </div>
       </section>
 
-      <VidasCard v={v} />
+      <VidasCard v={v} abrir={() => setVd(true)} />
+      {vd && <DistribuicaoVidas c={c} eid={eid} nome={nome} comp={lc} faturas={todas} fechar={() => setVd(false)} />}
     </>
   );
 }
@@ -325,11 +328,11 @@ function Subs({ last }: { last: Item[] }) {
   );
 }
 
-function VidasCard({ v }: { v: Vidas | null }) {
+function VidasCard({ v, abrir }: { v: Vidas | null; abrir: () => void }) {
   const [vq, setVq] = useState('');
   if (!v) return <section className="card"><div className="card-h"><h2>Vidas</h2></div><p className="empty">Carregando as vidas…</p></section>;
   if (v.none || !(v.vidas || []).length) {
-    return <section className="card"><div className="card-h"><h2>Vidas</h2></div><p className="empty">A relação de vidas desta empresa ainda não está nesta ficha.</p></section>;
+    return <section className="card"><div className="card-h"><h2>Vidas</h2></div><p className="empty">A relação de vidas desta empresa ainda não está nesta ficha. <button type="button" className="lnk" onClick={abrir}>Ver a distribuição de vidas</button></p></section>;
   }
   const L = v.vidas!, at = L.filter((x) => x.sit !== 'Excluído'), tit = at.filter((x) => x.td === 'T'), dep = at.filter((x) => x.td !== 'T');
   const idades = at.map((x) => +x.id).filter((x) => x >= 0), media = idades.length ? sum(idades, (x) => x) / idades.length : 0;

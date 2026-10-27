@@ -13,10 +13,11 @@ export default async function CorretoraLayout({ children, params }: { children: 
   const base = `/corretora/${c}`;
   const papel = master ? 'Master' : PAPEL[papeisCorretora(s, c).includes('admin_corretora') ? 'admin_corretora' : 'operador_corretora'];
   const links = [
-    // as quatro abas da Central (já como telas do portal; Pendências continua na Central), depois as outras telas do portal
+    // as abas da Central (já como telas do portal), depois as outras telas do portal
     { href: base, rotulo: 'Início' },
     { href: `${base}/faturamento`, rotulo: 'Faturamento' },
     ...(admin ? [{ href: `${base}/comissoes`, rotulo: 'Comissões' }, { href: `${base}/projecao`, rotulo: 'Projeção' }] : []),
+    { href: `${base}/pendencias`, rotulo: 'Pendências' },
     { href: `${base}/empresas`, rotulo: 'Empresas' },
     { href: `${base}/pedidos`, rotulo: 'Pedidos' },
     ...(admin ? [{ href: `${base}/usuarios`, rotulo: 'Equipe e acessos' }] : []),

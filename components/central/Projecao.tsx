@@ -7,6 +7,7 @@ import { type Doc, FCOL, addMonth, brl, ckey, fam, famsIn, fatItems, kfmt, mesLa
 import { type Credito, mergeCom, projAll } from '@/lib/central/projecao.gen';
 import { plural } from '@/lib/formato';
 import { Barras } from './Barras';
+import { gravar, registrar } from './gravar';
 
 const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const MESF = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -16,17 +17,6 @@ const ord = (n: number) => n + 'ª';
 const OPS = ['Porto Saúde', 'Bradesco Saúde', 'Bradesco Dental', 'Amil', 'Amil Dental', 'Hapvida', 'SulAmérica', 'Santa Helena'];
 
 export type DadosProjecao = { faturas: Doc[]; comissoes: Doc[]; agenciamentos: Doc[]; implantacoes: Doc[]; projecoes: Doc[] };
-
-// grava na Central (central_docs) pela mesma rota da Central antiga e deixa o registro na linha do tempo
-async function gravar(c: string, op: 'set' | 'delete', col: string, doc: string, dados?: Doc | Record<string, unknown>) {
-  const r = await fetch(`/api/central/${encodeURIComponent(c)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op, col, doc, dados }) });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).erro || 'não salvou');
-}
-async function registrar(c: string, agente: string, texto: string, now: string) {
-  const dia = now.slice(0, 10);
-  const j: { dados?: { itens?: unknown[] } } = await fetch(`/api/central/${encodeURIComponent(c)}?col=eventos&doc=${dia}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-  await gravar(c, 'set', 'eventos', dia, { dia, itens: [...(j?.dados?.itens || []), { ts: now, agente, texto }] });
-}
 
 export function Projecao({ c, d, hoje, usuario }: { c: string; d: DadosProjecao; hoje: string; usuario: string }) {
   const router = useRouter();
