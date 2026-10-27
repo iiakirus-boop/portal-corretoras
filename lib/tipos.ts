@@ -201,6 +201,49 @@ export type Ordem = {
   mensagem: string | null;
   sessao_url?: string | null; // a sessão do Claude que executou (para ver passo a passo)
   ordem_pai_id?: string | null;
+  modo?: 'codigo' | 'claude' | 'misto' | null; // como rodou: código (sem tokens) ou com o Claude
+  tokens_entrada?: number | null;
+  tokens_saida?: number | null;
+  custo_usd?: number | null;
+};
+
+// Cadastro dos agentes (tabela agentes) e o calendário que o supervisor aprendeu (view supervisor_previsao)
+export type Agente = {
+  id: string;
+  agente: string;
+  seguradora_id: string | null;
+  cobre: string[];
+  nome: string;
+  onde: 'nuvem' | 'pc';
+  automatico: boolean;
+  como: string | null;
+  situacao: 'ativo' | 'rascunho' | 'pausado';
+  criado_por: string;
+};
+
+export type Previsao = {
+  corretora_id: string;
+  agente: string;
+  seguradora_id: string | null;
+  competencia: string;
+  esperado_em: string;
+  atrasado: boolean;
+  motivo: string;
+};
+
+// O que o Agente Conferência achou numa competência (tabela conferencias)
+export type Conferencia = {
+  id: string;
+  corretora_id: string;
+  competencia: string;
+  seguradora_id: string | null;
+  empresa_id: string | null;
+  tipo: string;
+  gravidade: 'erro' | 'aviso';
+  mensagem: string;
+  primeira_vez: string;
+  ultima_vez: string;
+  resolvida_em: string | null;
 };
 
 export type Rotina = {

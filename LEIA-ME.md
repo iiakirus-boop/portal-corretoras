@@ -46,6 +46,21 @@ npm run dev      # http://localhost:3000
 - /master/agentes mostra o que está rodando, a fila e o que espera você, e se atualiza sozinha. Também tem o botão "Ver passo a passo" (abre a sessão), "Tentar de novo" ou "Já resolvi, continuar", "Tirar da fila", "Pausar" ou "Ligar" em cada rotina e "Colocar na fila".
 - Os botões só escrevem no banco. Quem obedece é o agente, na próxima rodada.
 
+## Código primeiro, Claude só na exceção
+
+Para o custo de tokens não crescer com o número de corretoras, cada tarefa roda no degrau mais barato que resolve:
+
+1. **Código, sem tokens.** Tudo o que é conta ou regra fixa: ler arquivo, gravar, projetar, conferir. Hoje: Projeção (função `agente-projecao`), Conferência (função `conferir` no banco, pg_cron a cada 10 min) e os scripts do PC chamados pelo vigia (`rodar.py`).
+2. **Claude só para o que o código não faz:** navegar num portal que mudou de tela, ler um layout novo, explicar uma divergência que a Conferência achou.
+
+Cada ordem grava como rodou (`modo`: código, Claude ou os dois) e, quando houver, `tokens_entrada`, `tokens_saida` e `custo_usd` (parâmetros opcionais de `agente_fim`). O /master/agentes soma o custo dos últimos 30 dias. Sem `modo` informado, `agente_fim` usa "claude" quando a ordem tem link de sessão e "código" quando não tem.
+
+**Agente Conferência** (migration `supabase/migrations/20261026_p19_custo_conferencia.sql`): depois de Faturas, Vidas e Comissões, confere a competência e grava em `conferencias` o que não bate: fatura duplicada, valor da fatura × soma das vidas, nº de vidas × lista, vidas que sumiram, fatura que faltou em relação ao mês anterior, comissão × prêmio e taxa, classe × taxa (acima de 50% agenciamento, até 10% vitalício) e comissão de quem não está no cadastro. Nada é apagado: o que deixa de aparecer ganha `resolvida_em`. Divergência de comissão só o administrador da corretora vê.
+
+**Agente Supervisor** (migration `supabase/migrations/20261026_p20_supervisor.sql`): decide sozinho o que precisa rodar. A view `supervisor_previsao` aprende o calendário pelo histórico. Para faturas, a próxima de cada empresa sai por volta da última emissão + 1 mês. Para comissão, ela vê de quantos em quantos dias cada seguradora paga e quando foi a última importação. A cada 30 minutos (7h às 20h), `supervisionar()` põe na fila o que está atrasado (origem `supervisor`, no máximo um pedido por dia para cada agente + seguradora + competência). Ela também cancela os pedidos dela que não precisam mais. Para seguradora com dados no banco e sem agente, cria um rascunho na tabela `agentes` e um pedido "criar agente" para alguém montar com a skill `criar-agente-seguradora`.
+
+A tabela `agentes` é o cadastro: quem existe, onde roda (nuvem ou PC), se roda sozinho e quais seguradoras cada um também atende (Amil → Amil Dental e Santa Helena). `agente_fila` só entrega ao PC o que roda no PC.
+
 ## Arquivos
 
 - Faturas, boletos e anexos ficam no bucket privado `documentos`. O download passa por `/arquivo/<id>`, que confere o acesso e gera um link de 60 segundos.
