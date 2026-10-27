@@ -39,7 +39,8 @@ x as (
                       and (d.seguradora_id = g.seguradora_id or d.seguradora_id = any(g.cobre)))) as ult
     from ag g)
 select x.corretora_id, x.agente, x.seguradora_id,
-       to_char(now() - interval '3 hours', 'YYYY-MM') as competencia,
+       -- faturas: a do mês seguinte (é a que sai no portal ao longo do mês); comissão: o mês atual
+       to_char(now() - interval '3 hours' + case when x.agente = 'faturas' then interval '1 month' else interval '0' end, 'YYYY-MM') as competencia,
        ((coalesce(x.ult, now() - interval '2 days') + interval '24 hours') - interval '3 hours')::date as esperado_em,
        x.ult is null or x.ult < now() - interval '24 hours' as atrasado,
        case when x.ult is null then 'nunca rodou'
