@@ -20,7 +20,7 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
   const [op, setOp] = useState('todas');
   const [mesSel, setMes] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const centralUrl = (pg: string) => (pg === 'projecao' ? `/corretora/${c}/projecao` : `/central/${c}#${pg}`);
+  const centralUrl = (pg: string) => `/corretora/${c}/${pg}`;
   const fichaUrl = (eid: string) => `/corretora/${c}/faturamento?emp=${encodeURIComponent(eid)}`;
 
   const base = useMemo(() => {

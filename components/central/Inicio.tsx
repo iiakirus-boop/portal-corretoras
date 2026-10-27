@@ -26,7 +26,7 @@ export type DadosInicio = { faturas: Doc[]; comissoes: Doc[]; agenciamentos: Doc
 
 export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje: string; admin: boolean }) {
   const [hday, setHday] = useState<string | null>(null);
-  const base = `/corretora/${c}`, pend = `/central/${c}#pendencias`;
+  const base = `/corretora/${c}`, pend = `/corretora/${c}/pendencias`;
   const fichaUrl = (eid: string) => `${base}/faturamento?emp=${encodeURIComponent(eid)}`;
   const [y, m, dd] = hoje.split('-').map(Number), T = new Date(Date.UTC(y, m - 1, dd)), cm = ckey(T);
 
@@ -94,7 +94,7 @@ export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje:
             <span className="kpi-s">R$ {brl(caiu)} já caiu · R$ {brl(falta)} a cair{vAtr ? <>, <b style={{ color: 'var(--bad-fg)' }}>R$ {brl(vAtr)} em atraso</b></> : null}<br />{mesLabel(nm)}: R$ {brl(pNext)}</span>
           </Link>
         )}
-        <a className="kpi" href={pend}><span className="kpi-l">Pendências</span><span className="kpi-v">{need.length} <span className="kpi-un">com você</span></span><span className="kpi-s">{doing.length} em andamento com os agentes</span></a>
+        <Link className="kpi" href={pend}><span className="kpi-l">Pendências</span><span className="kpi-v">{need.length} <span className="kpi-un">com você</span></span><span className="kpi-s">{doing.length} em andamento com os agentes</span></Link>
       </div>
 
       <div className="grid g32" style={{ alignItems: 'start' }}>
@@ -140,10 +140,10 @@ export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje:
               {agentes.length ? agentes.map((a) => {
                 const n = pendAg[a.id] || 0, st = n ? [`Com você (${n})`, 'p-warn'] : STATUS[a.status] || STATUS.em_dia;
                 return (
-                  <a key={a.id} className="agent" href={pend} title={a.atividade || ''}>
+                  <Link key={a.id} className="agent" href={`${pend}?agente=${encodeURIComponent(a.id)}`} title={a.atividade || ''}>
                     <span className="ic"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICON[a.id] || ICON.faturas}</svg></span>
                     {String(a.nome || a.id).replace(/^Agente /, '')}<span className={`pill ${st[1]}`}>{st[0]}</span>
-                  </a>
+                  </Link>
                 );
               }) : <p className="empty">Os agentes aparecem aqui assim que a base responder.</p>}
             </div>
