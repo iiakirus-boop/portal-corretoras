@@ -116,11 +116,13 @@ function projModel(faturas,comissoes,hoje,agcfg,imps){
   // projeção a partir da última fatura de cada empresa (não do último mês geral: um mês que ainda está chegando
   // derrubaria as empresas que ainda não faturaram nele). Empresa sem fatura nos 2 últimos meses fica de fora (cancelada).
   // proteção: se a última fatura da empresa veio mais de 30% abaixo da média dos 3 meses anteriores, projeta pela média
-  const totE={};fat.forEach(r=>{const o=totE[r.eid]=totE[r.eid]||{};o[r.comp]=(o[r.comp]||0)+(+r.valor||0)});
-  const lastE={};fat.forEach(r=>{if(!lastE[r.eid]||r.comp>lastE[r.eid])lastE[r.eid]=r.comp});
+  // a chave é empresa + operadora: a mesma empresa pode ter saúde e dental faturando em meses diferentes
+  const kE=r=>r.eid+'|'+r.operadora;
+  const totE={};fat.forEach(r=>{const o=totE[kE(r)]=totE[kE(r)]||{};o[r.comp]=(o[r.comp]||0)+(+r.valor||0)});
+  const lastE={};fat.forEach(r=>{const k=kE(r);if(!lastE[k]||r.comp>lastE[k])lastE[k]=r.comp});
   const corte=addM(ultComp,-1);
   const fatorE={};Object.entries(totE).forEach(([e,o])=>{const lc=lastE[e];const cur=o[lc];if(!cur)return;const prev=[1,2,3].map(k=>o[addM(lc,-k)]).filter(x=>x>0);if(prev.length<2)return;const med=prev.reduce((a,b)=>a+b,0)/prev.length;if(cur<0.7*med)fatorE[e]={f:med/cur,cur,med}});
-  const base=fat.filter(r=>r.comp===lastE[r.eid]&&r.comp>=corte).map(r=>{const F=fatorE[r.eid];return F?Object.assign({},r,{valor:(+r.valor||0)*F.f,valor0:+r.valor||0,fora:F}):r});
+  const base=fat.filter(r=>r.comp===lastE[kE(r)]&&r.comp>=corte).map(r=>{const F=fatorE[kE(r)];return F?Object.assign({},r,{valor:(+r.valor||0)*F.f,valor0:+r.valor||0,fora:F}):r});
   const nM=(a,b)=>{const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1)};
   base.forEach(r=>{const lc=r.comp;
     for(let k=1;k<=nM(lc,ultComp)+H;k++){const comp=addM(lc,k);const v0=shiftM(pd(r.venc),k),v=util(v0);
