@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cliente, exigirCorretora } from '@/lib/servidor';
-import { ABERTOS, competencia, data, moeda, num, seg, TIPO_PEDIDO } from '@/lib/formato';
+import { ABERTOS, competencia, data, moeda, num, plural, seg, TIPO_PEDIDO } from '@/lib/formato';
 import { Aviso } from '@/components/Aviso';
 import { Pessoas } from '@/components/Pessoas';
 import { Pill, StatusPill } from '@/components/Pill';
@@ -82,7 +82,7 @@ export default async function FichaEmpresa({ params, searchParams }: P) {
               ))}
             </ul>
           )}
-          <p className="note">{num(fs.length)} faturas registradas, total de {moeda(fs.reduce((t, f) => t + (f.valor_total ?? 0), 0))}.</p>
+          <p className="note">{plural(fs.length, 'fatura registrada', 'faturas registradas')}, total de {moeda(fs.reduce((t, f) => t + (f.valor_total ?? 0), 0))}.</p>
         </section>
       </div>
 

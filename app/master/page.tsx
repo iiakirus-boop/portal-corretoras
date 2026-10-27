@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
-import { ABERTOS, AGENTE, data, num, ORDEM_ROTULO, ORDEM_TOM, quando, seg, TIPO_PEDIDO } from '@/lib/formato';
+import { ABERTOS, AGENTE, data, num, plural, ORDEM_ROTULO, ORDEM_TOM, quando, seg, TIPO_PEDIDO } from '@/lib/formato';
 import { sinal, vidasCarteira, type FaturaUltima } from '@/lib/contas';
 import { Pill, StatusPill } from '@/components/Pill';
 import type { Corretora, Empresa, LoginStatus, Maquina, Ordem, Pedido } from '@/lib/tipos';
@@ -43,7 +43,7 @@ export default async function Master() {
         <Link href="/master/corretoras" className="kpi"><span className="kpi-l">Corretoras ativas</span><span className="kpi-v">{num(cs.filter((c) => c.ativa).length)}</span><span className="kpi-s">{num(es.length)} empresas na carteira</span></Link>
         <Link href="/master/cobranca" className="kpi"><span className="kpi-l">Vidas ativas</span><span className="kpi-v">{num(vidasCarteira(fs))}</span><span className="kpi-s">pelas faturas do mês mais recente, como na Central</span></Link>
         <div className="kpi"><span className="kpi-l">Pedidos em andamento</span><span className="kpi-v">{num(ps.length)}</span><span className="kpi-s">{atrasados.length ? `${atrasados.length} passaram do prazo` : 'nenhum atrasado'}</span></div>
-        <Link href="/master/agentes" className={`kpi${precisa.length + caidos.length ? ' alerta' : ''}`}><span className="kpi-l">Precisa de você</span><span className="kpi-v">{num(precisa.length + caidos.length)}</span><span className="kpi-s">{caidos.length} login(s) caído(s), {precisa.length} execução(ões) parada(s)</span></Link>
+        <Link href="/master/agentes" className={`kpi${precisa.length + caidos.length ? ' alerta' : ''}`}><span className="kpi-l">Precisa de você</span><span className="kpi-v">{num(precisa.length + caidos.length)}</span><span className="kpi-s">{plural(caidos.length, 'login caído', 'logins caídos')}, {plural(precisa.length, 'execução parada', 'execuções paradas')}</span></Link>
       </div>
 
       <div className="grid g32">
@@ -103,7 +103,7 @@ export default async function Master() {
               {os.slice(0, 10).map((o) => (
                 <tr key={o.id}>
                   <td><b>{AGENTE[o.agente] ?? o.agente}</b></td><td>{nomeC(o.corretora_id)}</td><td>{seg(o.seguradora_id)}</td><td>{o.origem}</td>
-                  <td><Pill tom={ORDEM_TOM[o.status]}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
+                  <td><Pill tom={ORDEM_TOM[o.status]} vivo={o.status === 'em_execucao'}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

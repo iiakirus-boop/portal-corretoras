@@ -88,7 +88,7 @@ export default async function Agentes({ searchParams }: P) {
               <li key={o.id}>
                 <div><b>{titulo(o)}</b><small>{nomeC(o.corretora_id)} · {o.mensagem ?? '—'} · {quando(o.iniciada_em ?? o.criada_em)}</small></div>
                 <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <Pill tom={ORDEM_TOM[o.status]}>{ORDEM_ROTULO[o.status]}</Pill>
+                  <Pill tom={ORDEM_TOM[o.status]} vivo={o.status === 'em_execucao'}>{ORDEM_ROTULO[o.status]}</Pill>
                   {sessao(o)}
                   {o.status !== 'em_execucao' && (
                     <form action={repetirOrdem}><input type="hidden" name="id" value={o.id} /><button className="btn ghost">{o.status === 'erro' ? 'Tentar de novo' : 'Já resolvi, continuar'}</button></form>
@@ -234,7 +234,7 @@ export default async function Agentes({ searchParams }: P) {
               {os.map((o) => (
                 <tr key={o.id}>
                   <td><b>{AGENTE[o.agente] ?? o.agente}</b></td><td>{nomeC(o.corretora_id)}</td><td>{seg(o.seguradora_id)}</td><td>{o.competencia ?? '—'}</td><td>{o.origem}</td>
-                  <td><Pill tom={ORDEM_TOM[o.status]}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{como(o)}</td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
+                  <td><Pill tom={ORDEM_TOM[o.status]} vivo={o.status === 'em_execucao'}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{como(o)}</td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
                   <td>{sessao(o) ?? (o.status === 'pendente' && (
                     <form action={cancelarOrdem}><input type="hidden" name="id" value={o.id} /><button className="btn ghost">Tirar da fila</button></form>
                   ))}</td>
