@@ -61,7 +61,7 @@ export const papeisEmpresa = (s: Sessao, e: string) => s.membros.filter((m) => m
 export function destino(s: Sessao): string {
   if (ehMaster(s)) return '/master';
   const c = s.membros.find((m) => m.papel === 'admin_corretora' || m.papel === 'operador_corretora');
-  if (c) return `/central/${c.corretora_id}`;
+  if (c) return `/corretora/${c.corretora_id}`;
   const e = s.membros.find((m) => m.empresa_id);
   if (e) return `/empresa/${e.empresa_id}`;
   return '/sem-acesso';

@@ -1,6 +1,7 @@
 import 'server-only';
 import { MODO_DEMO, type Cliente } from '../servidor';
 import { centralDemo } from './demo';
+import { pedidosComoTarefas } from './pedidos';
 import type { Doc } from './modelo';
 
 // Documentos da Central (tabela central_docs) de várias coleções de uma vez, já separados por coleção.
@@ -9,15 +10,15 @@ export async function docsCentral(db: Cliente, c: string, cols: string[]): Promi
   const out: Record<string, Doc[]> = Object.fromEntries(cols.map((col) => [col, []]));
   if (MODO_DEMO) {
     for (const col of cols) out[col] = Object.entries(centralDemo(c)[col] ?? {}).map(([id, dados]) => ({ ...(dados as object), id }));
-    return out;
-  }
-  for (let de = 0; ; de += 1000) {
+  } else for (let de = 0; ; de += 1000) {
     const { data, error } = await db.from('central_docs').select('colecao,doc_id,dados')
       .eq('corretora_id', c).in('colecao', cols).order('colecao').order('doc_id').range(de, de + 999);
     if (error) throw new Error(error.message);
     for (const r of data ?? []) out[r.colecao].push({ ...(r.dados ?? {}), id: r.doc_id });
     if (!data || data.length < 1000) break;
   }
+  // os pedidos do portal entram como tarefas do Agente Movimentações, como na Central
+  if (out.tarefas) out.tarefas.push(...(await pedidosComoTarefas(db, c)).map((t: { id: string; dados: object }) => ({ ...t.dados, id: t.id })));
   return out;
 }
 

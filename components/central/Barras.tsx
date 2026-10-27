@@ -1,14 +1,15 @@
 'use client';
 // Barras empilhadas por seguradora (o barsSVG da Central): clique ou Enter troca o mês, o balão mostra cada seguradora
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { FCOL, brl, kfmt } from '@/lib/central/modelo';
 
-export type Coluna = { key: string; label: string; sub?: string; title?: string; vals: Record<string, number> };
+export type Coluna = { key: string; label: string; sub?: string; title?: string; vals: Record<string, number>; extra?: React.ReactNode; proj?: boolean };
 
 export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
   colunas: Coluna[]; chaves: string[]; sel?: string; onClick?: (k: string) => void; aria: string; h?: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  const pid = 'hz' + useId().replace(/:/g, '');
   const [larg, setLarg] = useState(600);
   const [tip, setTip] = useState<number | null>(null);
   useEffect(() => {
@@ -34,6 +35,7 @@ export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
   return (
     <div className="chart" ref={box}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H }} role="img" aria-label={aria}>
+        <defs><pattern id={pid} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="var(--surface)" strokeWidth="2" opacity=".55" /></pattern></defs>
         {ticks.map((t) => (
           <g key={t}><line className="grid-l" x1={PADL - 4} x2={W} y1={Y(t)} y2={Y(t)} /><text className="ax" x={0} y={Y(t) + 4}>{t ? kfmt(t) : '0'}</text></g>
         ))}
@@ -49,7 +51,12 @@ export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
               {chaves.map((k) => {
                 const v = c.vals[k] || 0; if (v <= 0) return null;
                 const hh = Math.max(1, Y(0) - Y(v)), y = y0 - hh; y0 = y;
-                return <rect key={k} x={cx(i) - bw / 2} y={y} width={bw} height={hh} fill={FCOL[k] || 'var(--accent)'} stroke="var(--surface)" strokeWidth={1} />;
+                return (
+                  <g key={k} style={c.proj ? { opacity: 0.55 } : undefined}>
+                    <rect x={cx(i) - bw / 2} y={y} width={bw} height={hh} fill={FCOL[k] || 'var(--accent)'} stroke="var(--surface)" strokeWidth={1} />
+                    {c.proj && <rect x={cx(i) - bw / 2} y={y} width={bw} height={hh} fill={`url(#${pid})`} />}
+                  </g>
+                );
               })}
               {tv > 0 && <text className="val" x={cx(i)} y={Y(tv) - 6} textAnchor="middle" style={{ fontSize: small ? 10 : 11.5 }}>{kfmt(tv)}</text>}
               <text className="ax" x={cx(i)} y={H - bot + 15} textAnchor="middle" style={{ fontWeight: ativo ? 800 : 600, fill: 'var(--fg)', fontSize: small ? 10 : 11 }}>{c.label}</text>
@@ -60,9 +67,10 @@ export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
       </svg>
       {b && tip != null && (
         <div className="tip" style={{ left: Math.min(Math.max(cx(tip), 90), W - 90), top: Math.max(40, Y(tot(b)) - 8) }}>
-          <b>{b.title || b.label}</b>
+          <b>{b.title || b.label}{b.proj ? ' (projetado)' : ''}</b>
           {chaves.filter((k) => b.vals[k] > 0).map((k) => <span key={k}><br /><i style={{ background: FCOL[k] }} />{k}: R$ <b>{brl(b.vals[k])}</b></span>)}
           {chaves.length > 1 && <><br />Total: R$ <b>{brl(tot(b))}</b></>}
+          {b.extra && <><br />{b.extra}</>}
         </div>
       )}
     </div>

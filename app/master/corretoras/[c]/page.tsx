@@ -45,7 +45,10 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
           <h1>{k.nome}</h1>
           <p>{k.razao_social} ({cnpj(k.cnpj)})</p>
         </div>
-        <a href={`/central/${c}`} className="btn">Abrir a Central desta corretora</a>
+        <div className="acoes">
+          <a href={`/corretora/${c}`} className="btn">Abrir o painel desta corretora</a>
+          <a href={`/central/${c}`} className="btn ghost">Central antiga</a>
+        </div>
       </div>
       <Aviso sp={sp} />
 
