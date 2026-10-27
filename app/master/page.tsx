@@ -26,7 +26,9 @@ export default async function Master() {
   const nomeC = (id: string) => cs.find((c) => c.id === id)?.nome ?? '—';
   const nomeE = (id: string) => { const e = es.find((x) => x.id === id); return e?.nome_curto ?? e?.razao_social ?? '—'; };
   const precisa = os.filter((o) => o.status === 'aguardando_voce' || o.status === 'erro');
-  const caidos = ls.filter((l) => !l.ativa);
+  // o vigia do PC confere a cada 2 min e grava a cada 10: sem notícia há 20 min, o PC ou o vigia parou
+  const velho = (l: LoginStatus) => Date.now() - new Date(l.verificado_em).getTime() > 20 * 60 * 1000;
+  const caidos = ls.filter((l) => !l.ativa || velho(l));
   const atrasados = ps.filter((p) => p.prazo && p.prazo < new Date().toISOString().slice(0, 10));
 
   return (
@@ -85,11 +87,11 @@ export default async function Master() {
               {ls.map((l) => (
                 <li key={`${l.corretora_id}${l.codigo}`}>
                   <div><b>{seg(l.seguradora_id)} {l.codigo}</b><small>{nomeC(l.corretora_id)}, conferido {quando(l.verificado_em)}</small></div>
-                  {l.ativa ? <Pill tom="ok">Ativo</Pill> : <Pill tom="warn">Precisa entrar</Pill>}
+                  {velho(l) ? <Pill tom="warn">Sem notícia do PC</Pill> : l.ativa ? <Pill tom="ok">Ativo</Pill> : <Pill tom="warn">Caiu</Pill>}
                 </li>
               ))}
             </ul>
-            <p className="note">Quando um login cai, alguém da corretora entra no portal da seguradora. O robô nunca digita senha.</p>
+            <p className="note">O vigia do PC confere os logins a cada 2 minutos. Quando um cai, o próprio agente entra de novo com a senha guardada no cofre do Windows na próxima vez que precisar do portal. Só captcha ou código por SMS ficam com você.</p>
           </section>
         </div>
       </div>

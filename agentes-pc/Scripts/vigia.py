@@ -13,11 +13,12 @@ O que ele roda sozinho:
     Hapvida" nas 9335/9336/9337 para a comissão, os três logins; a Hapvida faturas entra sozinha); 2) baixa com
     baixar_<op>.js (faturas: competência do pedido ou a próxima; comissão: do último pagamento já importado até hoje;
     Hapvida: mês de referência do pedido ou o atual); 3) rodar.py --ordem <id>, que grava, publica na Central e sincroniza.
-    Login caído (ou saída 3 do baixar) = "esperando você: login caiu: clique em Entrar na <op>". Saída 2 = erro, com o
+    Login caído: o vigia abre sozinho o "Entrar na <op>" (login_<op>.ps1, senha do cofre do Windows) e espera até 4 min;
+    sem senha no cofre, já tentou na última meia hora ou saída 3 do baixar = "esperando você". Saída 2 = erro, com o
     print em Scripts/_socorro. Nada novo no portal = concluída.
   - Faturas SulAmérica e Amil: lê os arquivos que já estão em "boletos a enviar".
   - Pedido com a pasta ou os arquivos (parametros.entrada / parametros.arquivos): roda direto com eles.
-    O agente nunca digita senha: login caído é sempre com alguém.
+    A cada volta manda ao master o estado de cada login (Visão geral > Logins nas seguradoras).
   - Projeção: não é com ele. Roda na nuvem (depois de faturas e de comissão, pelo agente_fim).
 
 Base aberta no Excel: o rodar.py marca "esperando você"; feche a planilha e use "repetir" no master.
@@ -33,7 +34,7 @@ import sys, os, time, datetime, subprocess, json, urllib.request
 import banco
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-VERSAO = 'vigia 2026-10-27'
+VERSAO = 'vigia 2026-10-27b'
 INTERVALO = int(os.environ.get('SHADDAI_VIGIA_MINUTOS', '2')) * 60
 MAQUINA = os.environ.get('SHADDAI_MAQUINA', 'PC do Bruno')
 LOG = os.path.join(AQUI, '_vigia.log')
@@ -50,6 +51,11 @@ def log(msg):
 
 def sinal():
     banco._rpc('agente_sinal', dict(p_maquina=MAQUINA, p_versao=VERSAO))
+    try:
+        banco.logins([dict(seguradora=banco.SEG[op], codigo=cod, ativa=logado(op, porta, dom)) for op, cod, porta, dom in LOGINS],
+                     MAQUINA)
+    except Exception as e:  # o estado dos logins nunca para o vigia
+        log(f'estado dos logins: {e.__class__.__name__}: {e}')
 
 
 def comando(o):
@@ -87,6 +93,15 @@ AUTO = {('faturas', 'porto'), ('faturas', 'bradesco'), ('faturas', 'hapvida'),
 PORTA = {'porto': (9334, 'portoseguro.com.br'), 'bradesco': (9333, 'bradescoseguros.com.br')}  # Chrome dos atalhos "Entrar na ..."
 WEBHAP = {9335: 'Hapvida', 9336: 'Hapvida_045L', 9337: 'Hapvida_02JZ'}  # comissão Hapvida: um Chrome por login (045K, 045L, 02JZ)
 NOME = {'porto': 'Porto', 'bradesco': 'Bradesco', 'hapvida': 'Hapvida'}
+# o que vai para o master: (op, código na corretora_codigos, porta, domínio)
+LOGINS = [('porto', 'BA6QXJ', 9334, 'portoseguro.com.br'), ('bradesco', 'Portal', 9333, 'bradescoseguros.com.br'),
+          ('hapvida', '045K', 9335, 'webhap.hapvida.com.br'), ('hapvida', '045L', 9336, 'webhap.hapvida.com.br'),
+          ('hapvida', '02JZ', 9337, 'webhap.hapvida.com.br')]
+# login automático: o mesmo atalho "Entrar na <op>", que só pede senha quando ela não está no cofre (aí fica com você)
+COFRE = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Shaddai')
+ENTRAR = {'porto': ('login_porto.ps1', ['porto.cred']), 'bradesco': ('login_bradesco.ps1', ['bradesco.cred']),
+          'hapvida': ('login_hapvida.ps1', ['hapvida_045K.cred', 'hapvida_045L.cred', 'hapvida_02JZ.cred'])}
+TENTOU = {}  # op -> quando o vigia abriu o login pela última vez
 SEGURADORA = {'porto': ('PORTO SEGURO - SEGURO SAUDE', 'PORTOMED'), 'bradesco': ('BRADESCO',)}
 
 
@@ -100,6 +115,33 @@ def logado(op, porta=None, dominio='webhap.hapvida.com.br'):
     except Exception:
         return False
     return any(dominio in a.get('url', '') for a in abas if a.get('type') == 'page')
+
+
+def todos_logados(op, ag):
+    if op in PORTA:
+        return logado(op)
+    return ag != 'comissao' or all(logado(op, p) for p in WEBHAP)  # Hapvida faturas entra sozinha no baixar
+
+
+def entrar(op, ag):
+    """Abre o "Entrar na <op>" numa janela própria (como o atalho) e espera o portal ficar logado. Só com a senha no
+    cofre e no máximo uma vez a cada 30 min, para não bloquear o login com tentativas repetidas."""
+    ps1, creds = ENTRAR[op]
+    if not all(os.path.exists(os.path.join(COFRE, c)) for c in creds):
+        return 'sem a senha no cofre: clique uma vez em Entrar na ' + NOME[op] + ' para guardar'
+    if time.time() - TENTOU.get(op, 0) < 30 * 60:
+        return 'o login automático já tentou há menos de 30 min (captcha ou código?): termine na janela do Chrome'
+    TENTOU[op] = time.time()
+    log(f'{op}: login caído, abrindo {ps1}')
+    subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', os.path.join(AQUI, ps1)], cwd=AQUI,
+                     creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
+    for _ in range(24):  # até 4 min
+        time.sleep(10)
+        if todos_logados(op, ag):
+            time.sleep(60)  # o portal abre antes do login terminar (Porto ainda escolhe a SUSEP)
+            log(f'{op}: login automático feito')
+            return None
+    return 'o login automático não terminou em 4 min (captcha ou código?): termine na janela do Chrome'
 
 
 def ultimo_pagamento(op):
@@ -130,11 +172,11 @@ def automatico(o, simular=False):
     if not simular:
         banco.inicio(ag, ordem=o['id'], maquina=MAQUINA, mensagem='Baixando do portal')
     caiu = f'login caiu: clique em Entrar na {NOME[op]}'
-    if op in PORTA and not logado(op):
-        return parar(o, 'aguardando_voce', caiu, simular)
-    # os três logins juntos: o painel do mês sai das três pastas (comissao_hapvida.py)
-    if ag == 'comissao' and op == 'hapvida' and not all(logado(op, p) for p in WEBHAP):
-        return parar(o, 'aguardando_voce', caiu, simular)
+    # os três logins juntos na comissão Hapvida: o painel do mês sai das três pastas (comissao_hapvida.py)
+    if not todos_logados(op, ag):
+        motivo = entrar(op, ag)
+        if motivo:
+            return parar(o, 'aguardando_voce', f'login caiu, {motivo}', simular)
     comp = (o.get('competencia') or '').strip() or proxima_comp(hoje)
     if ag == 'faturas':
         args = ['faturas', f'{comp}-01' if op == 'hapvida' else comp]

@@ -93,3 +93,9 @@ def publicar(arquivos):
         total += _rpc('central_lote', dict(p_corretora=CORRETORA, p_docs=lote)) or 0
     print(f'[banco] Central do site: {total} documento(s) atualizados.')
     return total
+
+
+def logins(lista, maquina=None):
+    """Estado dos logins dos portais para o master (Logins nas seguradoras): [{seguradora, codigo, ativa, obs}]."""
+    return _rpc('agente_logins', dict(p_corretora=CORRETORA, p_maquina=maquina or os.environ.get('SHADDAI_MAQUINA', 'PC do Bruno'),
+                                      p_logins=lista))
