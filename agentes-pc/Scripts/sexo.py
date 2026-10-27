@@ -1,0 +1,84 @@
+# -*- coding: utf-8 -*-
+"""Agente Vidas — sexo de cada beneficiário.
+Ordem: 1) sexo informado pela operadora (PDF Bradesco)  2) correção da equipe em FATURAS/Vidas/Sexo_por_nome.csv
+3) parentesco (Filho/Filha, Enteado/Enteada…)  4) primeiro nome (gender-guesser + lista manual)  5) '?' = não identificado."""
+import os, csv, glob, json, unicodedata
+AQUI = os.path.dirname(os.path.abspath(__file__)); FAT = os.path.dirname(AQUI)
+CSV = os.path.join(FAT, 'Vidas', 'Sexo_por_nome.csv'); CACHE = os.path.join(AQUI, '_painel', 'sexo_bradesco.json')
+M = set('''ABRAAO ADAILTON ADEMILSON ADEMILTON ADEMIR ADERCIO ADILSON ADIMAR ADRIEL AELSON AGENOR ALAHDJIN ALAOR ALECIO ALERIO ALEXSANDRO ALLEF
+AMILTON ANDRIO APARECIDO AREDIO ARIELTON ARIVALDO BENIVALDO BERNANDO BRENO CAIQUE CAUE CAUEH CAZIMIRO CLAUDINEI CLAYDSON CLEBER CLECIO CLEISON
+CLEITON CLESIO CLEYDSON CLODOALDO CYRO DAMIAO DANYEL DARCISIO DAVI DEIVERSON DELVO DENNER DEUSDETE DEUZIVAN DHYERRES DIOGENES DIRCEU DJEAN DONISETE
+DORIVAL DOVILIO EDEMILSON EDER EDICARLOS EDILSON EDIMO EDMILSON EDNALDO ELCIO ELIVELTON ELZAIR ENOQUE EPAMINONDAS ERISVALDO ERIVALDO ERNANDO ERNANE
+ERONILDO ESLAN EVAIR EVERALDO EVERTON FRANCINALDO FRANCIVALDO FREDSON GABRYEL GARCIONI GENARIO GENILTON GENIVALDO GEOVANNE GESIO GILDASIO GILENO GILSON
+GILVAN GIVANILDO GLAUCIMAR GLAUCIO GLEDSON GUILHERGME GULIVER GUTEMBERG HELTON HENZO HERIQUE HERIVELTO HIGOR IBSEN IGO ILTON ISAQUE ISMAR IVAIR IVISOM
+JAILSON JAILTON JANAILSON JANDSON JANIO JASIER JEFERSON JENILSON JHONATA JHONATAN JHOSEFER JOAO JOÃÆO JO?O JOANCIR JONATA JOSAFA JOSIAS JOSIELSON JOSILDO
+JOSIMAR JOSIVAL JOZINALDO KAIQUE KAUA KAUAN KLEVERSON LAERCIO LEVY LICINO LINIKER LOURIVAL LUCCA LUI LUIZ MATHEUS MAYCON MESSIAS MIQUEIAS MOACIR MURILO
+NERIVALDO NILDO NILSON NILTON OCIMAR OSMAR PETERSON PETRICK RAI RAVI REINILSON RENILSON RENNAN RIAN RIQUELME ROBINSON ROBSON RODOLFHO ROMULO RONILDO ROSIEL
+RYAN SALATIEL SAVIO SEBASTIAO SENIVALDO SIDNEI TADER THAYLLAN THIAGO THIEISSON TONINHO UBIRAJARA VALDEMIR VALDERI VALDIR VANDERSON VITOR VITTOR WANDERLEI
+WANDERLEY WELLINGTON WELLISSON WESLEI WILIAM WILLIANS WILLIAN WISNEY YGOR'''.split())
+F = set('''ADRIELLY AIRIDES ALCIONE ALYNE ALZENIR ANANIETA ANDRESSA ANTONILDE APARECIDA ARIADNE ARIELLA AYLLA BHEATRIZ CAROLINNE CASSIANE CAYENE CELINNE
+CIBELE CICERA CILEIANE CIRLENE CLAUDETE CLAUDINETECAVALCANTE CLEIDE CLEONICE CLESIA CRISTIANE DAIANE DELICE DEUSIRENE DILANI EDIANA EDILANE EDILEIDE
+EDILENE EDILEUSA EDJANE EDNALVA EDNETE ELENICE ELENILZA ELENIR ELIETE ELISANGELA ELOA ELOAH ELZANIRA EMILLY FRANCIELLE FRANCILENE FRANCIMARA FRANCINI
+FRANCIVANIA GABRIELLI GARDENIA GEISA GEOVANA GEOVANNA GESIANE GILDETE GIOVANA GIRLAINE GISELE GISELIA GIVANIA GLAUCIA GLEISIANE GLEYCE GRACIELHA GRAZIELE
+GREICE HELOISA HEMANOELLY HOZANA IAMARA IARA IDAIANE ILARA IRACI IRISNEIDE ISABELLY ISADORA IVANEIDE IVANETE IVANILDA IVETE IVINNA IVONETE IZABEL IZILDA
+JACILENE JACIRA JANAINA JANAINE JANAINI JANELEIDE JANETE JAQUELINI JEIZA JESSAMINE JOANITA JOCACIA JOCELIA JOSEANE JOSELMA JOSEMARY JOSILENE JOSINEIDE
+JUCINEIDE JULIENE JULIETE JUNIA JUSSANA JUSSARA KANANDA KELLY KELYN KEROLLYN KEZIA LAIANE LAIS LAIZ LAVNIA LAYS LAYSSA LAYZA LEIDE LEILIANE LENICE
+LETHYCIA LIDIANE LIUZENE LIVYA LUCIARA LUCIENE LUCILENE LUCIMARA LUCINEIA LUCIVANIA LUNNA LUZINETE LYGIA MACIENE MAIARA MANOELA MARIA MARILEIDE MARILIA
+MARILZA MARINEIDE MARIZA MARIZE MARIZETE MARLUCI MAYARA MAZILENE MEIRI MICAELLA MIRLAYNE MONICK NAIR NAJELA NALU NATALLY NEILA NHARA NICOLLY NICOLY NILZETE
+PAOMA QUITERIA RAFAELLA RAILDA RAYANNE RAYELLY REGIA REGIANE REJANES RELIANE ROMIELI ROSAMARI ROSEANE ROSELI ROSEMEIRE ROSENEIDE ROSENILDA ROSENILDE
+ROSIMEIRE ROSIMELRY ROZANGELA SAMILI SAMYRA SHAIANE SIDNEIA SILVANIA SORAIA STHEFANE STHEFANIE SUELEN SUELI SUELY TAISA TALITA TAMIRES TATIANE TAYNARA
+THABATA THAIANNY THAIS THALISSA THAMIRES THAMIRIS THAUANY THAYNA VALDENICE VALQUIRIA VANIELE VANILDA VANUZIA VITORIA VIVIANI WALDIRENE WALESCA WANESSA
+YASKARA YASMIM ZELENE ZENAIDE ZULEIDE LUCIMAR'''.split())
+M.update({'JOAÆO', 'JOAO'}); M = {_s0 for _s0 in M}
+PAR = {'FILHA': 'F', 'FILHO': 'M', 'ENTEADA': 'F', 'ENTEADO': 'M', 'ESPOSA': 'F', 'MARIDO': 'M', 'NORA': 'F', 'GENRO': 'M', 'MAE': 'F', 'PAI': 'M', 'NETA': 'F', 'NETO': 'M'}
+
+def _s(x): return ' '.join(''.join(c for c in unicodedata.normalize('NFD', str(x or '')).upper() if c == ' ' or ('A' <= c <= 'Z') or c.isdigit()).split())
+
+_det = None
+def _gg(n):
+    global _det
+    try:
+        import gender_guesser.detector as gd
+    except ImportError:
+        return None
+    _det = _det or gd.Detector(case_sensitive=False)
+    g = _det.get_gender(n.capitalize(), 'portugal')
+    if g in ('unknown', 'andy'): g = _det.get_gender(n.capitalize())
+    return {'male': 'M', 'female': 'F', 'mostly_male': 'M', 'mostly_female': 'F'}.get(g)
+
+def carregar():
+    over = {}
+    if os.path.exists(CSV):
+        for r in csv.DictReader(open(CSV, encoding='utf-8-sig'), delimiter=';'):
+            if r.get('sexo', '').strip().upper() in ('M', 'F'): over[_s(r['nome'])] = r['sexo'].strip().upper()
+    brad = json.load(open(CACHE, encoding='utf-8')) if os.path.exists(CACHE) else {}
+    return over, brad
+
+def bradesco_cache():
+    """Lê o sexo dos PDFs do Bradesco já baixados (uma vez; guarda em _painel/sexo_bradesco.json)."""
+    import faturas_bradesco as fb
+    out = json.load(open(CACHE, encoding='utf-8')) if os.path.exists(CACHE) else {}
+    for f in glob.glob(os.path.join(FAT, 'Faturas', '*', 'Bradesco*', '*', '*FATURADOS*.pdf')):
+        try:
+            for v in fb.parse(f)['vidas']:
+                sx = {'MAS': 'M', 'FEM': 'F'}.get(str(v.get('sexo')).strip().upper()[:3])
+                if sx: out[_s(v['nome'])] = sx
+        except Exception as e:
+            print('aviso', os.path.basename(f), e)
+    json.dump(out, open(CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
+    return out
+
+def sexo(nome, parentesco, over, brad):
+    """Devolve (sexo, fonte): sexo M/F/?, fonte operadora/equipe/parentesco/nome/—"""
+    n = _s(nome)
+    if n in brad: return brad[n], 'operadora'
+    p = n.split()[0] if n else ''
+    if n in over: return over[n], 'equipe'
+    if p in over: return over[p], 'equipe'
+    pa = _s(parentesco).replace('(A)', '').replace('(O)', '').strip()
+    if pa in PAR: return PAR[pa], 'parentesco'
+    if p in M: return 'M', 'nome'
+    if p in F: return 'F', 'nome'
+    g = _gg(p)
+    if g: return g, 'nome'
+    return '?', '—'
