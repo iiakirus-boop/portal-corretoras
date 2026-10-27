@@ -103,7 +103,7 @@ export default async function Master() {
               {os.slice(0, 10).map((o) => (
                 <tr key={o.id}>
                   <td><b>{AGENTE[o.agente] ?? o.agente}</b></td><td>{nomeC(o.corretora_id)}</td><td>{seg(o.seguradora_id)}</td><td>{o.origem}</td>
-                  <td><Pill tom={ORDEM_TOM[o.status]}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
+                  <td><Pill tom={ORDEM_TOM[o.status]} vivo={o.status === 'em_execucao'}>{ORDEM_ROTULO[o.status]}</Pill></td><td>{quando(o.criada_em)}</td><td>{o.mensagem ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

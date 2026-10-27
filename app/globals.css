@@ -220,6 +220,15 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .sinal.off i { background: var(--bad-fg); }
 .sinal.nunca i { background: var(--faint); }
 
+/* animações: poucas e rápidas, porque o portal é usado todo dia */
+.pill .vivo { display: inline-block; width: .45rem; height: .45rem; border-radius: 999px; background: currentColor; margin-right: .35rem; vertical-align: .05em; animation: vivo 1.6s ease-in-out infinite; }
+.sinal:not(.off):not(.nunca) i { animation: vivo 1.6s ease-in-out infinite; }
+@keyframes vivo { 50% { opacity: .35; } }
+.aviso-flutua { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  transform: translateX(-50%); animation: aviso-entra 220ms cubic-bezier(.23, 1, .32, 1), aviso-sai 200ms ease-out 5s forwards; }
+@keyframes aviso-entra { from { opacity: 0; transform: translate(-50%, 8px); } }
+@keyframes aviso-sai { to { opacity: 0; visibility: hidden; } }
+
 @media (pointer: coarse) {
   .btn, .campo input, .campo select, input.busca, select.sel { min-height: 44px; }
   /* abaixo de 16px o iPhone dá zoom na página ao tocar no campo e não volta */
@@ -238,4 +247,8 @@ details.dobra > summary::-webkit-details-marker { display: none; }
   .btn.ghost:hover { border-color: var(--faint); }
   .perfil:hover { border-color: var(--accent); }
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .pill .vivo, .sinal i { animation: none !important; }
+  .aviso-flutua { animation: aviso-sai 200ms linear 5s forwards; }
+}

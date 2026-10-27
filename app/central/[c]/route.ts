@@ -33,6 +33,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ c: strin
 .nav a.cx-tab:hover{color:var(--navy-fg)}
 @media (min-width:821px){.nav{flex:1 0 auto}}
 @media (max-width:1180px){.brand-txt{display:none}.top .wrap{gap:.5rem}.cx-link{padding-inline:.55rem}}
+/* acabamento e celular (skills break-ui, mobile-native e emil-design-eng); no computador o visual fica o mesmo */
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button,a,.ei,.kpi{touch-action:manipulation}
+.btn,.pend-btn,.seg button,.chips button,.vbtn,button.kpi,.ei{transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+.btn:active,.pend-btn:active,.seg button:active,.chips button:active,.vbtn:active,button.kpi:active{transform:scale(.97)}
+.ei:active{transform:scale(.99)}
+.modal:not([hidden])>*{animation:cx-entra 200ms cubic-bezier(.23,1,.32,1)}
+.toast{animation:cx-sobe 220ms cubic-bezier(.23,1,.32,1)}
+@keyframes cx-entra{from{opacity:0;transform:scale(.97) translateY(6px)}}
+@keyframes cx-sobe{from{opacity:0;transform:translate(-50%,8px)}}
+.kpis:empty{min-height:112px;border-radius:var(--r-lg);background:linear-gradient(90deg,var(--line-soft) 25%,var(--sunken) 50%,var(--line-soft) 75%) 0 0/200% 100%;animation:cx-carrega 1.2s linear infinite}
+@keyframes cx-carrega{to{background-position:-200% 0}}
+.kpi-v{white-space:nowrap}
+@media (min-width:1500px){.cx-link .pl{display:inline!important}}
+@media (max-width:640px){
+  .top .wrap{flex-wrap:wrap;row-gap:0;padding-top:.5rem;min-height:0}
+  .brand{flex:1 1 auto}
+  #pendbtn{margin-left:auto}
+  .nav{order:3;flex:1 0 100%;min-height:44px;margin-inline:-.55rem;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+  .nav>:last-child{margin-right:24px}
+  .kpi-v{font-size:clamp(.95rem,4.6vw,1.1rem)}
+  .chart{padding-left:12px}
+  .elist ul{max-height:none;overflow:visible}
+  .ei b .nm{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .ei small{white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){.modal:not([hidden])>*,.toast,.kpis:empty{animation:none}}
 ${a.admin ? '' : `.nav [data-page="comissoes"],.nav [data-page="projecao"],.kpi[data-page="projecao"],section.card:has(#hwk),.page[data-pg="comissoes"],.page[data-pg="projecao"]{display:none!important}`}
 </style>`;
   const links = [
