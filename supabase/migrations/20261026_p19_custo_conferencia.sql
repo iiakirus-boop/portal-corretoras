@@ -191,21 +191,16 @@ end $$;
 revoke all on function conferir(uuid, char, uuid) from public, anon, authenticated;
 revoke all on function atender_conferencias() from public, anon, authenticated;
 
--- agente_fim ganha modo, tokens e custo (opcionais: o rodar.py de hoje continua funcionando igual)
+-- agente_fim mantém a assinatura de 4 argumentos (o rodar.py de hoje continua igual); o modo é deduzido
 -- e passa a disparar a Conferência depois de Faturas, Vidas e Comissão, e a Projeção também depois de Faturas.
-drop function if exists agente_fim(text, uuid, text, text);
-create or replace function agente_fim(p_token text, p_ordem uuid, p_status text, p_mensagem text default null,
-                                      p_modo text default null, p_tokens_entrada int default null, p_tokens_saida int default null,
-                                      p_custo_usd numeric default null)
+create or replace function agente_fim(p_token text, p_ordem uuid, p_status text, p_mensagem text default null)
 returns void language plpgsql security definer set search_path = public, privado as $$
 declare o ordens_execucao;
 begin
   if not privado.token_agente_ok(p_token) then raise exception 'token inválido'; end if;
   update ordens_execucao set status = p_status::status_ordem, mensagem = coalesce(p_mensagem, mensagem),
     terminada_em = case when p_status in ('concluida','erro') then now() else terminada_em end,
-    modo = coalesce(p_modo, modo, case when sessao_url is not null then 'claude' else 'codigo' end),
-    tokens_entrada = coalesce(p_tokens_entrada, tokens_entrada), tokens_saida = coalesce(p_tokens_saida, tokens_saida),
-    custo_usd = coalesce(p_custo_usd, custo_usd)
+    modo = coalesce(modo, case when sessao_url is not null then 'claude' else 'codigo' end)
   where id = p_ordem returning * into o;
   -- Comissão e Faturas disparam a Projeção (rodada sem nada novo no portal não dispara; uma pendente basta)
   if o.id is not null and p_status = 'concluida' and o.agente in ('comissao', 'faturas')
@@ -216,6 +211,7 @@ begin
             'Depois de ' || case when o.agente = 'comissao' then 'comissão ' else 'faturas ' end || coalesce(o.seguradora_id, ''));
   end if;
   if o.id is not null and p_status = 'concluida' and o.agente in ('faturas', 'vidas', 'comissao')
+     and coalesce(o.mensagem, '') not ilike 'nada novo%'
      and not exists (select 1 from ordens_execucao x where x.agente = 'conferencia' and x.status = 'pendente'
                       and x.corretora_id = o.corretora_id and coalesce(x.competencia, '') = coalesce(o.competencia, '')) then
     insert into ordens_execucao(corretora_id, agente, competencia, origem, ordem_pai_id, prioridade, mensagem)
@@ -223,8 +219,6 @@ begin
             'Depois de ' || o.agente || coalesce(' ' || o.seguradora_id, ''));
   end if;
 end $$;
-revoke all on function agente_fim(text, uuid, text, text, text, int, int, numeric) from public;
-grant execute on function agente_fim(text, uuid, text, text, text, int, int, numeric) to anon, authenticated, service_role;
 
 -- A cada 10 minutos (custo zero: é só SQL dentro do banco)
 select cron.unschedule('agente-conferencia') where exists (select 1 from cron.job where jobname = 'agente-conferencia');
