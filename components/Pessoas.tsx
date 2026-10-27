@@ -1,6 +1,6 @@
 // Quem tem acesso e convites pendentes, com o formulário de convite. Usado no master, na corretora e na empresa.
 import { convidar, desativarMembro } from '@/lib/acoes';
-import { data, PAPEL } from '@/lib/formato';
+import { data, PAPEL, plural } from '@/lib/formato';
 import { Pill } from './Pill';
 import type { Convite, Empresa, Membro, Papel } from '@/lib/tipos';
 
@@ -23,7 +23,7 @@ export function Pessoas({ de, corretoraId, membros, convites, empresas = [], emp
   return (
     <div className="grid g32">
       <section className="card">
-        <div className="card-h"><h2>Quem tem acesso</h2><span className="hint">{membros.length} pessoa(s)</span></div>
+        <div className="card-h"><h2>Quem tem acesso</h2><span className="hint">{plural(membros.length, 'pessoa', 'pessoas')}</span></div>
         {membros.length === 0 ? <p className="empty">Ninguém ainda. Convide pelo formulário ao lado.</p> : (
           <ul className="rows">
             {membros.map((m) => (

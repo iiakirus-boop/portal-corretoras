@@ -70,7 +70,7 @@ export default async function Vidas({ params, searchParams }: P) {
               <h2>Lista</h2>
               <form className="acoes" role="search">
                 <input type="hidden" name="mes" value={comp} />
-                <input className="busca" name="q" defaultValue={sp.q} placeholder="Buscar pelo nome" aria-label="Buscar pessoa" style={{ width: 220 }} />
+                <input className="busca" type="search" enterKeyHint="search" name="q" defaultValue={sp.q} placeholder="Buscar pelo nome" aria-label="Buscar pessoa" style={{ width: 220 }} />
                 <button className="btn ghost sm">Buscar</button>
               </form>
             </div>

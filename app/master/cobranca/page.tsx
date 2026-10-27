@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
-import { competencia, moeda, num } from '@/lib/formato';
+import { competencia, moeda, num, plural } from '@/lib/formato';
 import { mensalidade, vidasCarteiraPor, type Contrato, type FaturaUltima } from '@/lib/contas';
 import { Pill } from '@/components/Pill';
 import type { Corretora } from '@/lib/tipos';
@@ -33,7 +33,7 @@ export default async function Cobranca() {
         </div>
       </div>
       <div className="kpis">
-        <div className="kpi"><span className="kpi-l">Previsão deste mês</span><span className="kpi-v">{moeda(total)}</span><span className="kpi-s">{linhas.filter((l) => l.p).length} corretora(s) com preço combinado</span></div>
+        <div className="kpi"><span className="kpi-l">Previsão deste mês</span><span className="kpi-v">{moeda(total)}</span><span className="kpi-s">{plural(linhas.filter((l) => l.p).length, 'corretora', 'corretoras')} com preço combinado</span></div>
         <div className="kpi"><span className="kpi-l">Vidas cobráveis</span><span className="kpi-v">{num(linhas.filter((l) => l.p).reduce((t, l) => t + l.v, 0))}</span></div>
       </div>
       <div className="tbl">

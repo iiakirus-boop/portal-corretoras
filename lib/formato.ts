@@ -6,6 +6,8 @@ const numFmt = new Intl.NumberFormat('pt-BR');
 
 export const moeda = (v: number | null | undefined) => (v == null ? '—' : moedaFmt.format(v));
 export const num = (v: number | null | undefined) => (v == null ? '—' : numFmt.format(v));
+// "1 empresa", "3 empresas": nada de "empresa(s)"
+export const plural = (n: number, um: string, varios: string) => `${numFmt.format(n)} ${n === 1 ? um : varios}`;
 
 export function data(v: string | null | undefined) {
   if (!v) return '—';

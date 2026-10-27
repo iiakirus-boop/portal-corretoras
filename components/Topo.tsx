@@ -20,7 +20,7 @@ export function Topo({ master, nome, sub, cor, inicio, links, usuario, papel }: 
       <div className="wrap">
         <a href={inicio} className="brand">
           <span className="logo" aria-hidden>{master ? 'M' : iniciais(nome)}</span>
-          <span className="brand-txt">
+          <span className="brand-txt" title={sub ? `${nome} · ${sub}` : nome}>
             <span className="brand-name">{nome}</span>
             {sub && <span className="brand-sub" style={{ display: 'block' }}>{sub}</span>}
           </span>

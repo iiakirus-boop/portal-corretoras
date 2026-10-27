@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { MODO_DEMO } from '@/lib/servidor';
 
@@ -6,6 +6,9 @@ export const metadata: Metadata = {
   title: 'Portal da corretora',
   description: 'Faturas, vidas, pedidos e comissões das empresas atendidas pela corretora.',
 };
+
+// barra de status do celular na cor da barra de cima do portal
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#0f2a44' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { cliente, exigirCorretora } from '@/lib/servidor';
-import { competencia, data, moeda, num, seg } from '@/lib/formato';
+import { competencia, data, moeda, num, plural, seg } from '@/lib/formato';
 import { somarPor } from '@/lib/contas';
 import type { Empresa, LancamentoComissao, PagamentoComissao } from '@/lib/tipos';
 
@@ -46,7 +46,7 @@ export default async function Comissoes({ params, searchParams }: P) {
       {!comp ? <p className="empty">Nenhum extrato de comissão gravado ainda.</p> : (
         <>
           <div className="kpis">
-            <div className="kpi"><span className="kpi-l">A receber em {competencia(comp)}</span><span className="kpi-v">{moeda(total)}</span><span className="kpi-s">{ps.length} pagamento(s) das seguradoras</span></div>
+            <div className="kpi"><span className="kpi-l">A receber em {competencia(comp)}</span><span className="kpi-v">{moeda(total)}</span><span className="kpi-s">{plural(ps.length, 'pagamento', 'pagamentos')} das seguradoras</span></div>
             <div className="kpi"><span className="kpi-l">Vitalício</span><span className="kpi-v">{moeda(porClasse.get('vitalicio') ?? 0)}</span></div>
             <div className="kpi"><span className="kpi-l">Agenciamento</span><span className="kpi-v">{moeda(porClasse.get('agenciamento') ?? 0)}</span><span className="kpi-s">taxa acima de 50%</span></div>
             <div className="kpi"><span className="kpi-l">Empresas pagando</span><span className="kpi-v">{num(porEmp.length)}</span></div>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cliente, exigirCorretora } from '@/lib/servidor';
-import { ABERTOS, competencia, moeda, num, seg } from '@/lib/formato';
+import { ABERTOS, competencia, moeda, num, plural, seg } from '@/lib/formato';
 import { somarPor, type FaturaUltima } from '@/lib/contas';
 import { criarEmpresa } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
@@ -31,9 +31,9 @@ export default async function Empresas({ params, searchParams }: P) {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Empresas</h1><p>{es.length} empresa(s) na carteira. Vidas e valor da fatura mais recente de cada seguradora.</p></div>
+        <div><h1>Empresas</h1><p>{plural(es.length, 'empresa', 'empresas')} na carteira. Vidas e valor da fatura mais recente de cada seguradora.</p></div>
         <form className="acoes" role="search">
-          <input className="busca" name="q" defaultValue={sp.q} placeholder="Buscar pela razão social" aria-label="Buscar empresa" style={{ width: 260 }} />
+          <input className="busca" type="search" enterKeyHint="search" name="q" defaultValue={sp.q} placeholder="Buscar pela razão social" aria-label="Buscar empresa" style={{ width: 260 }} />
           <button className="btn ghost">Buscar</button>
         </form>
       </div>
