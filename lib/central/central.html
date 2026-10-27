@@ -370,6 +370,12 @@ th{font-size:.74rem;font-weight:700}
 #pweek .dcell.today .dn::after{content:' · hoje';font-weight:700}
 @media (max-width:640px){#pweek .dcell.today .dn::after{content:''}#pweek{gap:.3rem}}
 .dcell.proj .db i{opacity:.45}
+#cweek .db{width:44%;max-width:72px}
+#cweek .dcell.today .dn::after{content:' · hoje';font-weight:700}
+@media (max-width:640px){#cweek .dcell.today .dn::after{content:''}#cweek{gap:.3rem}}
+.cw-cmp{display:flex;flex-wrap:wrap;gap:.3rem 1.5rem;font-size:.84rem;color:var(--muted);margin:.5rem .1rem .2rem}
+.cw-cmp b{color:var(--fg);font-variant-numeric:tabular-nums}
+.cw-sub{font-size:.8rem;font-weight:800;margin:1rem 0 .2rem}
 .plist>li{display:block;padding:0}
 .prow>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.55rem 0}
 .plist>li:first-child .prow>summary{padding-top:.2rem}
@@ -454,6 +460,7 @@ tr.subf td:nth-child(2){padding-left:1.4rem}
       <section class="card"><div class="card-h"><h2>Comissão bruta por mês</h2><span class="hint">Pelo mês do extrato · clique num mês para abrir</span></div><ul class="legend" id="cchart-lg"></ul><div class="chart" id="cchart"></div></section>
       <section class="card"><div class="card-h"><h2>Por seguradora</h2><span class="hint" id="cseg-h"></span></div><div class="hbars" id="cseg"></div><p class="note" id="cbridge"></p></section>
     </div>
+    <section class="card"><div class="card-h"><h2 id="cweek-h">Comissão paga por semana</h2><span class="hint">Pela data em que caiu · % = quanto caiu do que a Projeção previa · clique numa semana para ver as empresas</span></div><div class="dstrip" id="cweek"></div><div id="cwdet"></div></section>
     <section class="card"><div class="card-h"><h2>Detalhe por empresa</h2><input class="search" id="cq" type="search" placeholder="Buscar empresa" aria-label="Buscar empresa" style="max-width:260px;margin-left:auto"></div>
       <div class="tbl scroll"><table><thead><tr><th>Empresa</th><th>Seguradora</th><th>Tipo</th><th class="num">Faturado (R$)</th><th class="num">Taxa</th><th class="num">Comissão (R$)</th></tr></thead><tbody id="crows"></tbody></table></div>
       <p class="note" id="cnote"></p>
@@ -533,7 +540,7 @@ tr.subf td:nth-child(2){padding-left:1.4rem}
 <div class="toast" id="toast" hidden></div>
 <script>
 (function(){
-const S={imps:[],fotos:[],impEdit:null,agcfg:{},pv:'com',pwk:null,pmk:null,op:'todas',_fat:[],_com:[],_comAll:[],faturas:[],comissoes:[],page:'inicio',agentes:[],tarefas:[],eventos:[],mes:null,cmes:null,emp:null,ff:'todas',fq:'',fsort:'valor',cq:'',filtro:null,canEdit:false,me:null,user:null,db:null,vcache:{},fexp:{},vq:'',vd:{},vdE:null,vdC:null,vdSx:(()=>{try{return localStorage.getItem('vdSx')==='1'}catch(e){return false}})()};
+const S={imps:[],fotos:[],impEdit:null,agcfg:{},pv:'com',pwk:null,cwk:null,pmk:null,op:'todas',_fat:[],_com:[],_comAll:[],faturas:[],comissoes:[],page:'inicio',agentes:[],tarefas:[],eventos:[],mes:null,cmes:null,emp:null,ff:'todas',fq:'',fsort:'valor',cq:'',filtro:null,canEdit:false,me:null,user:null,db:null,vcache:{},fexp:{},vq:'',vd:{},vdE:null,vdC:null,vdSx:(()=>{try{return localStorage.getItem('vdSx')==='1'}catch(e){return false}})()};
 const $=id=>document.getElementById(id);
 //<model>
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1143,7 +1150,52 @@ function renderCom(){
   $('cord-h').textContent=ords.length+' ordens em '+mesLabel(S.cmes);
   $('cord').innerHTML=ords.slice().sort((a,b)=>String(a.dataISO).localeCompare(String(b.dataISO))).map(o=>`<tr><td style="font-variant-numeric:tabular-nums">${esc(o.op)}<small>${int(o.lanc)} lançamentos</small></td><td>${esc(o.data)}</td><td>${esc(o.operadora||'')}<small>${esc(o.empresa||'')}</small></td><td class="num">${brl(o.bruto)}</td><td class="num">${o.debcred?brl(o.debcred):'—'}</td><td class="num">${brl(o.apagar)}</td></tr>`).join('');
   const gx={};(d.extras||[]).forEach(e=>{const k=e.tipo||'Outros';const o=gx[k]=gx[k]||{n:0,v:0,nomes:new Set()};o.n++;o.v+=+e.comissao||0;o.nomes.add(String(e.hist||'').split(' · ')[0])});
+  S._cPM=PM;renderCWeek();
   $('cextra').innerHTML=Object.entries(gx).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>`<li><span><b>${esc(k)}</b><small>${o.n} lançamentos · ${esc([...o.nomes].slice(0,4).join(', '))}${o.nomes.size>4?'…':''}</small></span><span class="r">R$ ${brl(o.v)}</span></li>`).join('')||'<li><span class="empty">Nada fora das faturas neste mês.</span></li>';
+}
+
+// comissão paga por semana do mês escolhido (data da ordem de pagamento), nas mesmas semanas da Projeção,
+// conferida com a última rodada do Agente Projeção feita antes da semana começar (itens com a data prevista de cada empresa)
+function renderCWeek(){
+  const PM=S._cPM;if(!PM||!S.cmes){$('cweek').innerHTML='<p class="empty">Aparece depois da primeira rodada do Agente Comissão.</p>';$('cwdet').innerHTML='';return}
+  const T=PM.hoje, d2=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+MES[d.getUTCMonth()], dm=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0');
+  const MESF=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const okOp=x=>S.op==='todas'||fam(x.op)===S.op, chave=x=>(x.eid||norm(x.empresa))+'|'+fam(x.op);
+  const R=PM.com.filter(x=>x.tipo==='real'), P=PM.com.filter(x=>x.tipo!=='real');
+  const F=S.fotos.filter(f=>Array.isArray(f.itens)).sort((a,b)=>String(a.geradoEm).localeCompare(String(b.geradoEm)));
+  const [ya,ma]=S.cmes.split('-').map(Number), m0=new Date(Date.UTC(ya,ma-1,1)), m1=new Date(Date.UTC(ya,ma,0));
+  const weeks=[];for(let w=wkStart(m0);w<=m1;w=new Date(w.getTime()+7*864e5)){const a=w<m0?m0:w, e0=new Date(w.getTime()+6*864e5), b=e0>m1?m1:e0, fim=new Date(b.getTime()+864e5-1);
+    const dentro=x=>x.data>=a&&x.data<=fim;
+    // rodada da Projeção: a última antes da semana começar (00h de Brasília); sem ela, a primeira de dentro da semana
+    const ini=new Date(w.getTime()+3*3600e3), antes=F.filter(f=>new Date(f.geradoEm)<ini).pop(), f=antes||F.find(f=>new Date(f.geradoEm)<=fim)||null;
+    const prev=f?f.itens.map(i=>Object.assign({},i,{data:new Date(i.data+'T00:00:00Z')})).filter(x=>okOp(x)&&dentro(x)):[];
+    const caiu=R.filter(dentro), desde=f?new Date(String(f.geradoEm).slice(0,10)+'T00:00:00Z'):a;
+    const kc=new Set(R.filter(x=>x.data>=desde&&x.data<=fim).map(chave)), kp=new Set(prev.map(chave));
+    weeks.push({key:a.toISOString().slice(0,10),dias:+a===+b?d2(a).slice(0,2):d2(a).slice(0,2)+'–'+d2(b).slice(0,2),title:'Semana de '+d2(a)+' a '+d2(b),a,fim,now:T>=a&&T<=fim,futura:a>T,
+      caiu,f,dentroF:!antes,prev,faltam:prev.filter(x=>!kc.has(chave(x))),fora:caiu.filter(x=>x.kind!=='outro'&&!kp.has(chave(x))),aCair:P.filter(dentro)})}
+  if(!S.cwk||!weeks.find(w=>w.key===S.cwk))S.cwk=(weeks.find(w=>w.now)||weeks.filter(w=>w.caiu.length).pop()||weeks[0]).key;
+  $('cweek-h').textContent='Comissão paga por semana · '+MESF[ma-1];
+  const vw=w=>w.futura?sum(w.aCair,x=>x.valor):sum(w.caiu,x=>x.valor), mxw=Math.max(1,...weeks.map(vw));
+  $('cweek').style.gridTemplateColumns=`repeat(${weeks.length},minmax(0,1fr))`;
+  $('cweek').innerHTML=weeks.map(w=>{const v=vw(w),on=S.cwk===w.key,pv=sum(w.prev,x=>x.valor),nf=w.now?0:w.faltam.length;
+    const dc=w.futura?(v?'previsto':'&nbsp;'):nf?nf+' faltou':pv?pct(sum(w.caiu,x=>x.valor)/pv*100,0):w.caiu.length?w.caiu.length+' créd.':'&nbsp;';
+    return `<button type="button" class="dcell${on?' on':''}${w.now?' today':''}${w.futura?' proj':''}" data-cwk="${w.key}" aria-pressed="${on}" aria-label="${esc(w.title)}: ${w.futura?'previsto':'caiu'} R$ ${brl(v)}${pv&&!w.futura?', previsto R$ '+brl(pv):''}${nf?', '+nf+' empresas não pagaram':''}"><span class="dn">${esc(w.dias)}</span><span class="db"><i style="height:${(v/mxw*100).toFixed(1)}%"></i></span><span class="dv">${v?kfmt(v):'—'}</span><span class="dc${nf?' late':''}">${dc}</span></button>`}).join('');
+  const w=weeks.find(x=>x.key===S.cwk), dd=d=>String(d.getUTCDate()).padStart(2,'0')+'<br>'+MES[d.getUTCMonth()];
+  const tag=x=>`<span class="ktag ${x.kind}">${x.kind==='ag'?'Agenciamento':x.kind==='outro'?esc(x.obs||'Outro'):'Vitalício'}</span>`;
+  const row=(x,pill,why)=>`<li><details class="prow"><summary><span class="date${pill[1]==='p-bad'?' late':''}">${dd(x.data)}</span><span style="min-width:0"><b>${esc(x.empresa)}</b><small>${tag(x)}${esc(fam(x.op))}</small></span><span class="r">R$ ${brl(x.valor)}<small><span class="pill ${pill[1]}">${pill[0]}</span></small></span></summary>
+    <div class="pwhy">${esc(why)}${x.eid?`<br><button class="lnk" type="button" data-emp="${esc(x.eid)}">Abrir a empresa</button>`:''}</div></details></li>`;
+  const lista=(L,f)=>{L=L.slice().sort((a,b)=>b.valor-a.valor);const top=L.slice(0,8),rest=L.slice(8);
+    return `<ul class="rows plist">${top.map(f).join('')}</ul>${rest.length?`<details class="more"><summary>+ ${rest.length} menor${rest.length>1?'es':''} · R$ ${brl(sum(rest,x=>x.valor))}</summary><ul class="rows plist">${rest.map(f).join('')}</ul></details>`:''}`};
+  const vC=sum(w.caiu,x=>x.valor), vP=sum(w.prev,x=>x.valor), fD=w.f?new Date(w.f.geradoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
+  let h=`<div class="day-h" style="margin-top:1rem"><span>${esc(w.title)}${w.now?' (esta semana)':''}</span><span>${w.futura?'Previsto R$ '+brl(sum(w.aCair,x=>x.valor)):'Caiu R$ '+brl(vC)+' · '+w.caiu.length+' crédito'+(w.caiu.length===1?'':'s')}</span></div>`;
+  if(w.futura){$('cwdet').innerHTML=h+`<p class="note">A semana ainda não chegou. A Projeção prevê R$ ${brl(sum(w.aCair,x=>x.valor))} em ${w.aCair.length} créditos. <button class="go" type="button" data-page="projecao">Abrir projeção</button></p>`;return}
+  const d=vC-vP;
+  h+=w.f?`<div class="cw-cmp"><span>Previsto na rodada de ${fD}${w.dentroF?' (já dentro da semana)':''}: <b>R$ ${brl(vP)}</b></span><span>Caiu: <b>R$ ${brl(vC)}</b></span><span>${w.now?'Até hoje':'Diferença'}: <b class="${d>=0?'up':'down'}">${d>=0?'+':'−'}R$ ${brl(Math.abs(d))}</b>${vP?' ('+pct(vC/vP*100,0)+' do previsto)':''}</span></div>`
+    :'<p class="note">Nenhuma rodada da Projeção com a data de cada empresa foi guardada antes desta semana, então não dá para comparar com o previsto. As rodadas guardam isso desde 27/10/2026.</p>';
+  h+=w.caiu.length?lista(w.caiu,x=>row(x,w.f&&w.fora.includes(x)?['Fora da previsão','p-info']:['Caiu','p-ok'],(x.how||'')+(x.quando?' · '+x.quando:'')+(w.f&&w.fora.includes(x)?'. A rodada de '+fD+' não previa esta empresa nesta semana (caiu adiantada, atrasada ou é nova).':''))):'<p class="empty">Nada caiu nesta semana.</p>';
+  if(w.f&&w.faltam.length)h+=`<p class="cw-sub">${w.now?'Previsto para esta semana e ainda não caiu':'Previsto e não caiu'} · ${w.faltam.length} empresa${w.faltam.length>1?'s':''} · R$ ${brl(sum(w.faltam,x=>x.valor))}</p>`+
+    lista(w.faltam,x=>row(x,w.now&&x.data>=T?['A cair','p-info']:['Não caiu','p-bad'],'A rodada de '+fD+' previa este crédito para '+dm(x.data)+(x.atraso?' (já estava em atraso)':'')+'. Ainda não apareceu em nenhum extrato depois dela.'));
+  $('cwdet').innerHTML=h;
 }
 
 // ---------- PROJEÇÃO ----------
@@ -1311,6 +1363,7 @@ document.addEventListener('click',async ev=>{
   const cm=t.closest('[data-cmes]'); if(cm){S.cmes=cm.dataset.cmes;renderCom();return}
   const pv=t.closest('[data-pv]'); if(pv){S.pv=pv.dataset.pv;renderProj();return}
   const pwk=t.closest('[data-pwk]'); if(pwk){S.pwk=pwk.dataset.pwk;renderProj();return}
+  const cwk=t.closest('[data-cwk]'); if(cwk){S.cwk=cwk.dataset.cwk;renderCWeek();return}
   const pmk=t.closest('[data-pmk]'); if(pmk){S.pmk=pmk.dataset.pmk;S.pwk=null;renderProj();return}
   const ff=t.closest('[data-ff]'); if(ff){S.ff=ff.dataset.ff;renderFat();return}
   const agf=t.closest('[data-agf]'); if(agf){S.filtro=agf.dataset.agf||null;showPage('pendencias',true);return}
