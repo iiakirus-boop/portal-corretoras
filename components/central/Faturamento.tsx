@@ -13,13 +13,13 @@ type Ordem = 'valor' | 'venc' | 'nome' | 'var';
 
 const sinal = (v: number) => <span className={v >= 0 ? 'up' : 'down'}>{v >= 0 ? '+' : '−'}{pct(Math.abs(v))}</span>;
 
-export function Faturamento({ c, faturas: todas, comissoes }: { c: string; faturas: Doc[]; comissoes: Doc[] | null }) {
+export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { c: string; faturas: Doc[]; comissoes: Doc[] | null; inicial?: string | null }) {
   const [op, setOp] = useState('todas');
   const [mesSel, setMes] = useState<string | null>(null);
   const [fq, setFq] = useState('');
   const [ff, setFf] = useState<Filtro>('todas');
   const [ordem, setOrdem] = useState<Ordem>('valor');
-  const [emp, setEmp] = useState<string | null>(null);
+  const [emp, setEmp] = useState<string | null>(inicial);
 
   const faturas = useMemo(() => (op === 'todas' ? todas : todas.filter((f) => fam(f.operadora) === op)), [todas, op]);
   const ops = famsIn(uniq(todas.map((f) => fam(f.operadora))));

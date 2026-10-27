@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FCOL, brl, kfmt } from '@/lib/central/modelo';
 
-export type Coluna = { key: string; label: string; sub?: string; title?: string; vals: Record<string, number> };
+export type Coluna = { key: string; label: string; sub?: string; title?: string; vals: Record<string, number>; extra?: React.ReactNode };
 
 export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
   colunas: Coluna[]; chaves: string[]; sel?: string; onClick?: (k: string) => void; aria: string; h?: number;
@@ -63,6 +63,7 @@ export function Barras({ colunas, chaves, sel, onClick, aria, h = 220 }: {
           <b>{b.title || b.label}</b>
           {chaves.filter((k) => b.vals[k] > 0).map((k) => <span key={k}><br /><i style={{ background: FCOL[k] }} />{k}: R$ <b>{brl(b.vals[k])}</b></span>)}
           {chaves.length > 1 && <><br />Total: R$ <b>{brl(tot(b))}</b></>}
+          {b.extra && <><br />{b.extra}</>}
         </div>
       )}
     </div>

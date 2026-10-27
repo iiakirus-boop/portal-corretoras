@@ -4,6 +4,7 @@ const $ = () => null; const S = { agentes: [] };
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const brl=n=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const int=n=>Number(n||0).toLocaleString('pt-BR');
+const vidas=n=>int(n)+(Number(n)===1?' vida':' vidas');
 const pct=(n,d=1)=>Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
 const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const mesLabel=c=>{if(!c)return '—';const [a,m]=c.split('-');return MES[+m-1]+'/'+a.slice(2)};

@@ -22,7 +22,7 @@ export const ckey = (d: Date) => d.toISOString().slice(0, 7);
 
 // seguradoras: ordem e cor fixas (a cor segue a seguradora, nunca a posição)
 export const FAMS = ['Porto', 'Bradesco', 'Amil', 'Santa Helena', 'Hapvida', 'SulAmérica'];
-export const FCOL: Record<string, string> = { Porto: 'var(--s1)', Bradesco: 'var(--s2)', Amil: 'var(--s3)', 'Santa Helena': 'var(--s4)', Hapvida: 'var(--s5)', SulAmérica: 'var(--s6)', Outras: 'var(--faint)' };
+export const FCOL: Record<string, string> = { Porto: 'var(--s1)', Bradesco: 'var(--s2)', Amil: 'var(--s3)', 'Santa Helena': 'var(--s4)', Hapvida: 'var(--s5)', SulAmérica: 'var(--s6)', Outras: 'var(--faint)', 'A cair': 'var(--faint)' };
 export const fam = (op: unknown) => { const o = String(op || ''); return /porto/i.test(o) ? 'Porto' : /bradesco/i.test(o) ? 'Bradesco' : /amil/i.test(o) ? 'Amil' : /santa/i.test(o) ? 'Santa Helena' : /hapvida/i.test(o) ? 'Hapvida' : /sul/i.test(o) ? 'SulAmérica' : 'Outras'; };
 export const famsIn = (list: string[]) => FAMS.filter((f) => list.includes(f));
 const PALAVRAS = ['LTDA', 'ME', 'EPP', 'EIRELI', 'DE', 'DO', 'DA', 'DOS', 'E', 'S', 'A', 'CIA', 'SA', 'LIMITADA', 'MEI'];
@@ -60,5 +60,8 @@ export function empRows(faturas: Doc[], mes: string) {
 
 // itens de comissão juntados por competência do extrato (a Central faz o mesmo em mergeCom)
 export const comissaoItens = (com: Doc[]) => com.flatMap((c) => (c.itens || []).map((i: Item) => ({ ext: c.comp, ...i })));
+
+// lançamento de agenciamento (contrato novo) ou vitalício
+export const isAg = (i: Record<string, unknown>) => (i.tipo ? i.tipo === 'AN' : Number(i.taxa) > 50);
 
 export const FAIXAS: [number, number, string][] = [[0, 18, '0–18'], [19, 23, '19–23'], [24, 28, '24–28'], [29, 33, '29–33'], [34, 38, '34–38'], [39, 43, '39–43'], [44, 48, '44–48'], [49, 53, '49–53'], [54, 58, '54–58'], [59, 200, '59+']];
