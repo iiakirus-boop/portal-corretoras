@@ -126,10 +126,6 @@ export default async function Agentes({ searchParams }: P) {
               </label>
               <label className="campo">Competência<input type="month" name="competencia" defaultValue={comp} /></label>
             </div>
-            <label className="campo">Pasta ou arquivos no PC (opcional)
-              <input name="local" placeholder="Ex.: C:\Users\bruno\Downloads\kits bradesco" />
-              <small className="hint">Faturas Bradesco: a pasta dos kits. Comissão: os arquivos do extrato, separados por ponto e vírgula. Sem isso, o PC deixa o pedido esperando alguém entrar no portal.</small>
-            </label>
             <div><button className="btn">Colocar na fila</button></div>
             <p className="note">Faturas sempre dispara Vidas em seguida, e Comissões sempre dispara Projeção. Faturas, Vidas e Comissões disparam também a Conferência. Projeção, Conferência e Supervisor rodam na nuvem, como código; os outros, no PC (o vigia pega em até 2 minutos). Você não precisa pedir: o Supervisor põe na fila o que estiver atrasado.</p>
           </form>
