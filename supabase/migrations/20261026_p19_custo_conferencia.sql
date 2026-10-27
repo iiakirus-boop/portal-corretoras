@@ -192,7 +192,7 @@ revoke all on function conferir(uuid, char, uuid) from public, anon, authenticat
 revoke all on function atender_conferencias() from public, anon, authenticated;
 
 -- agente_fim ganha modo, tokens e custo (opcionais: o rodar.py de hoje continua funcionando igual)
--- e passa a disparar a Conferência depois de Faturas, Vidas e Comissão.
+-- e passa a disparar a Conferência depois de Faturas, Vidas e Comissão, e a Projeção também depois de Faturas.
 drop function if exists agente_fim(text, uuid, text, text);
 create or replace function agente_fim(p_token text, p_ordem uuid, p_status text, p_mensagem text default null,
                                       p_modo text default null, p_tokens_entrada int default null, p_tokens_saida int default null,
@@ -207,9 +207,13 @@ begin
     tokens_entrada = coalesce(p_tokens_entrada, tokens_entrada), tokens_saida = coalesce(p_tokens_saida, tokens_saida),
     custo_usd = coalesce(p_custo_usd, custo_usd)
   where id = p_ordem returning * into o;
-  if o.id is not null and p_status = 'concluida' and o.agente = 'comissao' then
+  -- Comissão e Faturas disparam a Projeção (rodada sem nada novo no portal não dispara; uma pendente basta)
+  if o.id is not null and p_status = 'concluida' and o.agente in ('comissao', 'faturas')
+     and coalesce(o.mensagem, '') not ilike 'nada novo%'
+     and not exists (select 1 from ordens_execucao x where x.agente = 'projecao' and x.status = 'pendente' and x.corretora_id = o.corretora_id) then
     insert into ordens_execucao(corretora_id, agente, competencia, origem, ordem_pai_id, prioridade, mensagem)
-    values (o.corretora_id, 'projecao', o.competencia, 'encadeamento', o.id, 2, 'Depois da comissão ' || coalesce(o.seguradora_id, ''));
+    values (o.corretora_id, 'projecao', o.competencia, 'encadeamento', o.id, 2,
+            'Depois de ' || case when o.agente = 'comissao' then 'comissão ' else 'faturas ' end || coalesce(o.seguradora_id, ''));
   end if;
   if o.id is not null and p_status = 'concluida' and o.agente in ('faturas', 'vidas', 'comissao')
      and not exists (select 1 from ordens_execucao x where x.agente = 'conferencia' and x.status = 'pendente'
