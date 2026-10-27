@@ -61,6 +61,11 @@ async function projetar(corretora: string, gatilho: string) {
   const top: Record<string, number> = {};
   M.com.filter((x: I) => x.tipo !== 'real' && M_.ckey(x.data) > cm).forEach((x: I) => { const k = x.empresa + '|' + M_.fam(x.op) + '|' + x.kind; top[k] = (top[k] || 0) + x.valor; });
   const empresas = Object.entries(top).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => { const [empresa, seg, kind] = k.split('|'); return { empresa, seg, kind, valor: r2(v) }; });
+  // cada crédito previsto desta semana e da próxima, com a data: a tela de Comissões confere, semana a semana,
+  // o que caiu contra a última rodada feita antes da semana começar (e mostra as empresas que faltaram)
+  const w0 = new Date(T.getTime() - ((T.getUTCDay() + 6) % 7) * 864e5), w1 = new Date(w0.getTime() + 14 * 864e5);
+  const itens = M.com.filter((x: I) => x.tipo !== 'real' && x.data >= w0 && x.data < w1).sort((a: I, b: I) => a.data - b.data)
+    .map((x: I) => ({ data: x.data.toISOString().slice(0, 10), empresa: x.empresa, eid: x.eid || '', op: x.op, kind: x.kind, valor: r2(x.valor), tipo: x.tipo, ...(x.atraso ? { atraso: true } : {}) }));
   const agora = new Date();
   const foto = {
     id: cm + '_' + new Date(agora.getTime() - 3 * 3600e3).toISOString().slice(0, 16).replace(/[-:T]/g, ''), geradoEm: agora.toISOString(), gatilho, mesAtual: cm, horizonte: meses[3], ultCompFaturas: M.ultComp,
@@ -71,6 +76,7 @@ async function projetar(corretora: string, gatilho: string) {
     }),
     linhas, empresas, agenciamentos: M.ag.map((A: I) => ({ eid: A.eid, nome: A.nome, restantes: A.restantes, recebidas: A.rec.length + A.assum, imp: !!A.im })),
     atrasos: M.com.filter((x: I) => x.atraso).map((x: I) => ({ empresa: x.empresa, seg: M_.fam(x.op), kind: x.kind, valor: r2(x.valor), quando: x.quando })),
+    itens,
     implantacoesNovas: (M.novas || []).length, extraSemFatura: M.extraN, origem: 'nuvem',
   };
   const { error } = await db.from('central_docs').upsert({ corretora_id: corretora, colecao: 'projecoes', doc_id: foto.id, dados: foto, atualizado_em: agora.toISOString() });
