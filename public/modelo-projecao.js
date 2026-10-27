@@ -113,15 +113,19 @@ function projModel(faturas,comissoes,hoje,agcfg,imps){
       const c=comFor(r,r.comp);let d=util(addD(pd(r.venc),lag(r.eid)));const atras=d<T,dPrev=d;if(atras)d=PROX;
       com.push({tipo:'prev',semHist:!!c.semHist,atraso:atras,op:r.operadora,kind:c.kind,eid:r.eid,empresa:r.empresa,titulo:r.titulo,data:d,valor:c.v,parc:c.parc,comp:r.comp,taxa:c.taxa,how:c.how,base:{fat:r.titulo,comp:r.comp,valor:+r.valor||0,venc:r.venc},quando:atras?'previsto para '+dm(dPrev)+' e ainda não caiu: em atraso, jogado para '+dm(PROX):'vencimento '+r.venc.slice(0,5)+' + '+lagTxt(r.eid),obs:(atras?'em atraso (previsão era '+String(dPrev.getUTCDate()).padStart(2,'0')+'/'+String(dPrev.getUTCMonth()+1).padStart(2,'0')+') · ':'')+'fatura '+r.titulo+' · '+cobs(c)})}});
   com.push(...real);
-  // projeção a partir das faturas da última competência
+  // projeção a partir da última fatura de cada empresa (não do último mês geral: um mês que ainda está chegando
+  // derrubaria as empresas que ainda não faturaram nele). Empresa sem fatura nos 2 últimos meses fica de fora (cancelada).
   // proteção: se a última fatura da empresa veio mais de 30% abaixo da média dos 3 meses anteriores, projeta pela média
   const totE={};fat.forEach(r=>{const o=totE[r.eid]=totE[r.eid]||{};o[r.comp]=(o[r.comp]||0)+(+r.valor||0)});
-  const fatorE={};Object.entries(totE).forEach(([e,o])=>{const cur=o[ultComp];if(!cur)return;const prev=[1,2,3].map(k=>o[addM(ultComp,-k)]).filter(x=>x>0);if(prev.length<2)return;const med=prev.reduce((a,b)=>a+b,0)/prev.length;if(cur<0.7*med)fatorE[e]={f:med/cur,cur,med}});
-  const base=fat.filter(r=>r.comp===ultComp).map(r=>{const F=fatorE[r.eid];return F?Object.assign({},r,{valor:(+r.valor||0)*F.f,valor0:+r.valor||0,fora:F}):r});
-  for(let k=1;k<=H;k++){const comp=addM(ultComp,k);
-    base.forEach(r=>{const v0=shiftM(pd(r.venc),k),v=util(v0);
-      emp.push({tipo:'proj',op:r.operadora,eid:r.eid,empresa:r.empresa,titulo:null,data:v,valor:+r.valor||0,comp,obs:r.fora?'fatura fora do normal em '+mesLabel(ultComp)+': usa a média dos 3 meses anteriores':'repete a fatura de '+ultComp.slice(5)+'/'+ultComp.slice(2,4)});
-      if(!comOps.has(r.operadora))return;const c=comFor(r,comp);com.push({tipo:'proj',semHist:!!c.semHist,fora:!!r.fora,op:r.operadora,kind:c.kind,eid:r.eid,empresa:r.empresa,data:util(addD(v0,lag(r.eid))),valor:c.v,parc:c.parc,comp,taxa:c.taxa,obs:cobs(c),how:c.how+(r.fora&&c.kind==='vit'?' · fatura fora do normal em '+mesLabel(ultComp)+' (R$ '+brl(r.fora.cur)+' contra média de R$ '+brl(r.fora.med)+'): projeta pela média; confira':''),base:{fat:null,comp,valor:+r.valor||0,venc:dm(v0)+'/'+v0.getUTCFullYear(),rep:r.titulo},quando:'vencimento previsto '+dm(v0)+' + '+lagTxt(r.eid)})})}
+  const lastE={};fat.forEach(r=>{if(!lastE[r.eid]||r.comp>lastE[r.eid])lastE[r.eid]=r.comp});
+  const corte=addM(ultComp,-1);
+  const fatorE={};Object.entries(totE).forEach(([e,o])=>{const lc=lastE[e];const cur=o[lc];if(!cur)return;const prev=[1,2,3].map(k=>o[addM(lc,-k)]).filter(x=>x>0);if(prev.length<2)return;const med=prev.reduce((a,b)=>a+b,0)/prev.length;if(cur<0.7*med)fatorE[e]={f:med/cur,cur,med}});
+  const base=fat.filter(r=>r.comp===lastE[r.eid]&&r.comp>=corte).map(r=>{const F=fatorE[r.eid];return F?Object.assign({},r,{valor:(+r.valor||0)*F.f,valor0:+r.valor||0,fora:F}):r});
+  const nM=(a,b)=>{const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1)};
+  base.forEach(r=>{const lc=r.comp;
+    for(let k=1;k<=nM(lc,ultComp)+H;k++){const comp=addM(lc,k);const v0=shiftM(pd(r.venc),k),v=util(v0);
+      emp.push({tipo:'proj',op:r.operadora,eid:r.eid,empresa:r.empresa,titulo:null,data:v,valor:+r.valor||0,comp,obs:r.fora?'fatura fora do normal em '+mesLabel(lc)+': usa a média dos 3 meses anteriores':'repete a fatura de '+lc.slice(5)+'/'+lc.slice(2,4)});
+      if(!comOps.has(r.operadora))continue;const c=comFor(r,comp);com.push({tipo:'proj',semHist:!!c.semHist,fora:!!r.fora,op:r.operadora,kind:c.kind,eid:r.eid,empresa:r.empresa,data:util(addD(v0,lag(r.eid))),valor:c.v,parc:c.parc,comp,taxa:c.taxa,obs:cobs(c),how:c.how+(r.fora&&c.kind==='vit'?' · fatura fora do normal em '+mesLabel(lc)+' (R$ '+brl(r.fora.cur)+' contra média de R$ '+brl(r.fora.med)+'): projeta pela média; confira':''),base:{fat:null,comp,valor:+r.valor||0,venc:dm(v0)+'/'+v0.getUTCFullYear(),rep:r.titulo},quando:'vencimento previsto '+dm(v0)+' + '+lagTxt(r.eid)})}});
   // implantações que ainda não têm fatura na base
   const fatE=new Set(fat.map(r=>r.eid)), endC=addM(T.toISOString().slice(0,7),3);
   const novas=imps.filter(im=>!(im.eid&&fatE.has(im.eid))&&+im.valor>0);
@@ -133,7 +137,7 @@ function projModel(faturas,comissoes,hoje,agcfg,imps){
         how:ag?'Implantação nova ('+pctTx(im.agPct)+'): '+q+'ª fatura estimada de R$ '+brl(val)+' sem IOF × '+pctTx(fr*100):'Implantação nova, já vitalício: fatura estimada de R$ '+brl(val)+' sem IOF × '+pctTx(tv),
         quando:atras?'previsto para '+dm(dPrev)+' e a fatura ainda não está na base: em atraso, jogado para '+dm(PROX):'vencimento dia '+dia+' + 4 dias (prazo padrão)',base:{fat:null,comp,valor:val,venc:dm(v0)+'/'+a},obs:'implantação · '+q+'ª fatura · '+(ag?pctTx(fr*100):pctTx(tv))})}});
   // empresas em agenciamento (ou que acabaram de sair)
-  const eids=[...new Set(fat.filter(r=>r.comp===ultComp).map(r=>r.eid))];
+  const eids=[...new Set(base.map(r=>r.eid))];
   const ag=eids.map(agInfo).filter(A=>(A.rec.length||A.im)&&(A.restantes>0||A.cfg||com.some(x=>x.eid===A.eid&&x.kind==='ag'&&x.tipo!=='real')))
     .map(A=>{const nome=(fat.find(r=>r.eid===A.eid)||{}).empresa||A.eid;
       const prox=com.filter(x=>x.eid===A.eid&&x.kind==='ag'&&x.tipo!=='real').sort((a,b)=>a.parc-b.parc);
