@@ -47,7 +47,7 @@ export function Faturamento({ c, faturas: todas, comissoes }: { c: string; fatur
       <div className="page-head">
         <div>
           <h1>Faturamento</h1>
-          <p>{up ? `Atualizado em ${new Date(up).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. ` : ''}Clique numa empresa para ver faturas, vidas e situação.</p>
+          <p>{up ? `Atualizado em ${new Date(up).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. ` : ''}Clique numa empresa para ver faturas, vidas e situação. <a href={`/central/${c}#faturamento`}>Ver na Central antiga</a></p>
         </div>
         <div className="filtros">
           {ops.length > 1 && (
