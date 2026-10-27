@@ -8,12 +8,13 @@ update agentes set automatico = true, como = 'baixar_bradesco.js (Portal de Neg�
  where agente in ('faturas', 'comissao') and seguradora_id = 'bradesco_saude';
 update agentes set automatico = true, como = 'baixar_porto.js (Corretor Online, login guardado)'
  where agente in ('faturas', 'comissao') and seguradora_id = 'porto_saude';
-update agentes set como = 'baixar_hapvida.js (Portal Empresa, lista de logins) + pasta "boletos a enviar\HAPVIDA"'
+update agentes set automatico = true, como = 'baixar_hapvida.js (Portal Empresa, lista de logins) + pasta "boletos a enviar\HAPVIDA"'
  where agente = 'faturas' and seguradora_id = 'hapvida';
--- Bruno (27/10): por enquanto o ciclo automático é só de Bradesco e Porto. As outras ficam pausadas
+-- Bruno (27/10): por enquanto o ciclo automático é de Bradesco, Porto e Hapvida (faturas). As outras ficam pausadas
 -- (continuam rodando quando alguém pede no master; o supervisor só não cria pedidos para elas).
 update agentes set situacao = 'pausado'
- where agente in ('faturas', 'comissao') and seguradora_id not in ('bradesco_saude', 'porto_saude');
+ where agente in ('faturas', 'comissao') and seguradora_id not in ('bradesco_saude', 'porto_saude')
+   and not (agente = 'faturas' and seguradora_id = 'hapvida');
 
 create or replace view supervisor_previsao with (security_invoker = true) as
 with
