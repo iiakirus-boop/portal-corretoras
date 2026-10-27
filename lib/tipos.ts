@@ -82,6 +82,7 @@ export type Fatura = {
   valor_boleto: number | null;
   vidas_informadas: number | null;
   data_pagamento: string | null;
+  pago_pela_comissao: string | null; // a comissão dessa fatura caiu: o boleto foi pago (data do lançamento)
   conferencia_valor: string | null;
   fatura_doc_id: string | null;
   boleto_doc_id: string | null;
