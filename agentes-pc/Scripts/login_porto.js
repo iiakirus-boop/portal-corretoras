@@ -3,6 +3,9 @@
 // porta 9334 para o Claude continuar o trabalho. Captcha ou código por SMS/e-mail: resolver na janela.
 const { chromium } = require('C:/Users/bruno/.claude/plugins/cache/playwright-skill/playwright-skill/5.0.0/skills/playwright-skill/node_modules/playwright');
 const SUSEP = process.env.PORTO_SUSEP || 'BA6QXJ';
+// marcador para o vigia: o login terminou de verdade (o vigia só baixa depois disso)
+const marca = op => { const d = require('path').join(process.env.LOCALAPPDATA, 'Shaddai');
+  require('fs').mkdirSync(d, { recursive: true }); require('fs').writeFileSync(require('path').join(d, `${op}.logado`), new Date().toISOString()); };
 (async () => {
   const browser = await chromium.launch({ headless: false, channel: 'chrome', args: ['--remote-debugging-port=9334', '--start-maximized'] });
   const page = await (await browser.newContext({ viewport: null, acceptDownloads: true })).newPage();
@@ -15,11 +18,14 @@ const SUSEP = process.env.PORTO_SUSEP || 'BA6QXJ';
   await cpf.fill(process.env.PORTO_USER);
   await page.locator('input[name="password"]:visible').first().fill(process.env.PORTO_PASS);
   await page.locator('#inputLogin').click();
-  // se pedir captcha, resolva na janela; depois vem a escolha da SUSEP (corretor BA6QXJ)
-  const susep = page.locator('select:visible').first();
-  await susep.waitFor({ timeout: 180000 });
-  const opcao = await susep.locator('option').evaluateAll((os, s) => (os.find(o => o.textContent.includes(s) || o.value.includes(s)) || {}).value, SUSEP);
-  if (opcao) await susep.selectOption(opcao);
+  // se pedir captcha, resolva na janela; depois vem a escolha da SUSEP (corretor BA6QXJ): campo de texto com
+  // sugestões (jQuery UI autocomplete), não um select. Digita, clica na sugestão "BA6QXJ (P)" e entra, sem pausa
+  // (a tela parada por alguns minutos faz a Porto recusar o acesso)
+  const susep = page.locator('#susepsAutocomplete');
+  await susep.waitFor({ state: 'visible', timeout: 180000 });
+  await susep.click();
+  await susep.pressSequentially(SUSEP, { delay: 80 });
+  await page.locator('ul.ui-autocomplete li.ui-menu-item', { hasText: SUSEP }).first().click({ timeout: 15000 });
   await page.locator('#btnAvancarSusep').click();
   // código de acesso: preenche se a tela pedir e ele estiver guardado; senão digite na janela
   const cod = page.locator('input:visible').and(page.locator('[id*=odigo i],[name*=odigo i],[id*=token i],[name*=token i],[placeholder*=ódigo i],[placeholder*=odigo i]'));
@@ -29,7 +35,9 @@ const SUSEP = process.env.PORTO_SUSEP || 'BA6QXJ';
   }
   console.log('Login enviado. Se pedir código ou captcha, resolva na janela. Deixe esta janela preta aberta enquanto o Claude trabalha.');
   // mantém a sessão viva: recarrega uma aba própria a cada 12 min, sem mexer na aba em que o Claude trabalha
-  await page.waitForFunction(() => !document.querySelector('#logonPrincipal')?.offsetParent && !document.querySelector('#btnAvancarSusep')?.offsetParent, null, { timeout: 300000 });
+  await page.waitForFunction(() => !document.querySelector('#logonPrincipal')?.offsetParent && !document.querySelector('#btnAvancarSusep')?.offsetParent
+    && !/validar seu acesso/i.test(document.body.innerText) && !/template\.LOGIN/.test(location.href), null, { timeout: 300000 });
+  marca('porto');
   const viva = await page.context().newPage();
   await page.bringToFront();
   setInterval(() => viva.goto(page.url().split('#')[0], { waitUntil: 'domcontentloaded', timeout: 60000 })

@@ -13,7 +13,7 @@ O que ele roda sozinho:
     Hapvida" nas 9335/9336/9337 para a comissão, os três logins; a Hapvida faturas entra sozinha); 2) baixa com
     baixar_<op>.js (faturas: competência do pedido ou a próxima; comissão: do último pagamento já importado até hoje;
     Hapvida: mês de referência do pedido ou o atual); 3) rodar.py --ordem <id>, que grava, publica na Central e sincroniza.
-    Login caído: o vigia abre sozinho o "Entrar na <op>" (login_<op>.ps1, senha do cofre do Windows) e espera até 4 min;
+    Login caído: o vigia abre sozinho o "Entrar na <op>" (login_<op>.ps1, senha do cofre do Windows) e espera até 5 min o login terminar;
     sem senha no cofre, já tentou na última meia hora ou saída 3 do baixar = "esperando você". Saída 2 = erro, com o
     print em Scripts/_socorro. Nada novo no portal = concluída.
   - Faturas SulAmérica e Amil: lê os arquivos que já estão em "boletos a enviar".
@@ -34,7 +34,7 @@ import sys, os, time, datetime, subprocess, json, urllib.request
 import banco
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-VERSAO = 'vigia 2026-10-27b'
+VERSAO = 'vigia 2026-10-27c'
 INTERVALO = int(os.environ.get('SHADDAI_VIGIA_MINUTOS', '2')) * 60
 MAQUINA = os.environ.get('SHADDAI_MAQUINA', 'PC do Bruno')
 LOG = os.path.join(AQUI, '_vigia.log')
@@ -135,13 +135,17 @@ def entrar(op, ag):
     log(f'{op}: login caído, abrindo {ps1}')
     subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', os.path.join(AQUI, ps1)], cwd=AQUI,
                      creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
-    for _ in range(24):  # até 4 min
+    marca = os.path.join(COFRE, f'{op}.logado')  # Porto e Bradesco: o login_<op>.js grava quando entrou de verdade
+    for _ in range(30):  # até 5 min
         time.sleep(10)
+        if op in PORTA and not (os.path.exists(marca) and os.path.getmtime(marca) >= TENTOU[op]):
+            continue
         if todos_logados(op, ag):
-            time.sleep(60)  # o portal abre antes do login terminar (Porto ainda escolhe a SUSEP)
+            if op not in PORTA:
+                time.sleep(30)  # webhap: só o Chrome aberto; dá tempo de o login terminar
             log(f'{op}: login automático feito')
             return None
-    return 'o login automático não terminou em 4 min (captcha ou código?): termine na janela do Chrome'
+    return 'o login automático não terminou em 5 min (captcha ou código?): termine na janela do Chrome'
 
 
 def ultimo_pagamento(op):
