@@ -13,17 +13,17 @@ export default async function CorretoraLayout({ children, params }: { children: 
   const base = `/corretora/${c}`;
   const papel = master ? 'Master' : PAPEL[papeisCorretora(s, c).includes('admin_corretora') ? 'admin_corretora' : 'operador_corretora'];
   const links = [
-    // mesmo menu da Central: as quatro abas dela, depois as telas do portal. Faturamento e Comissões já são telas do portal.
-    { href: `/central/${c}#inicio`, rotulo: 'Início' },
+    // as quatro abas da Central (já como telas do portal; Pendências continua na Central), depois as outras telas do portal
+    { href: base, rotulo: 'Início' },
     { href: `${base}/faturamento`, rotulo: 'Faturamento' },
-    ...(admin ? [{ href: `${base}/comissoes`, rotulo: 'Comissões' }, { href: `/central/${c}#projecao`, rotulo: 'Projeção' }] : []),
+    ...(admin ? [{ href: `${base}/comissoes`, rotulo: 'Comissões' }, { href: `${base}/projecao`, rotulo: 'Projeção' }] : []),
     { href: `${base}/empresas`, rotulo: 'Empresas' },
     { href: `${base}/pedidos`, rotulo: 'Pedidos' },
     ...(admin ? [{ href: `${base}/usuarios`, rotulo: 'Equipe e acessos' }] : []),
   ];
   return (
     <>
-      <Topo nome={cor.nome} sub="Portal da corretora" cor={cor.cor_primaria} inicio={`/central/${c}`} links={links} usuario={s.nome} papel={papel} />
+      <Topo nome={cor.nome} sub="Portal da corretora" cor={cor.cor_primaria} inicio={base} links={links} usuario={s.nome} papel={papel} />
       {master && (
         <div className="faixa-master"><div className="wrap">Você está vendo o painel da {cor.nome} como master. <Link href={`/master/corretoras/${c}`}>Voltar ao master</Link></div></div>
       )}

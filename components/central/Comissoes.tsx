@@ -20,7 +20,7 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
   const [op, setOp] = useState('todas');
   const [mesSel, setMes] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const centralUrl = (pg: string) => `/central/${c}#${pg}`;
+  const centralUrl = (pg: string) => (pg === 'projecao' ? `/corretora/${c}/projecao` : `/central/${c}#${pg}`);
   const fichaUrl = (eid: string) => `/corretora/${c}/faturamento?emp=${encodeURIComponent(eid)}`;
 
   const base = useMemo(() => {
@@ -43,7 +43,7 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
 
   const cabeca = (
     <div className="page-head">
-      <div><h1>Comissões</h1><p>Quanto cada seguradora e cada empresa pagou, pelo mês do extrato. Para saber em que dia cada valor cai, veja a <a href={centralUrl('projecao')}>Projeção</a>.</p></div>
+      <div><h1>Comissões</h1><p>Quanto cada seguradora e cada empresa pagou, pelo mês do extrato. Para saber em que dia cada valor cai, veja a <a href={centralUrl('projecao')}>Projeção</a>. <a href={`/central/${c}#comissoes`}>Ver na Central antiga</a></p></div>
       <div className="filtros">
         {ops.length > 1 && (
           <div className="chips" role="group" aria-label="Seguradora">
