@@ -41,7 +41,7 @@ export function criarBanco(): Banco {
     ],
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
-    maquinas: [], rotinas: [], ordens_execucao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [],
+    maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();
@@ -201,6 +201,31 @@ export function criarBanco(): Banco {
       status, criada_em: iso(menosMin(min)), iniciada_em: status === 'pendente' ? null : iso(menosMin(min - 1)),
       terminada_em: status === 'concluida' || status === 'erro' ? iso(menosMin(min - 8)) : null, mensagem: msg,
       // demonstração: o endereço real é o da sessão do Claude que rodou a ordem
-      sessao_url: status === 'pendente' ? null : 'https://claude.ai/code' });
+      sessao_url: status === 'pendente' ? null : 'https://claude.ai/code', modo: status === 'concluida' || status === 'erro' ? 'claude' : null });
+  db.ordens_execucao.push({ id: uid('ord'), corretora_id: 'c-shaddai', agente: 'conferencia', seguradora_id: null, competencia: '2026-10', origem: 'encadeamento',
+    prioridade: 3, status: 'concluida', criada_em: iso(menosMin(160)), iniciada_em: iso(menosMin(160)), terminada_em: iso(menosMin(160)),
+    mensagem: 'Conferência 2026-10: 0 erros e 3 avisos (3 novos).', sessao_url: null, modo: 'codigo', custo_usd: 0 });
+  const ags: [string, string | null, string, 'nuvem' | 'pc', boolean, string][] = [
+    ['faturas', 'hapvida', 'Faturas Hapvida', 'pc', true, 'arquivos em "boletos a enviar"'], ['faturas', 'porto_saude', 'Faturas Porto', 'pc', false, 'portal (alguém loga)'],
+    ['comissao', 'bradesco_saude', 'Comissão Bradesco', 'pc', false, 'portal (alguém loga)'], ['vidas', null, 'Vidas', 'pc', true, 'base de faturas'],
+    ['projecao', null, 'Projeção', 'nuvem', true, 'banco'], ['conferencia', null, 'Conferência', 'nuvem', true, 'banco'], ['supervisor', null, 'Supervisor', 'nuvem', true, 'histórico do banco'],
+  ];
+  for (const [agente, seguradora_id, nome, onde, automatico, como] of ags)
+    db.agentes.push({ id: uid('ag'), agente, seguradora_id, cobre: [], nome, onde, automatico, como, situacao: 'ativo', criado_por: 'cadastro' });
+  db.supervisor_previsao.push(
+    { corretora_id: 'c-shaddai', agente: 'faturas', seguradora_id: 'bradesco_saude', competencia: '2026-11', esperado_em: '2026-10-16', atrasado: true,
+      motivo: '12 de 40 empresas com fatura de 2026-11 que já devia ter saído: ALFA LOGÍSTICA, BETA ENGENHARIA e mais 10' },
+    { corretora_id: 'c-shaddai', agente: 'faturas', seguradora_id: 'hapvida', competencia: '2026-11', esperado_em: '2026-10-29', atrasado: false,
+      motivo: '14 empresas; a primeira fatura de 2026-11 costuma sair em 29/10' },
+    { corretora_id: 'c-shaddai', agente: 'comissao', seguradora_id: 'hapvida', competencia: '2026-10', esperado_em: '2026-10-21', atrasado: true,
+      motivo: 'última importação em 17/10 (último pagamento de 16/10); costuma pagar a cada 4 dias' });
+  const confs: [string, string, 'erro' | 'aviso', string][] = [
+    ['hapvida', 'vidas_divergem', 'aviso', 'ALFA LOGÍSTICA: a fatura 88231 diz 42 vidas e a lista tem 41'],
+    ['porto_saude', 'fatura_faltando', 'aviso', 'BETA ENGENHARIA: tinha fatura em 2026-09 e ainda não tem nesta competência'],
+    ['amil', 'comissao_sem_empresa', 'aviso', 'GAMA SERVIÇOS LTDA: 2 lançamentos de comissão (R$ 1.204,70) sem empresa cadastrada'],
+  ];
+  for (const [seguradora_id, tipo, gravidade, mensagem] of confs)
+    db.conferencias.push({ id: uid('conf'), corretora_id: 'c-shaddai', competencia: '2026-10', seguradora_id, empresa_id: null, tipo, gravidade, mensagem,
+      primeira_vez: iso(menosMin(160)), ultima_vez: iso(menosMin(160)), resolvida_em: null });
   return db;
 }

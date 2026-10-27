@@ -103,8 +103,16 @@ export const SEGURADORA: Record<string, string> = {
 export const seg = (id: string | null | undefined) => (id ? SEGURADORA[id] ?? id : '—');
 
 export const AGENTE: Record<string, string> = {
-  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação',
+  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação', conferencia: 'Conferência', supervisor: 'Supervisor', criar_agente: 'Criar agente',
 };
 
 export const ORDEM_TOM = { pendente: 'idle', em_execucao: 'info', concluida: 'ok', erro: 'bad', cancelada: 'idle', aguardando_voce: 'warn' } as const;
 export const ORDEM_ROTULO = { pendente: 'Na fila', em_execucao: 'Rodando', concluida: 'Concluída', erro: 'Erro', cancelada: 'Cancelada', aguardando_voce: 'Esperando você' };
+
+// Tipos de divergência do Agente Conferência
+export const CONFERENCIA_TIPO: Record<string, string> = {
+  fatura_duplicada: 'Fatura duplicada', valor_divergem: 'Valor da fatura × vidas', vidas_divergem: 'Nº de vidas × lista',
+  vidas_sumiram: 'Vidas sumiram', fatura_faltando: 'Fatura faltando', comissao_calculo: 'Comissão × prêmio e taxa',
+  comissao_classe: 'Classe × taxa', comissao_sem_empresa: 'Comissão sem empresa',
+};
+export const MODO_ROTULO = { codigo: 'Código', claude: 'Claude', misto: 'Código + Claude' } as const;
