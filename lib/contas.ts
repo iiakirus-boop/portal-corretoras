@@ -14,9 +14,13 @@ export function ultimas(faturas: Fatura[]) {
 
 // Linha da view faturas_ultimas: a fatura mais recente de cada empresa/seguradora, já somada
 export type FaturaUltima = { corretora_id: string; empresa_id: string; seguradora_id: string; competencia: string; vidas: number; valor: number; vencimento: string | null; faturas: number; comp_carteira: string };
-// Vidas da carteira = soma do mês mais recente de cada corretora (mesma conta da Central); empresas sem fatura nesse mês ficam fora
-export const vidasCarteira = (us: FaturaUltima[]) => us.reduce((t, u) => t + (u.competencia === u.comp_carteira ? u.vidas : 0), 0);
-export const vidasCarteiraPor = (us: FaturaUltima[]) => somarPor(us.filter((u) => u.competencia === u.comp_carteira), (u) => u.corretora_id, (u) => u.vidas);
+// Linha da view vidas_carteira (p26): vidas de cada empresa/seguradora a partir do último mês fechado (base). Quem já tem o boleto
+// novo conta o boleto novo, quem ainda não tem continua com o último faturamento; somam-se inclusões e tiram-se exclusões concluídas
+// depois da última fatura. É a conta das telas e da cobrança da plataforma.
+export type VidaCarteira = { corretora_id: string; empresa_id: string; seguradora_id: string | null; competencia: string | null; base: string; vidas_faturadas: number; inclusoes: number; exclusoes: number; vidas: number };
+export const vidasCarteira = (vs: VidaCarteira[]) => vs.reduce((t, v) => t + v.vidas, 0);
+export const vidasCarteiraPor = (vs: VidaCarteira[]) => somarPor(vs, (v) => v.corretora_id, (v) => v.vidas);
+export const vidasEmpresaPor = (vs: VidaCarteira[]) => somarPor(vs, (v) => v.empresa_id, (v) => v.vidas);
 
 // Vidas ativas = vidas da fatura mais recente de cada empresa/seguradora
 export const vidasAtivas = (faturas: Fatura[]) => ultimas(faturas).reduce((t, f) => t + (f.vidas_informadas ?? 0), 0);

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { cliente } from '@/lib/servidor';
 import { competencia, moeda, num, plural } from '@/lib/formato';
-import { mensalidade, vidasCarteiraPor, type Contrato, type FaturaUltima } from '@/lib/contas';
+import { mensalidade, vidasCarteiraPor, type Contrato, type VidaCarteira } from '@/lib/contas';
 import { Pill } from '@/components/Pill';
 import type { Corretora } from '@/lib/tipos';
 
@@ -9,13 +9,13 @@ type Fechamento = { id: string; corretora_id: string; competencia: string; vidas
 
 export default async function Cobranca() {
   const db = await cliente();
-  const [{ data: corretoras }, { data: faturas }, { data: fech }] = await Promise.all([
+  const [{ data: corretoras }, { data: vidasC }, { data: fech }] = await Promise.all([
     db.from('corretoras').select('*').order('nome'),
-    db.from('faturas_ultimas').select('*'),
+    db.from('vidas_carteira').select('*'),
     db.from('cobranca_fechamentos').select('*').order('competencia', { ascending: false }),
   ]);
   const cs = (corretoras ?? []) as Corretora[];
-  const vidas = vidasCarteiraPor((faturas ?? []) as FaturaUltima[]);
+  const vidas = vidasCarteiraPor((vidasC ?? []) as VidaCarteira[]);
   const linhas = cs.map((c) => {
     const ct = (c.contrato ?? {}) as Contrato;
     const v = vidas.get(c.id) ?? 0;
@@ -29,7 +29,7 @@ export default async function Cobranca() {
       <div className="page-head">
         <div>
           <h1>Cobrança</h1>
-          <p>A mensalidade de cada corretora sai das vidas ativas na carteira dela: preço por vida da faixa em que o total cai, respeitando o mínimo combinado.</p>
+          <p>A mensalidade de cada corretora sai das vidas ativas na carteira dela (vidas do último mês faturado, mais as entradas e menos as saídas; empresa cujo boleto novo ainda não saiu continua contando o último): preço por vida da faixa em que o total cai, respeitando o mínimo combinado.</p>
         </div>
       </div>
       <div className="kpis">

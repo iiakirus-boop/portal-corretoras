@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cliente, exigirSessao } from '@/lib/servidor';
 import { cnpj, competencia, data, moeda, num, seg } from '@/lib/formato';
-import { mensalidade, somarPor, vidasCarteira, type Contrato, type FaturaUltima } from '@/lib/contas';
+import { mensalidade, vidasCarteira, vidasEmpresaPor, type Contrato, type VidaCarteira } from '@/lib/contas';
 import { Aviso } from '@/components/Aviso';
 import { Pessoas } from '@/components/Pessoas';
 import { Pill } from '@/components/Pill';
@@ -18,21 +18,22 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
   const { data: cor } = await db.from('corretoras').select('*').eq('id', c).maybeSingle();
   if (!cor) notFound();
   const k = cor as Corretora;
-  const [{ data: cnpjs }, { data: codigos }, { data: empresas }, { data: faturas }, { data: membros }, { data: convites }] = await Promise.all([
+  const [{ data: cnpjs }, { data: codigos }, { data: empresas }, { data: vidasC }, { data: membros }, { data: convites }] = await Promise.all([
     db.from('corretora_cnpjs').select('*').eq('corretora_id', c),
     db.from('corretora_codigos').select('*').eq('corretora_id', c),
     db.from('empresas').select('*').eq('corretora_id', c).order('razao_social'),
-    db.from('faturas_ultimas').select('*').eq('corretora_id', c),
+    db.from('vidas_carteira').select('*').eq('corretora_id', c),
     db.from('membros').select('*').eq('corretora_id', c).eq('ativo', true),
     db.from('convites').select('*').eq('corretora_id', c),
   ]);
   const es = (empresas ?? []) as Empresa[];
-  const ult = (faturas ?? []) as FaturaUltima[];
-  const vidasE = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas);
+  const vc = (vidasC ?? []) as VidaCarteira[];
+  const vidasE = vidasEmpresaPor(vc);
   const segsE = new Map<string, string[]>();
-  for (const f of ult) segsE.set(f.empresa_id, [...(segsE.get(f.empresa_id) ?? []), seg(f.seguradora_id)]);
-  const ultimaComp = ult[0]?.comp_carteira ?? '';
-  const vidas = vidasCarteira(ult);
+  for (const v of vc) if (v.seguradora_id) segsE.set(v.empresa_id, [...(segsE.get(v.empresa_id) ?? []), seg(v.seguradora_id)]);
+  const base = vc[0]?.base ?? '';
+  const mov = vc.reduce((t, v) => t + v.inclusoes - v.exclusoes, 0);
+  const vidas = vidasCarteira(vc);
   const contrato = (k.contrato ?? {}) as Contrato;
   const preco = mensalidade(vidas, contrato);
 
@@ -50,7 +51,7 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
 
       <div className="kpis">
         <div className="kpi"><span className="kpi-l">Empresas ativas</span><span className="kpi-v">{num(es.filter((e) => e.ativa).length)}</span></div>
-        <div className="kpi"><span className="kpi-l">Vidas ativas</span><span className="kpi-v">{num(vidas)}</span><span className="kpi-s">última competência: {competencia(ultimaComp || null)}</span></div>
+        <div className="kpi"><span className="kpi-l">Vidas ativas</span><span className="kpi-v">{num(vidas)}</span><span className="kpi-s">faturadas desde {competencia(base || null)}{mov ? `, ${mov > 0 ? '+' : ''}${num(mov)} de movimentações` : ''}</span></div>
         <div className="kpi"><span className="kpi-l">Mensalidade da plataforma</span><span className="kpi-v">{preco ? moeda(preco.valor) : '—'}</span><span className="kpi-s">{preco ? `${moeda(preco.porVida)} por vida${preco.minimoAplicado ? ', valor mínimo' : ''}` : contrato.observacao ?? 'sem preço combinado'}</span></div>
         <div className="kpi"><span className="kpi-l">Desde</span><span className="kpi-v">{data(k.criado_em)}</span><span className="kpi-s">{k.slug}</span></div>
       </div>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { cliente, exigirCorretora } from '@/lib/servidor';
 import { ABERTOS, competencia, moeda, num, plural, seg } from '@/lib/formato';
-import { somarPor, type FaturaUltima } from '@/lib/contas';
+import { somarPor, vidasEmpresaPor, type FaturaUltima, type VidaCarteira } from '@/lib/contas';
 import { criarEmpresa } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
 import type { Empresa, Pedido } from '@/lib/tipos';
@@ -15,14 +15,15 @@ export default async function Empresas({ params, searchParams }: P) {
   const db = await cliente();
   let q = db.from('empresas').select('*').eq('corretora_id', c).order('razao_social');
   if (sp.q) q = q.ilike('razao_social', `%${sp.q}%`);
-  const [{ data: empresas }, { data: faturas }, { data: pedidos }] = await Promise.all([
+  const [{ data: empresas }, { data: faturas }, { data: vidasC }, { data: pedidos }] = await Promise.all([
     q,
     db.from('faturas_ultimas').select('*').eq('corretora_id', c),
+    db.from('vidas_carteira').select('*').eq('corretora_id', c),
     db.from('pedidos').select('*').eq('corretora_id', c).in('status', ABERTOS),
   ]);
   const es = (empresas ?? []) as Empresa[];
   const ult = (faturas ?? []) as FaturaUltima[];
-  const vidas = somarPor(ult, (f) => f.empresa_id, (f) => f.vidas);
+  const vidas = vidasEmpresaPor((vidasC ?? []) as VidaCarteira[]);
   const valor = somarPor(ult, (f) => f.empresa_id, (f) => Number(f.valor));
   const ped = somarPor((pedidos ?? []) as Pedido[], (p) => p.empresa_id, () => 1);
   const segs = new Map<string, FaturaUltima[]>();
@@ -31,7 +32,7 @@ export default async function Empresas({ params, searchParams }: P) {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Empresas</h1><p>{plural(es.length, 'empresa', 'empresas')} na carteira. Vidas e valor da fatura mais recente de cada seguradora.</p></div>
+        <div><h1>Empresas</h1><p>{plural(es.length, 'empresa', 'empresas')} na carteira. Valor da fatura mais recente de cada seguradora; vidas do último mês faturado, mais entradas e menos saídas.</p></div>
         <form className="acoes" role="search">
           <input className="busca" type="search" enterKeyHint="search" name="q" defaultValue={sp.q} placeholder="Buscar pela razão social" aria-label="Buscar empresa" style={{ width: 260 }} />
           <button className="btn ghost">Buscar</button>
