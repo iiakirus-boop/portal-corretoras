@@ -9,7 +9,8 @@ O rodar.py chama sozinho no fim de toda rodada que deu certo. Também dá para r
 Como funciona: gera os CSV de carga com o Carga_Supabase/carga.py (mesmos IDs de sempre, nada duplica)
 e manda para o banco pela função sincronizar_lote, com o token dos agentes:
   - faturas e ordens de comissão: atualiza a linha existente ou insere a nova;
-  - vidas (por empresa + seguradora + mês) e lançamentos (por ordem): troca o grupo inteiro pela cópia da planilha.
+  - vidas (por empresa + seguradora + mês) e lançamentos (por ordem): troca o grupo inteiro pela cópia da planilha;
+  - no fim, documentos.py sobe os PDFs de fatura e boleto que ainda não estão no portal.
 Só lê a planilha; nunca grava nela. Sem rede ou sem token, avisa e segue.
 """
 import csv, json, os, subprocess, sys, datetime
@@ -78,6 +79,12 @@ def main():
     enviar('comissao_pagamentos', pag)
     enviar('vidas', vid, lambda r: (r['empresa_id'], r['seguradora_id'], r['competencia']))
     enviar('comissao_lancamentos', lan, lambda r: r['pagamento_id'])
+    # PDFs de fatura e boleto para a empresa baixar no portal (só os que faltam)
+    try:
+        import documentos
+        documentos.main(meses, SECO)
+    except Exception as e:  # nunca derruba a sincronização
+        print(f'[sincronizar] PDFs não enviados: {e.__class__.__name__}: {e}')
     return 0
 
 
