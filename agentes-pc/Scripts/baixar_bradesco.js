@@ -105,7 +105,9 @@ async function faturas(comp, saida) {
     for (let t = 0; t < 90000 && !arqs.length; t += 2000) await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Ok' }).click({ timeout: 3000 }).catch(() => {});
   }
-  for (let t = 0, n = -1, parado = 0; arqs.length && t < 600000 && arqs.length < sel && parado < 30000; t += 2000) {
+  // "Você selecionou N kits" conta LINHAS; o portal manda um PDF por SUBFATURA (11/2026: 64 linhas, 76 PDFs) e
+  // alguns chegam minutos depois. Por isso não para ao chegar em N: espera até ficar 4 min sem chegar nada.
+  for (let t = 0, n = -1, parado = 0; arqs.length && t < 1200000 && parado < 240000; t += 2000) {
     parado = arqs.length === n && n > 0 ? parado + 2000 : 0; n = arqs.length;
     await page.waitForTimeout(2000);
   }

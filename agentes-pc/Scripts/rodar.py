@@ -54,7 +54,9 @@ class Parou(Exception):
 
 def etapa(titulo, cmd, saida=None, cwd=AQUI):
     print(f'\n== {titulo}', flush=True)
-    r = subprocess.run(cmd, cwd=cwd, stdout=open(saida, 'w', encoding='utf-8') if saida else None)
+    # o vigia roda num console do Windows (cp1252): sem isto o JSON da leitura sai com 'Área' em cp1252 e a gravação quebra
+    env = {**os.environ, 'PYTHONIOENCODING': 'utf-8', 'PYTHONUTF8': '1'}
+    r = subprocess.run(cmd, cwd=cwd, env=env, stdout=open(saida, 'w', encoding='utf-8') if saida else None)
     if r.returncode:
         raise Parou(f'{titulo} terminou com erro (código {r.returncode}). Nada depois dela foi rodado.')
 
