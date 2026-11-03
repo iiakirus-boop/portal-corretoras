@@ -77,7 +77,13 @@ async function faturas(comp, saida) {
   passo = `Faturas: filtro ${rotulo}`;
   await page.locator('.cabecalho__botao-filtros').click();
   const op = page.getByText(rotulo, { exact: true }).first();
-  if (!await op.isVisible({ timeout: 5000 }).catch(() => false)) throw new Error(`competência ${rotulo} não aparece no filtro do portal`);
+  if (!await op.isVisible({ timeout: 5000 }).catch(() => false)) {
+    // mês que a Bradesco ainda não liberou (ex.: o supervisor pede o mês seguinte logo no dia 1º): não é erro, é "nada novo ainda"
+    await page.keyboard.press('Escape').catch(() => {});
+    saida.faturas = { competencia: comp, selecionados: 0, recebidos: 0, indisponivel: true };
+    saida.aviso = `Faturas de ${rotulo} ainda não saíram no portal da Bradesco.`;
+    return;
+  }
   await op.click();
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await page.waitForTimeout(3000);
