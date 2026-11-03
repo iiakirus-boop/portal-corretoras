@@ -2,7 +2,7 @@
 // Comissões da Central de Agentes como tela do portal: mesmas contas (lib/central/modelo.ts) e a mesma Projeção (projecao.gen.js)
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { type Doc, type Item, FCOL, brl, ckey, fam, famsIn, fatItems, int, isAg, kfmt, mesLabel, norm, pct, sum, uniq } from '@/lib/central/modelo';
+import { type Doc, type Item, FCOL, addMonth, brl, ckey, fam, famsIn, fatItems, int, isAg, kfmt, mesLabel, norm, pct, sum, uniq } from '@/lib/central/modelo';
 import { type Credito, type Modelo, mergeCom, projAll } from '@/lib/central/projecao.gen';
 import { plural } from '@/lib/formato';
 import { Barras } from './Barras';
@@ -43,7 +43,7 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
 
   const cabeca = (
     <div className="page-head">
-      <div><h1>Comissões</h1><p>Quanto cada seguradora e cada empresa pagou, pelo mês do extrato. Para saber em que dia cada valor cai, veja a <a href={centralUrl('projecao')}>Projeção</a>. <a href={`/central/${c}#comissoes`}>Ver na Central antiga</a></p></div>
+      <div><h1>Comissões</h1><p>Quanto falta cair, quanto estava previsto e quanto caiu, e o que vai cair de cada seguradora. Datas de cada empresa na <a href={centralUrl('projecao')}>Projeção</a>. <a href={`/central/${c}#comissoes`}>Ver na Central antiga</a></p></div>
       <div className="filtros">
         {ops.length > 1 && (
           <div className="chips" role="group" aria-label="Seguradora">
@@ -69,20 +69,9 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
   const empN = uniq(it.map((i) => fam(i.operadora) + '|' + norm(i.empresa))).length;
   const pi = comps.indexOf(mes), pd = pi > 0 ? comissoes.find((x) => x.comp === comps[pi - 1]) : null, pb = pd ? sum(pd.ordens || [], (o: Doc) => o.bruto) : 0, dl = pb ? (br - pb) / pb * 100 : 0;
 
-  // quanto ainda falta cair no mês corrente (mesma conta da Projeção)
-  let falta: React.ReactNode = null, cmNow: string | null = null, faltaV = 0;
-  if (PM) {
-    const T = PM.hoje; cmNow = ckey(T);
-    const L = PM.com.filter((x) => ckey(x.data) === cmNow), fC = L.filter((x) => x.tipo !== 'real'), aT = fC.filter((x) => x.atraso), fim = new Date(Date.UTC(T.getUTCFullYear(), T.getUTCMonth() + 1, 0));
-    faltaV = sum(fC, (x) => x.valor);
-    falta = (
-      <a className="kpi kpi-main" href={centralUrl('projecao')}>
-        <span className="kpi-l">Falta cair até {String(fim.getUTCDate()).padStart(2, '0')}/{MES[fim.getUTCMonth()]}</span>
-        <span className="kpi-v">R$ {brl(faltaV)}</span>
-        <span className="kpi-s">{plural(fC.length, 'crédito', 'créditos')}{aT.length > 0 && <> · inclui <b style={{ color: 'var(--bad-fg)' }}>R$ {brl(sum(aT, (x) => x.valor))} em atraso</b></>}<br />R$ {brl(sum(L.filter((x) => x.tipo === 'real'), (x) => x.valor))} já caiu em {mesLabel(cmNow)}</span>
-      </a>
-    );
-  }
+  // mês corrente pela Projeção: o que já caiu e o que falta
+  const cmNow = PM ? ckey(PM.hoje) : null;
+  const faltaV = PM ? sum(PM.com.filter((x) => ckey(x.data) === cmNow && x.tipo !== 'real'), (x) => x.valor) : 0;
 
   // gráfico por mês (no mês atual, o que ainda vai cair fica empilhado em cima, em cor clara)
   const src = d.comissoes.filter((x) => op === 'todas' || fam(x.operadora) === op), ck = famsIn(uniq(src.map((x) => fam(x.operadora))));
@@ -116,8 +105,15 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
   return (
     <div className="page cx">
       {cabeca}
+      {PM && <MesAtual PM={PM} op={op} fotos={d.projecoes} />}
+      {PM && <PrevistoCaiu PM={PM} op={op} fotos={d.projecoes} mes={mes} setMes={setMes} />}
+      {PM && <ACair PM={PM} fichaUrl={fichaUrl} />}
+      <Semanas PM={PM} mes={mes} op={op} fotos={d.projecoes} centralUrl={centralUrl} fichaUrl={fichaUrl} />
+
+      <details className="fold">
+        <summary><h2>Detalhes do extrato de {mesLabel(mes)}</h2><span className="hint">Comissão bruta, empresas, taxas, ordens de pagamento e lançamentos sem fatura</span></summary>
+        <div className="fb cx-det">
       <div className="kpis">
-        {falta}
         <div className="kpi"><span className="kpi-l">Comissão bruta {mesLabel(mes)}</span><span className="kpi-v">R$ {brl(br)}</span>
           <span className="kpi-s">{pd && <><span className={dl >= 0 ? 'up' : 'down'}>{dl >= 0 ? '+' : '−'}{pct(Math.abs(dl))}</span> vs {mesLabel(comps[pi - 1])} · </>}pelo mês do extrato</span></div>
         <div className="kpi"><span className="kpi-l">A receber</span><span className="kpi-v">R$ {brl(ap)}</span><span className="kpi-s">{deb ? `depois de R$ ${brl(Math.abs(deb))} de débitos` : 'sem débitos'}</span></div>
@@ -148,8 +144,6 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
           <p className="note">Bruto <b>R$ {brl(br)}</b>{deb ? <> − débitos <b>R$ {brl(Math.abs(deb))}</b></> : null} = a receber <b>R$ {brl(ap)}</b></p>
         </section>
       </div>
-
-      <Semanas PM={PM} mes={mes} op={op} fotos={d.projecoes} centralUrl={centralUrl} fichaUrl={fichaUrl} />
 
       <section className="card">
         <div className="card-h"><h2>Detalhe por empresa</h2><input className="busca" type="search" placeholder="Buscar empresa" aria-label="Buscar empresa" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260, marginLeft: 'auto' }} /></div>
@@ -200,7 +194,130 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
           {!Object.keys(gx).length && <li><span className="empty">Nada fora das faturas neste mês.</span></li>}
         </ul></div>
       </details>
+        </div>
+      </details>
     </div>
+  );
+}
+
+// ---------- blocos de cima: mês atual, previsto × caiu, a cair por seguradora ----------
+
+// previsto de um mês = a primeira rodada da Projeção feita dentro do mês (meses[].total já soma o que caiu e o que falta)
+type Foto = { geradoEm: string; mes: Doc };
+function primeiraFoto(fotos: Doc[], m: string): Foto | null {
+  const F = fotos.filter((f) => Array.isArray(f.meses) && String(f.geradoEm || '').slice(0, 7) === m).sort((a, b) => String(a.geradoEm).localeCompare(String(b.geradoEm)));
+  for (const f of F) { const x = f.meses.find((y: Doc) => y.comp === m); if (x) return { geradoEm: f.geradoEm, mes: x }; }
+  return null;
+}
+const previstoDe = (f: Foto | null, op: string, seg?: string) => {
+  if (!f) return null;
+  const k = seg ?? (op === 'todas' ? null : op);
+  return k ? +(f.mes.porSeg?.[k]?.total || 0) : +f.mes.total || 0;
+};
+const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+
+function MesAtual({ PM, op, fotos }: { PM: Modelo; op: string; fotos: Doc[] }) {
+  const T = PM.hoje, cm = ckey(T), L = PM.com.filter((x) => ckey(x.data) === cm);
+  const caiu = sum(L.filter((x) => x.tipo === 'real' && x.kind !== 'outro'), (x) => x.valor), F = L.filter((x) => x.tipo !== 'real'), falta = sum(F, (x) => x.valor);
+  const at = F.filter((x) => x.atraso), tot = caiu + falta, w = (v: number) => (v / Math.max(1, tot) * 100).toFixed(2) + '%';
+  const f1 = primeiraFoto(fotos, cm), p1 = previstoDe(f1, op);
+  return (
+    <section className="card">
+      <div className="card-h"><h2>{MESF[T.getUTCMonth()][0].toUpperCase() + MESF[T.getUTCMonth()].slice(1)} até agora</h2><span className="hint">pela Projeção de hoje</span></div>
+      <div className="cstack" role="img" aria-label={`Já caiu R$ ${brl(caiu)} de R$ ${brl(tot)} previstos`}><i style={{ width: w(caiu), background: 'var(--ok-fg)' }} /><i className="falta" style={{ width: w(falta) }} /></div>
+      <div className="cleg">
+        <span><i style={{ background: 'var(--ok-fg)' }} />Já caiu <b>R$ {brl(caiu)}</b></span>
+        <span><i className="falta" />Falta cair <b>R$ {brl(falta)}</b></span>
+        <span>Previsto hoje para o mês <b>R$ {brl(tot)}</b>{p1 != null && Math.abs(p1 - tot) >= 1 && <> (no dia {dataBR(f1!.geradoEm)} eram R$ {brl(p1)})</>}</span>
+        {at.length > 0 && <span><span className="pill p-bad">R$ {brl(sum(at, (x) => x.valor))} em atraso</span> {plural(uniq(at.map((x) => x.eid || x.empresa)).length, 'empresa devia ter pago e não pagou', 'empresas deviam ter pago e não pagaram')}</span>}
+      </div>
+    </section>
+  );
+}
+
+function PrevistoCaiu({ PM, op, fotos, mes, setMes }: { PM: Modelo; op: string; fotos: Doc[]; mes: string; setMes: (m: string) => void }) {
+  const [aberto, setAberto] = useState<string | null>(null);
+  const cm = ckey(PM.hoje), R = PM.com.filter((x) => x.tipo === 'real' && x.kind !== 'outro');
+  const primeiro = R.map((x) => ckey(x.data)).sort()[0] || cm;
+  const meses: string[] = []; for (let m = cm; m >= primeiro && meses.length < 6; m = addMonth(m, -1)) meses.push(m);
+  const ab = aberto ?? (meses.find((m) => m !== cm && primeiraFoto(fotos, m)) || null);
+  const segsM = (m: string, f: Foto | null) => famsIn(uniq([...R.filter((x) => ckey(x.data) === m).map((x) => fam(x.op)), ...Object.keys(f?.mes.porSeg || {})])).filter((s) => op === 'todas' || s === op);
+  const Dif = ({ p, c, atual, falta }: { p: number | null; c: number; atual: boolean; falta: number }) =>
+    p == null ? <td className="num hint">—</td> : atual ? <td className="num hint">ainda faltam {brl(falta)}</td>
+      : <td className="num"><span className={c - p >= 0 ? 'up' : 'down'}>{c - p >= 0 ? '+' : '−'}{brl(Math.abs(c - p))}</span></td>;
+  return (
+    <section className="card">
+      <div className="card-h"><h2>Previsto × caiu, mês a mês</h2><span className="hint">Previsto = primeira projeção do mês · clique no mês para abrir por seguradora</span></div>
+      <div className="tbl scroll">
+        <table className="pxc">
+          <thead><tr><th>Mês</th><th className="num">Previsto (R$)</th><th className="num">Caiu (R$)</th><th className="num">Diferença (R$)</th><th className="num">% que caiu</th></tr></thead>
+          <tbody>
+            {meses.flatMap((m) => {
+              const f = primeiraFoto(fotos, m), p = previstoDe(f, op), Rm = R.filter((x) => ckey(x.data) === m), c = sum(Rm, (x) => x.valor), atual = m === cm;
+              const falta = atual ? sum(PM.com.filter((x) => ckey(x.data) === m && x.tipo !== 'real'), (x) => x.valor) : 0, open = ab === m;
+              const linhas = [
+                <tr key={m} className={m === mes ? 'sel' : ''}>
+                  <td><button type="button" className="lnk" aria-expanded={open} onClick={() => { setAberto(open ? '' : m); setMes(m); }}>{open ? '▾' : '▸'} {mesLabel(m)}</button>{atual && <> <span className="pill p-info">em andamento</span></>}</td>
+                  <td className="num">{p != null ? brl(p) : <span className="hint">sem projeção guardada</span>}</td>
+                  <td className="num">{brl(c)}</td>
+                  <Dif p={p} c={c} atual={atual} falta={falta} />
+                  <td className="num">{p ? pct(c / p * 100, 0) : '—'}</td>
+                </tr>,
+              ];
+              if (open) segsM(m, f).forEach((sg) => {
+                const ps = f ? previstoDe(f, op, sg) : null, cs = sum(Rm.filter((x) => fam(x.op) === sg), (x) => x.valor);
+                const fs = atual ? sum(PM.com.filter((x) => ckey(x.data) === m && x.tipo !== 'real' && fam(x.op) === sg), (x) => x.valor) : 0;
+                linhas.push(
+                  <tr key={m + sg} className="sub">
+                    <td><i className="sq" style={{ background: FCOL[sg] }} />{sg}</td>
+                    <td className="num">{ps != null ? brl(ps) : '—'}</td><td className="num">{brl(cs)}</td>
+                    <Dif p={ps} c={cs} atual={atual} falta={fs} />
+                    <td className="num">{ps ? pct(cs / ps * 100, 0) : '—'}</td>
+                  </tr>,
+                );
+              });
+              return linhas;
+            })}
+          </tbody>
+        </table>
+      </div>
+<p className="note">O previsto de cada mês é a primeira projeção guardada dentro dele. Mês sem projeção guardada mostra só o que caiu. Caiu = comissão das faturas, pela data da ordem de pagamento (bônus, odonto e seguros sem fatura ficam nos Detalhes do extrato).</p>
+    </section>
+  );
+}
+
+function ACair({ PM, fichaUrl }: { PM: Modelo; fichaUrl: (e: string) => string }) {
+  const T = PM.hoje, cm = ckey(T), L = PM.com.filter((x) => ckey(x.data) === cm);
+  const segs = famsIn(uniq(L.map((x) => fam(x.op)))).map((sg) => {
+    const X = L.filter((x) => fam(x.op) === sg), F = X.filter((x) => x.tipo !== 'real').sort((a, b) => +a.data - +b.data);
+    return { sg, caiu: sum(X.filter((x) => x.tipo === 'real' && x.kind !== 'outro'), (x) => x.valor), falta: sum(F, (x) => x.valor), F, at: sum(F.filter((x) => x.atraso), (x) => x.valor), n: uniq(F.map((x) => x.eid || x.empresa)).length };
+  }).filter((s) => s.falta > 0.005 || s.caiu > 0.005).sort((a, b) => b.falta - a.falta);
+  const mx = Math.max(1, ...segs.map((s) => s.caiu + s.falta));
+  if (!segs.length) return null;
+  return (
+    <section className="card">
+      <div className="card-h"><h2>O que falta cair em {MESF[T.getUTCMonth()]}, por seguradora</h2><span className="hint">Clique na seguradora para ver as empresas e as datas</span></div>
+      <div className="acair">
+        {segs.map((s) => (
+          <details key={s.sg} className="acs">
+            <summary>
+              <span className="nm"><i className="sq" style={{ background: FCOL[s.sg] }} />{s.sg}<small>{s.n ? `${plural(s.n, 'empresa', 'empresas')} · próxima ${dm(s.F[0].data)}` : 'nada mais a cair'}</small></span>
+              <span className="trk"><i style={{ width: `${(s.caiu / mx * 100).toFixed(2)}%`, background: 'var(--ok-fg)' }} /><i style={{ width: `${(s.falta / mx * 100).toFixed(2)}%`, background: FCOL[s.sg] }} /></span>
+              <span className="r">R$ {brl(s.falta)}<small>{s.caiu > 0.005 ? `já caiu R$ ${brl(s.caiu)}` : 'nada caiu ainda'}{s.at > 0.005 ? ` · R$ ${brl(s.at)} em atraso` : ''}</small></span>
+            </summary>
+            <ul className="rows">
+              {s.F.map((x, i) => (
+                <li key={x.empresa + i}>
+                  <span><b>{x.eid ? <Link href={fichaUrl(x.eid)}>{x.empresa}</Link> : x.empresa}</b><small>{dm(x.data)}{x.atraso ? ' · em atraso' : ''} · {x.kind === 'ag' ? 'agenciamento' : 'vitalício'}</small></span>
+                  <span className="r">R$ {brl(x.valor)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
+      </div>
+      <p className="note">Barra: verde = já caiu no mês, cor da seguradora = falta cair.</p>
+    </section>
   );
 }
 
@@ -234,20 +351,18 @@ function Semanas({ PM, mes, op, fotos, centralUrl, fichaUrl }: { PM: Modelo | nu
     });
   }
   const key = sel && weeks.find((w) => w.key === sel) ? sel : (weeks.find((w) => w.now) || weeks.filter((w) => w.caiu.length).pop() || weeks[0]).key;
-  const vw = (w: Semana) => (w.futura ? sum(w.aCair, (x) => x.valor) : sum(w.caiu, (x) => x.valor)), mxw = Math.max(1, ...weeks.map(vw));
-  const w = weeks.find((x) => x.key === key)!;
+    const w = weeks.find((x) => x.key === key)!;
   const vC = sum(w.caiu, (x) => x.valor), vP = sum(w.prev, (x) => x.valor), fD = w.f ? new Date(w.f.geradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '';
   const df = vC - vP;
 
-  const tag = (x: Credito) => <span className={`ktag ${x.kind}`}>{x.kind === 'ag' ? 'Agenciamento' : x.kind === 'outro' ? x.obs || 'Outro' : 'Vitalício'}</span>;
   const Linha = ({ x, pill, why }: { x: Credito; pill: [string, string]; why: string }) => (
     <li><details className="prow"><summary>
       <span className={'date' + (pill[1] === 'p-bad' ? ' late' : '')}>{String(x.data.getUTCDate()).padStart(2, '0')}<br />{MES[x.data.getUTCMonth()]}</span>
-      <span style={{ minWidth: 0 }}><b>{x.empresa}</b><small>{tag(x)}{fam(x.op)}</small></span>
+      <span style={{ minWidth: 0 }}><b>{x.empresa}</b><small>{fam(x.op)}</small></span>
       <span className="r">R$ {brl(x.valor)}<small><span className={`pill ${pill[1]}`}>{pill[0]}</span></small></span>
     </summary><div className="pwhy">{why}{x.eid && <><br /><Link className="lnk" href={fichaUrl(x.eid)}>Abrir a empresa</Link></>}</div></details></li>
   );
-  const Lista = ({ L, row }: { L: Credito[]; row: (x: Credito) => React.ReactNode }) => {
+  const Lista = ({ L, row }: { L: Credito[]; row: (x: Credito, i: number) => React.ReactNode }) => {
     const o = L.slice().sort((a, b) => b.valor - a.valor), top = o.slice(0, 8), rest = o.slice(8);
     return <>
       <ul className="rows plist">{top.map(row)}</ul>
@@ -258,16 +373,18 @@ function Semanas({ PM, mes, op, fotos, centralUrl, fichaUrl }: { PM: Modelo | nu
 
   return (
     <section className="card">
-      <div className="card-h"><h2>Comissão paga por semana · {MESF[ma - 1]}</h2><span className="hint">Pela data em que caiu · % = quanto caiu do que a Projeção previa</span></div>
-      <div className="dstrip" style={{ gridTemplateColumns: `repeat(${weeks.length},minmax(0,1fr))` }}>
+      <div className="card-h"><h2>Por semana · {MESF[ma - 1]}</h2><span className="hint">Verde = caiu · cor clara = falta cair · clique na semana</span></div>
+      <div className="csems" style={{ gridTemplateColumns: `repeat(${weeks.length},minmax(0,1fr))` }}>
         {weeks.map((s) => {
-          const v = vw(s), on = key === s.key, pv = sum(s.prev, (x) => x.valor), nf = s.now ? 0 : s.faltam.length;
-          const dc = s.futura ? (v ? 'previsto' : ' ') : nf ? nf + ' faltou' : pv ? pct(sum(s.caiu, (x) => x.valor) / pv * 100, 0) : s.caiu.length ? s.caiu.length + ' créd.' : ' ';
+          const on = key === s.key, vc = sum(s.caiu, (x) => x.valor), va = s.futura || s.now ? sum(s.aCair, (x) => x.valor) : 0, t = vc + va, pv = sum(s.prev, (x) => x.valor), nf = s.now ? 0 : s.faltam.length;
+          const txt = !t && !nf ? '' : s.futura ? 'previsto' : s.now ? `caiu ${kfmt(vc)} · falta ${kfmt(va)}` : nf ? `${plural(nf, 'empresa não pagou', 'empresas não pagaram')}` : pv ? `${pct(vc / pv * 100, 0)} do previsto` : 'caiu';
           return (
-            <button key={s.key} type="button" className={'dcell' + (on ? ' on' : '') + (s.now ? ' today' : '') + (s.futura ? ' proj' : '')} aria-pressed={on} onClick={() => setSel(s.key)}
-              aria-label={`${s.title}: ${s.futura ? 'previsto' : 'caiu'} R$ ${brl(v)}${pv && !s.futura ? ', previsto R$ ' + brl(pv) : ''}${nf ? ', ' + nf + ' empresas não pagaram' : ''}`}>
-              <span className="dn">{s.dias}</span><span className="db"><i style={{ height: `${(v / mxw * 100).toFixed(1)}%` }} /></span>
-              <span className="dv">{v ? kfmt(v) : '—'}</span><span className={'dc' + (nf ? ' late' : '')}>{dc}</span>
+            <button key={s.key} type="button" className={'csem' + (on ? ' on' : '')} aria-pressed={on} onClick={() => setSel(s.key)}
+              aria-label={`${s.title}: caiu R$ ${brl(vc)}${va ? ', falta cair R$ ' + brl(va) : ''}`}>
+              <span className="d">{s.dias}/{String(s.a.getUTCMonth() + 1).padStart(2, '0')}{s.now ? ' · esta semana' : ''}</span>
+              <span className="v">{t ? 'R$ ' + kfmt(t) : '—'}</span>
+              <span className="mini"><i style={{ width: `${(vc / Math.max(1, t) * 100).toFixed(1)}%`, background: 'var(--ok-fg)' }} /><i className="falta" style={{ width: `${(va / Math.max(1, t) * 100).toFixed(1)}%` }} /></span>
+              <span className={'h' + (nf ? ' late' : '')}>{txt}</span>
             </button>
           );
         })}
@@ -286,11 +403,11 @@ function Semanas({ PM, mes, op, fotos, centralUrl, fichaUrl }: { PM: Modelo | nu
           </div>
         ) : <p className="note">Nenhuma rodada da Projeção com a data de cada empresa foi guardada antes desta semana, então não dá para comparar com o previsto. As rodadas guardam isso desde 27/10/2026.</p>}
         {w.caiu.length ? (
-          <Lista L={w.caiu} row={(x) => { const fora = !!w.f && w.fora.includes(x); return <Linha key={k(x, 0)} x={x} pill={fora ? ['Fora da previsão', 'p-info'] : ['Caiu', 'p-ok']} why={(x.how || '') + (x.quando ? ' · ' + x.quando : '') + (fora ? `. A rodada de ${fD} não previa esta empresa nesta semana (caiu adiantada, atrasada ou é nova).` : '')} />; }} />
+          <Lista L={w.caiu} row={(x, i) => { const fora = !!w.f && w.fora.includes(x); return <Linha key={k(x, i)} x={x} pill={fora ? ['Fora da previsão', 'p-info'] : ['Caiu', 'p-ok']} why={(x.how || '') + (x.quando ? ' · ' + x.quando : '') + (fora ? `. A rodada de ${fD} não previa esta empresa nesta semana (caiu adiantada, atrasada ou é nova).` : '')} />; }} />
         ) : <p className="empty">Nada caiu nesta semana.</p>}
         {w.f && w.faltam.length > 0 && <>
           <p className="cw-sub">{w.now ? 'Previsto para esta semana e ainda não caiu' : 'Previsto e não caiu'} · {plural(w.faltam.length, 'empresa', 'empresas')} · R$ {brl(sum(w.faltam, (x) => x.valor))}</p>
-          <Lista L={w.faltam} row={(x) => <Linha key={k(x, 1)} x={x} pill={w.now && x.data >= T ? ['A cair', 'p-info'] : ['Não caiu', 'p-bad']} why={`A rodada de ${fD} previa este crédito para ${dm(x.data)}${x.atraso ? ' (já estava em atraso)' : ''}. Ainda não apareceu em nenhum extrato depois dela.`} />} />
+          <Lista L={w.faltam} row={(x, i) => <Linha key={k(x, i)} x={x} pill={w.now && x.data >= T ? ['A cair', 'p-info'] : ['Não caiu', 'p-bad']} why={`A rodada de ${fD} previa este crédito para ${dm(x.data)}${x.atraso ? ' (já estava em atraso)' : ''}. Ainda não apareceu em nenhum extrato depois dela.`} />} />
         </>}
       </>}
     </section>
