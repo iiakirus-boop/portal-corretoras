@@ -65,7 +65,10 @@ const coleta = (page, H, desde) => page.evaluate(async ([B, H, DESDE]) => {
       if (j.err) return { err: j.err };
       const c = (j.content && j.content.companies) || []; comp = comp.concat(c); if (c.length < 50) break;
     }
-    const res = { contratos: [] };
+    const res = { contratos: [], situacoes: [] };
+    // situação do boleto (Liquidado = pago) também dos 3 meses antes de DESDE, sem baixar nada: o site sabe o que foi pago depois
+    const d0 = new Date(DESDE + 'T12:00:00'); d0.setMonth(d0.getMonth() - 3);
+    const DESDE_SIT = d0.toISOString().slice(0, 10);
     for (const c of comp.filter(c => c.isMainPartnerCompany)) {
       const pc = c.partnerCompany;
       await fetch(B + `users/partner-company/${pc}/create-session`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: '{}' });
@@ -76,6 +79,8 @@ const coleta = (page, H, desde) => page.evaluate(async ([B, H, DESDE]) => {
       const filhos = comp.filter(x => x.mainPartnerCompany === pc).map(x => ({ cod: x.partnerCompany, plano: x.planType, status: x.partnerCompanyStatus }));
       const ent = { contrato: pc, razao: c.legal, cnpj: c.document, status: c.partnerCompanyStatus, filhos, faturas: [] };
       for (const b of bills) {
+        if (iso(b.dueDate) >= DESDE_SIT) res.situacoes.push({ contrato: pc, billingNumber: b.billingNumber, billType: b.billType, status: b.status,
+          dueDate: b.dueDate, amount: b.amount, paymentDate: b.paymentDate || b.paidDate || b.payDate || null, aba: b.aba });
         if (iso(b.dueDate) < DESDE) continue;
         const f = { ...b };
         if (!/COPARTIC/i.test(b.billType || '')) {
@@ -140,7 +145,7 @@ async function faturas(desde, saida) {
   if (fs.existsSync(arq)) { saida.repetidos.push(arq); return; }
   const lista = logins.ativos('hapvida');
   if (!lista.length) throw erroLogin('nenhum login de fatura cadastrado (atalho "Cadastrar login Hapvida")');
-  const res = { geradoEm: new Date().toISOString(), login: 'portal-empresa NDI', logins: [], contratos: [] };
+  const res = { geradoEm: new Date().toISOString(), login: 'portal-empresa NDI', logins: [], contratos: [], situacoes: [] };
   const browser = await chromium.launch({ headless: false, channel: 'chrome' });
   try {
     for (const l of lista) {
@@ -163,6 +168,7 @@ async function faturas(desde, saida) {
         const c = await Promise.race([coleta(page, H, desde), page.waitForTimeout(40 * 60000).then(() => { throw new Error('a coleta passou de 40 min'); })]);
         if (c.err) throw new Error(`a API devolveu HTTP ${c.err} na lista de contratos`);
         junta(res, c.contratos, l.apelido);
+        res.situacoes.push(...(c.situacoes || []));
         res.logins.push(l.apelido);
         logins.marca('hapvida', l.apelido, { ultimo_sucesso: new Date().toISOString() });
       } catch (e) {

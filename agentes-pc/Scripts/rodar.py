@@ -27,8 +27,8 @@ meio, com o que já foi gravado) e as tabelas do portal
 É o mesmo comando que o despachante da plataforma vai chamar. Os scripts de cada etapa continuam iguais e podem ser
 rodados à mão como antes.
 """
-import sys, os, glob, shutil, subprocess, tempfile, datetime
-import banco
+import sys, os, glob, json, shutil, subprocess, tempfile, datetime
+import banco, fumaca
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 FAT = os.path.dirname(AQUI)
@@ -50,6 +50,26 @@ COMISSAO = {'porto': 'Comissao Porto', 'bradesco': 'Comissao Bradesco', 'amil': 
 
 class Parou(Exception):
     pass
+
+
+# teste de fumaça (fumaca.py): o que não bateu nesta rodada. Com algo aqui, a rodada termina como "erro" no master.
+PROBLEMAS = []
+
+
+def mes_antes(comp, k=1):
+    y, m = map(int, comp.split('-'))
+    m -= k
+    while m < 1:
+        m += 12; y -= 1
+    return f'{y}-{m:02d}'
+
+
+def situacao(fn, *a):
+    """Manda a situação dos boletos lida no portal ao banco ("pago no portal" no site). Nunca para a rodada."""
+    try:
+        fn(*a)
+    except Exception as e:
+        print(f'[banco] situação dos boletos não enviada ({e.__class__.__name__}: {e})')
 
 
 def etapa(titulo, cmd, saida=None, cwd=AQUI):
@@ -153,7 +173,15 @@ def faturas(args):
     inicio = datetime.datetime.now().timestamp()
     if op == 'porto' and not simular and '--sem-baixar' not in args:
         print('\n== Download Porto (baixar_porto.js)', flush=True)
-        r = subprocess.run(['node', 'baixar_porto.js', 'faturas', comp], cwd=AQUI)
+        # também lê se o boleto dos 2 meses anteriores já foi pago (só lê, não baixa)
+        r = subprocess.run(['node', 'baixar_porto.js', 'faturas', comp, 'situacao', mes_antes(comp, 1), 'situacao', mes_antes(comp, 2)],
+                           cwd=AQUI, stdout=subprocess.PIPE, text=True, encoding='utf-8', errors='replace')
+        print(r.stdout, end='', flush=True)
+        if r.returncode == 0:
+            try:
+                situacao(banco.situacao_do_download, 'porto', json.loads(r.stdout.strip().splitlines()[-1]))
+            except (ValueError, IndexError):
+                print('[banco] o download não devolveu o resumo: situação dos boletos não enviada.')
         if r.returncode == 3:
             raise Parou('Porto: o portal não está logado. Dê dois cliques em "Entrar na Porto" e rode de novo.')
         if r.returncode:
@@ -167,6 +195,13 @@ def faturas(args):
         etapa('Leitura dos kits Bradesco', [PY, 'faturas_bradesco.py', *pdfs], saida=js)
     else:
         etapa(f'Leitura {nome}', [PY, f'faturas_{op}.py', entrada, js] + ([portal] if portal else []))
+    if op == 'hapvida' and portal and not simular:
+        situacao(banco.situacao_hapvida, portal)
+    # teste de fumaça 1: arquivos baixados = faturas lidas
+    probs, lidas = fumaca.leitura(op, js, entrada, pdfs if op == 'bradesco' else None)
+    PROBLEMAS.extend('Leitura: ' + p for p in probs)
+    print(f'\n== Teste da leitura: {lidas} fatura(s) lida(s)' + ''.join(f'\n   PROBLEMA: {p}' for p in probs), flush=True)
+    gravou = os.path.join(AQUI, f'_gravou_{op}.txt')
     pasta_fat = [] if op == 'bradesco' else [FAT]
     if simular:
         tmp = caixa_de_areia()
@@ -174,19 +209,31 @@ def faturas(args):
             base = os.path.join(tmp, 'Base_Faturas_Vidas.xlsx')
             cmd = [PY, f'gravar_{op}.py', js, base, base] + ([] if op == 'bradesco' else [tmp]) + [data]
             cmd += [] if op == 'bradesco' else ['--sem-copia']
-            etapa(f'Gravação {nome} (SIMULAÇÃO numa cópia, a base não muda)', cmd, cwd=os.path.join(tmp, 'Scripts'))
+            etapa(f'Gravação {nome} (SIMULAÇÃO numa cópia, a base não muda)', cmd, saida=gravou, cwd=os.path.join(tmp, 'Scripts'))
+            mostrar_gravacao(op, lidas, gravou)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         print('\nSimulação concluída. Nada foi gravado. Para gravar, rode de novo sem --simular.')
+        if PROBLEMAS:
+            print('Teste da rodada com problema:\n  ' + '\n  '.join(PROBLEMAS))
         return
     backup(rotulo, data)
-    etapa(f'Gravação {nome}', [PY, f'gravar_{op}.py', js, BASE, BASE] + pasta_fat + [data])
+    etapa(f'Gravação {nome}', [PY, f'gravar_{op}.py', js, BASE, BASE] + pasta_fat + [data], saida=gravou)
+    mostrar_gravacao(op, lidas, gravou)
     painel_central(op, comp)
     vidas(nome if op != 'bradesco' else None)
     pain = novos_no_painel(inicio)
     print('\nPronto. Arquivos do painel para subir na Central:' if pain else '\nPronto. Nenhum arquivo novo no painel.')
     for f in pain:
         print('  _painel/' + f)
+
+
+def mostrar_gravacao(op, lidas, gravou):
+    """Mostra a saída do gravar_<op>.py (fica num arquivo para o teste ler) e roda o teste 2: lidas = gravadas."""
+    print(open(gravou, encoding='utf-8', errors='replace').read(), end='', flush=True)
+    probs = fumaca.gravacao(op, lidas, gravou)
+    PROBLEMAS.extend('Gravação: ' + p for p in probs)
+    print('\n== Teste da gravação: ' + ('OK' if not probs else ''.join(f'\n   PROBLEMA: {p}' for p in probs)), flush=True)
 
 
 def comissao(args):
@@ -249,8 +296,12 @@ def main():
         pain = publicar_painel(inicio)
         # portal (empresa e master): faturas, vidas e comissões iguais à base. Se falhar, só avisa.
         sinc = subprocess.run([PY, 'sincronizar.py'], cwd=AQUI).returncode
-        banco.fim(ordem, 'concluida', f'Concluída. {len(pain)} arquivo(s) do painel atualizados.'
-                  + ('' if sinc == 0 else ' Portal não sincronizado: rode sincronizar.py.'))
+        nota = f'{len(pain)} arquivo(s) do painel atualizados.' + ('' if sinc == 0 else ' Portal não sincronizado: rode sincronizar.py.')
+        if PROBLEMAS:  # teste de fumaça: o que deu para gravar foi gravado, mas a rodada não está completa
+            print('\nTESTE DA RODADA COM PROBLEMA:\n  ' + '\n  '.join(PROBLEMAS))
+            banco.fim(ordem, 'erro', 'Teste da rodada: ' + ' | '.join(PROBLEMAS) + ' ' + nota)
+            sys.exit(1)
+        banco.fim(ordem, 'concluida', 'Concluída. ' + nota)
 
 
 if __name__ == '__main__':

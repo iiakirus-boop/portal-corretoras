@@ -1,4 +1,4 @@
-import { competencia, data, moeda, num, seg } from '@/lib/formato';
+import { PAGO_ROTULO, competencia, data, moeda, num, pagamento, seg } from '@/lib/formato';
 import { Pill } from './Pill';
 import type { Fatura } from '@/lib/tipos';
 
@@ -13,23 +13,24 @@ export function TabelaFaturas({ faturas, conferencia = false }: { faturas: Fatur
           <tr><th>Mês</th><th>Seguradora</th><th>Vencimento</th><th className="num">Vidas</th><th className="num">Valor</th><th>Pagamento</th>{conferencia && <th>Conferência</th>}<th>Arquivos</th></tr>
         </thead>
         <tbody>
-          {faturas.map((f) => (
+          {faturas.map((f) => { const pg = pagamento(f); return (
             <tr key={f.id}>
               <td><b>{competencia(f.competencia)}</b><small>nº {f.numero}</small></td>
               <td>{seg(f.seguradora_id)}</td>
               <td>{data(f.vencimento)}</td>
               <td className="num">{num(f.vidas_informadas)}</td>
               <td className="num">{moeda(f.valor_boleto ?? f.valor_total)}</td>
-              <td>{f.data_pagamento || f.pago_pela_comissao ? <Pill tom="ok">Pago</Pill> : f.vencimento && f.vencimento < h ? <Pill tom="idle">Sem baixa</Pill> : <Pill tom="warn">Em aberto</Pill>}</td>
-              {conferencia && <td>{f.pago_pela_comissao && !f.data_pagamento && <small>pago, a comissão caiu em {data(f.pago_pela_comissao)}</small>}{f.conferencia_valor === 'OK' ? <Pill tom="ok">Bateu</Pill> : f.conferencia_valor ? <Pill tom="warn">{f.conferencia_valor}</Pill> : '—'}</td>}
+              <td>{pg ? <><Pill tom={pg.via === 'portal' ? 'ok' : 'info'}>{PAGO_ROTULO[pg.via]}</Pill><small>{pg.via === 'portal' ? (f.data_pagamento ? `em ${data(pg.em)}` : `visto em ${data(pg.em)}`) : `comissão caiu em ${data(pg.em)}`}</small></>
+                : f.vencimento && f.vencimento < h ? <Pill tom="idle">Sem baixa</Pill> : <Pill tom="warn">Em aberto</Pill>}</td>
+              {conferencia && <td>{f.conferencia_valor === 'OK' ? <Pill tom="ok">Bateu</Pill> : f.conferencia_valor ? <Pill tom="warn">{f.conferencia_valor}</Pill> : '—'}</td>}
               <td>
                 <span className="acoes">
                   {f.fatura_doc_id && <a href={`/arquivo/${f.fatura_doc_id}`} target="_blank" rel="noopener">Fatura</a>}
-                  {f.boleto_doc_id && !f.data_pagamento && !f.pago_pela_comissao && <a href={`/arquivo/${f.boleto_doc_id}`} target="_blank" rel="noopener">Boleto</a>}
+                  {f.boleto_doc_id && !pg && <a href={`/arquivo/${f.boleto_doc_id}`} target="_blank" rel="noopener">Boleto</a>}
                 </span>
               </td>
             </tr>
-          ))}
+          ); })}
         </tbody>
       </table>
     </div>
