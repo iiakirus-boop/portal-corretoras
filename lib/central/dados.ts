@@ -30,19 +30,27 @@ export async function docCentral(db: Cliente, c: string, col: string, id: string
 }
 
 // O "boleto" de cada fatura na Central é o que o agente viu no portal no dia em que baixou a fatura. Se a empresa pagou
-// depois, o banco sabe (baixa em data_pagamento, ou a comissão daquela fatura caiu: pago_pela_comissao) e a tela tem de
-// mostrar Pago. Cada item ganha pagoEm (aaaa-mm-dd) e pagoVia ('baixa' | 'comissao' | 'portal').
-export type Pg = { numero: string; competencia: string; data_pagamento: string | null; pago_pela_comissao: string | null };
+// depois, o banco sabe e a tela tem de mostrar Pago. Do mais certo para o menos: baixa no portal da Bradesco
+// (data_pagamento), o agente viu pago no portal da Porto ou da Hapvida (pago_no_portal) ou a comissão daquela fatura
+// caiu (pago_pela_comissao, provável). Cada item ganha pagoEm (aaaa-mm-dd) e pagoVia ('baixa' | 'portal' | 'comissao').
+export type Pg = { numero: string; competencia: string; data_pagamento: string | null; pago_pela_comissao: string | null; pago_no_portal?: string | null };
 async function marcarPagamentos(db: Cliente, c: string, faturas: Doc[]) {
-  const L: Pg[] = [];
-  for (let de = 0; ; de += 1000) {
-    const { data, error } = await db.from('faturas').select('numero,competencia,data_pagamento,pago_pela_comissao')
-      .eq('corretora_id', c).or('data_pagamento.not.is.null,pago_pela_comissao.not.is.null').order('id').range(de, de + 999);
-    if (error) return; // sem acesso à tabela: fica o que o agente leu
-    L.push(...((data ?? []) as Pg[]));
-    if (!data || data.length < 1000) break;
-  }
-  aplicarPagamentos(faturas, L);
+  const ler = async (comPortal: boolean) => {
+    const L: Pg[] = [];
+    for (let de = 0; ; de += 1000) {
+      const { data, error } = await db.from('faturas')
+        .select('numero,competencia,data_pagamento,pago_pela_comissao' + (comPortal ? ',pago_no_portal' : ''))
+        .eq('corretora_id', c).or('data_pagamento.not.is.null,pago_pela_comissao.not.is.null' + (comPortal ? ',pago_no_portal.not.is.null' : ''))
+        .order('id').range(de, de + 999);
+      if (error) return null;
+      L.push(...((data ?? []) as unknown as Pg[]));
+      if (!data || data.length < 1000) break;
+    }
+    return L;
+  };
+  // sem a coluna pago_no_portal (banco ainda sem a p29) segue como antes; sem acesso à tabela: fica o que o agente leu
+  const L = (await ler(true)) ?? (await ler(false));
+  if (L) aplicarPagamentos(faturas, L);
 }
 
 export function aplicarPagamentos(faturas: Doc[], L: Pg[]) {
@@ -52,6 +60,7 @@ export function aplicarPagamentos(faturas: Doc[], L: Pg[]) {
     if (!r || !r.titulo) return;
     const b = pg.get(String(r.titulo) + '|' + comp);
     if (b?.data_pagamento) { r.pagoEm = b.data_pagamento; r.pagoVia = 'baixa'; }
+    else if (b?.pago_no_portal) { r.pagoEm = b.pago_no_portal; r.pagoVia = 'portal'; }
     else if (b?.pago_pela_comissao) { r.pagoEm = b.pago_pela_comissao; r.pagoVia = 'comissao'; }
     else if (/pago/i.test(String(r.boleto || '')) && !aberto(r)) { r.pagoVia = 'portal'; return; }
     else return;

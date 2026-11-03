@@ -44,7 +44,11 @@ export const situacao = (r: Record<string, unknown>, hoje: Date = today()): Situ
 const dm_ = (iso?: unknown) => { const s = String(iso || ''); return s.length >= 10 ? s.slice(8, 10) + '/' + s.slice(5, 7) : ''; };
 // como sabemos que foi pago (pagoVia vem de lib/central/dados.ts)
 export const comoPago = (r: Record<string, unknown>) =>
-  r.pagoVia === 'baixa' ? `baixa em ${dm_(r.pagoEm)}` : r.pagoVia === 'comissao' ? `comissão caiu em ${dm_(r.pagoEm)}` : r.pagoVia === 'portal' ? 'portal da seguradora' : '';
+  r.pagoVia === 'baixa' ? `baixa em ${dm_(r.pagoEm)}` : r.pagoVia === 'comissao' ? `comissão caiu em ${dm_(r.pagoEm)}`
+    : r.pagoVia === 'portal' ? (r.pagoEm ? `visto pago no portal em ${dm_(r.pagoEm)}` : 'visto pago no portal') : '';
+// as duas formas de pago que a tela separa: o portal da seguradora mostra pago (certo) ou só a comissão caiu (provável).
+// Item pago sem pagoVia é o que o agente já viu pago no dia do download: conta como portal.
+export const pagoPelaComissao = (r: Record<string, unknown>) => situacao(r) === 'pago' && r.pagoVia === 'comissao';
 export const diasVencido = (r: Record<string, unknown>, hoje: Date = today()) => { const v = pdate(r.venc as string); return v ? Math.round((hoje.getTime() - v.getTime()) / 864e5) : 0; };
 
 export type Linha = {

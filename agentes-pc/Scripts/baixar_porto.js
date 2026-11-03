@@ -5,8 +5,9 @@
 //   node baixar_porto.js faturas 2026-11                 -> Faturas/2026-11/PortoSaude/<sub> - <NOME CURTO>/<sub> - <NOME CURTO> VIDAS|BOLETO|FATURADOS PORTO SAUDE 11-26
 //   node baixar_porto.js comissao 2026-10-01 2026-10-26  -> Comissoes/<mês do pagamento>/PortoSaude/<OP> - PORTOMED|SEGURO SAUDE|SEGUROS GERAIS COMISSAO DD-MM-AA.html
 //   node baixar_porto.js faturas 2026-11 1979216,1808600  -> só essas subestipulantes (teste)
+//   node baixar_porto.js situacao 2026-10                -> não baixa nada: só lê se o boleto de cada título do mês já foi pago
 //   (dá para juntar os dois na mesma chamada).
-// Saída: uma linha JSON {"ok":true,"arquivos":[...],"repetidos":[...],"pagos":[...],"sem_dados":[...]}. Arquivo que já existe não é baixado de novo.
+// Saída: uma linha JSON {"ok":true,"arquivos":[...],"repetidos":[...],"pagos":[...],"sem_dados":[...],"faturas":[{comp,titulo,boleto}],"situacao":[{comp,titulo,boleto}]}. Arquivo que já existe não é baixado de novo.
 // Erros: código 3 + {"ok":false,"motivo":"login"} sem aba logada (ou tela de login/código/captcha); código 2 + print/passo em Scripts/_socorro/.
 // Caminho no portal: Saúde > links úteis > "Resumo da Fatura" (frame Filtros.aspx). Para cada estipulante ativo, cada subestipulante e a
 // 1ª unidade: ResumoFaturaFull.aspx?comp=MMAAAA&nest&nsub&nuni; os botões Imprimir/Exportação/Boleto são links baixados por fetch.
@@ -98,8 +99,8 @@ async function abreFiltros() {
   return f;
 }
 
-async function faturas(comp, saida, so) {
-  const [y, m] = comp.split('-'), mmaa = `${m}-${y.slice(2)}`, nomes = nomesCurtos();
+// estipulantes ativos -> subestipulantes -> unidades de cobrança (cada unidade tem título próprio)
+async function listarAlvos(saida) {
   const f = await abreFiltros();
   passo = 'listar estipulantes, subestipulantes e unidades';
   const ws = (metodo, codigo) => f.evaluate(async ([metodo, codigo]) => {
@@ -120,6 +121,12 @@ async function faturas(comp, saida, so) {
       for (const u of us) alvos.push({ est: e.cod, sub: String(s.nr), nuni: u.cd.split(' - ')[0], portal: s.c });
     }
   }
+  return { alvos, subNome };
+}
+
+async function faturas(comp, saida, so) {
+  const [y, m] = comp.split('-'), mmaa = `${m}-${y.slice(2)}`, nomes = nomesCurtos();
+  const { alvos, subNome } = await listarAlvos(saida);
   const nomeDe = sub => nomes[sub] || (saida.avisos.push(`sub ${sub} sem pasta anterior: nome curto "${curtoPortal(subNome[sub] || sub)}" tirado do portal, confira`), nomes[sub] = curtoPortal(subNome[sub] || sub));
   const titulos = new Set();
   saida.faturas = [];
@@ -145,7 +152,7 @@ async function faturas(comp, saida, so) {
     const bt = k => Object.entries(links).find(([t]) => new RegExp(k, 'i').test(t))?.[1] || { off: true };
     const vidas = Number(pega(/Saldo Atual\s+\d+\s+R\$\s*[\d.,]+\s+\d+\s+R\$\s*[\d.,]+\s+(\d+)/));
     const total = pega(/\bTotal\s+R\$\s*([\d.,]+)/), venc = pega(/Vencimento:\s*(\d\d\/\d\d\/\d{4})/);
-    const reg = { sub: a.sub, unidade: Number(a.nuni), nome, titulo, vencimento: venc, vidas, total: total ? Number(total.replace(/\./g, '').replace(',', '.')) : null, boleto: 'aberto' };
+    const reg = { comp, sub: a.sub, unidade: Number(a.nuni), nome, titulo, vencimento: venc, vidas, total: total ? Number(total.replace(/\./g, '').replace(',', '.')) : null, boleto: 'aberto' };
     saida.faturas.push(reg);
     // FATURADOS (PDF)
     const pdf = path.join(pasta, `${base} FATURADOS PORTO SAUDE ${mmaa}${un}.pdf`);
@@ -172,6 +179,31 @@ async function faturas(comp, saida, so) {
       if (fs.existsSync(f2)) saida.repetidos.push(f2); else grava(f2, t.dados, saida);
     }
     if (txts.length === 1 && !/^02\|/m.test(txts[0].dados.toString('latin1'))) saida.avisos.push(`${base}: TXT sem linhas 02 (vidas)`);
+  }
+}
+
+// só lê a situação do boleto de um mês já baixado (nada é baixado): botão Boleto desabilitado = pago.
+// Serve para o site saber que o boleto do mês anterior foi pago depois do download.
+async function situacao(comp, saida) {
+  const [y, m] = comp.split('-');
+  const { alvos } = await listarAlvos({ sem_dados: [], avisos: [] });
+  const titulos = new Set();
+  saida.situacao = saida.situacao || [];
+  for (const a of alvos) {
+    passo = `situação ${a.sub} ${comp}`;
+    await page.goto(`${RFC}ResumoFaturaFull.aspx?comp=${m}${y}&nest=${a.est}&nsub=${a.sub.padStart(10, '0')}&nuni=${a.nuni}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    const txt = await page.locator('body').innerText({ timeout: 60000 });
+    if (/Ocorreu um erro ao realizar a requisi|SEM DADOS DISPON/i.test(txt) || !/T[íi]tulo:/.test(txt)) { await confereLogin(); continue; }
+    const titulo = (txt.match(/T[íi]tulo:\s*(\d+)/) || [])[1], ref = (txt.match(/Referencia:\s*(\d\d\/\d{4})/) || [])[1];
+    if (ref !== `${m}/${y}` || titulos.has(titulo)) continue;
+    titulos.add(titulo);
+    const off = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('[onclick]')].find(e => /boleto/i.test(e.title || e.innerText || ''));
+      if (!b) return null; // sem o botão na tela: não dá para saber, não marca nada
+      return b.classList.contains('button-disabled') || !/window\.open\('/.test(b.getAttribute('onclick') || '');
+    });
+    if (off === null) { saida.avisos.push(`situação ${a.sub} ${comp}: botão Boleto não está na tela`); continue; }
+    saida.situacao.push({ comp, sub: a.sub, unidade: Number(a.nuni), titulo, boleto: off ? 'pago' : 'aberto' });
   }
 }
 
@@ -228,10 +260,11 @@ async function comissao(ini, fim, saida) {
 
 (async () => {
   const args = process.argv.slice(2), tarefas = [];
-  const uso = { ok: false, motivo: 'uso: node baixar_porto.js faturas AAAA-MM | comissao AAAA-MM-DD AAAA-MM-DD' };
+  const uso = { ok: false, motivo: 'uso: node baixar_porto.js faturas AAAA-MM | situacao AAAA-MM | comissao AAAA-MM-DD AAAA-MM-DD' };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === 'faturas' && /^\d{4}-\d{2}$/.test(args[i + 1])) tarefas.push(['faturas', args[++i], /^\d+(,\d+)*$/.test(args[i + 1] || '') ? args[++i].split(',') : null]);
     else if (args[i] === 'comissao' && /^\d{4}-\d{2}-\d{2}$/.test(args[i + 1]) && /^\d{4}-\d{2}-\d{2}$/.test(args[i + 2])) tarefas.push(['comissao', args[++i], args[++i]]);
+    else if (args[i] === 'situacao' && /^\d{4}-\d{2}$/.test(args[i + 1])) tarefas.push(['situacao', args[++i]]);
     else sai(1, uso);
   }
   if (!tarefas.length) sai(1, uso);
@@ -251,7 +284,7 @@ async function comissao(ini, fim, saida) {
   const saida = { ok: true, arquivos: [], repetidos: [], pagos: [], sem_dados: [], avisos: [] };
   try {
     await confereLogin();
-    for (const [t, ...p] of tarefas) { page = aba; await (t === 'faturas' ? faturas(p[0], saida, p[1]) : comissao(p[0], p[1], saida)); }
+    for (const [t, ...p] of tarefas) { page = aba; await (t === 'faturas' ? faturas(p[0], saida, p[1]) : t === 'situacao' ? situacao(p[0], saida) : comissao(p[0], p[1], saida)); }
   } catch (e) { e.aba = aba; throw e; }
   await aba.close();
   sai(0, saida);

@@ -158,6 +158,14 @@ def ultimo_pagamento(op):
     return max(datas).date() if datas else datetime.date.today().replace(day=1)
 
 
+def mes_antes(comp, k=1):
+    y, m = map(int, comp.split('-'))
+    m -= k
+    while m < 1:
+        m += 12; y -= 1
+    return f'{y}-{m:02d}'
+
+
 def proxima_comp(hoje):
     return (hoje.replace(day=1) + datetime.timedelta(days=32)).strftime('%Y-%m')
 
@@ -184,6 +192,8 @@ def automatico(o, simular=False):
     comp = (o.get('competencia') or '').strip() or proxima_comp(hoje)
     if ag == 'faturas':
         args = ['faturas', f'{comp}-01' if op == 'hapvida' else comp]
+        if op == 'porto':  # aproveita o portal aberto: boleto dos 2 meses anteriores já foi pago? (só lê, não baixa)
+            args += sum((['situacao', mes_antes(comp, k)] for k in (1, 2)), [])
     elif op == 'hapvida':
         comp = (o.get('competencia') or '').strip() or hoje.strftime('%Y-%m')  # mês de referência do webhap
         args = ['comissao', comp]
@@ -200,6 +210,11 @@ def automatico(o, simular=False):
     if r.returncode:
         return parar(o, 'erro', f"Download parou no passo \"{saida.get('passo', '?')}\": {saida.get('motivo', r.stderr[-200:])}."
                      f" Print em Scripts/_socorro ({os.path.basename(saida.get('print') or '')}).", simular)
+    if not simular:
+        try:  # "pago no portal" no site; nunca para a rodada
+            banco.situacao_do_download(op, saida)
+        except Exception as e:
+            log(f'{ag} {op}: situação dos boletos não enviada ({e.__class__.__name__}: {e})')
     novos = saida.get('arquivos', [])
     log(f"{ag} {op}: {len(novos)} arquivo(s) novo(s), {len(saida.get('repetidos', []))} já baixado(s)")
     if not novos:

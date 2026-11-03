@@ -99,3 +99,45 @@ def logins(lista, maquina=None):
     """Estado dos logins dos portais para o master (Logins nas seguradoras): [{seguradora, codigo, ativa, obs}]."""
     return _rpc('agente_logins', dict(p_corretora=CORRETORA, p_maquina=maquina or os.environ.get('SHADDAI_MAQUINA', 'PC do Bruno'),
                                       p_logins=lista))
+
+
+def situacao_boletos(seguradora, itens):
+    """Situação do boleto lida no portal (Porto, Hapvida): [{numero, competencia, situacao: 'pago'|'aberto', pago_em}].
+    O site mostra "Pago no portal" a partir disto (tabela faturas_situacao_portal e faturas.pago_no_portal). Sem rede, só avisa."""
+    itens = [i for i in itens if i.get('numero') and i.get('situacao') in ('pago', 'aberto')]
+    if not itens:
+        return None
+    r = _rpc('agente_situacao_boletos', dict(p_corretora=CORRETORA, p_seguradora=SEG.get(seguradora, seguradora), p_itens=itens))
+    if isinstance(r, dict):
+        print(f"[banco] boletos {seguradora}: {r.get('pagos', 0)} pago(s) e {r.get('abertos', 0)} em aberto no portal; "
+              f"{r.get('faturas_marcadas', 0)} fatura(s) marcadas como pagas no site.")
+    return r
+
+
+def situacao_do_download(op, saida):
+    """Tira a situação dos boletos da saída do baixar_<op>.js e manda ao banco (Porto: faturas do mês + tarefa situacao)."""
+    if op != 'porto' or not isinstance(saida, dict):
+        return None
+    itens = [dict(numero=str(f['titulo']), competencia=f.get('comp'), situacao=f.get('boleto'))
+             for f in (saida.get('faturas') or []) + (saida.get('situacao') or []) if f.get('titulo')]
+    return situacao_boletos('porto', itens)
+
+
+def situacao_hapvida(portal_json):
+    """Hapvida: status de cada boleto no JSON da coleta do Portal Empresa (Liquidado = pago)."""
+    P = json.load(open(portal_json, encoding='utf-8'))
+    def iso(d):
+        d = str(d or '')
+        return f'{d[6:10]}-{d[3:5]}-{d[0:2]}' if len(d) >= 10 and d[2] == '/' else (d[:10] or None)
+    vistos, itens = set(), []
+    lista = P.get('situacoes') or [dict(f, contrato=c.get('contrato')) for c in P.get('contratos', []) for f in c.get('faturas', [])]
+    for f in lista:
+        n = str(f.get('billingNumber') or '')
+        if not n or n in vistos or 'COPARTIC' in str(f.get('billType') or '').upper():
+            continue
+        vistos.add(n)
+        pago = 'LIQUID' in str(f.get('status') or '').upper()
+        pg = f.get('paymentDate') or f.get('paidDate') or f.get('payDate')
+        itens.append(dict(numero=n, competencia=(iso(f.get('dueDate')) or '')[:7] or None, situacao='pago' if pago else 'aberto',
+                          pago_em=iso(pg) if pago and pg else None))
+    return situacao_boletos('hapvida', itens)
