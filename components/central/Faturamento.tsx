@@ -2,14 +2,14 @@
 // Faturamento da Central de Agentes como tela do portal. As contas vêm de lib/central/modelo.ts (as mesmas da Central).
 import { useEffect, useMemo, useState } from 'react';
 import {
-  type Doc, type Item, type Linha, FAIXAS, FCOL, aberto, addMonth, brl, ckey, comissaoItens, empRows, fam, famsIn, fatItems,
-  int, mesLabel, norm, pct, pdate, sum, today, uniq, vidas,
+  type Doc, type Item, type Linha, FAIXAS, FCOL, addMonth, brl, ckey, comissaoItens, empRows, fam, famsIn, fatItems,
+  comoPago, diasVencido, int, mesLabel, norm, pct, pdate, situacao, sum, today, uniq, vidas,
 } from '@/lib/central/modelo';
 import { plural } from '@/lib/formato';
 import { Barras } from './Barras';
 import { DistribuicaoVidas } from './DistribuicaoVidas';
 
-type Filtro = 'todas' | 'aberto' | 'variou' | 'div';
+type Filtro = 'todas' | 'vencido' | 'avencer' | 'variou' | 'div';
 type Ordem = 'valor' | 'venc' | 'nome' | 'var';
 
 const sinal = (v: number) => <span className={v >= 0 ? 'up' : 'down'}>{v >= 0 ? '+' : '−'}{pct(Math.abs(v))}</span>;
@@ -36,7 +36,8 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
 
   const { rows, pm } = empRows(faturas, mes);
   const tot = sum(rows, (e) => e.valor), docs = faturas.filter((f) => f.comp === mes);
-  const nab = rows.filter((e) => e.ab), pIt = pm ? itens.filter((r) => r.comp === pm) : [], ptot = sum(pIt, (r) => r.valor), dl = ptot ? (tot - ptot) / ptot * 100 : 0;
+  const itM = itens.filter((r) => r.comp === mes), pagos = itM.filter((r) => situacao(r) === 'pago'), vencidos = itM.filter((r) => situacao(r) === 'vencido'), aVencer = itM.filter((r) => situacao(r) === 'avencer');
+  const pIt = pm ? itens.filter((r) => r.comp === pm) : [], ptot = sum(pIt, (r) => r.valor), dl = ptot ? (tot - ptot) / ptot * 100 : 0;
   const eN = new Set(rows.map((e) => e.eid)), eP = new Set(pIt.map((r) => r.eid));
   const sN = sum(rows.filter((e) => eP.has(e.eid)), (e) => e.valor), sP = sum(pIt.filter((r) => eN.has(r.eid)), (r) => r.valor), dlS = sP ? (sN - sP) / sP * 100 : 0;
   const nVidas = sum(rows, (e) => e.vidas);
@@ -69,10 +70,14 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
       <div className="kpis">
         <div className="kpi"><span className="kpi-l">Faturado em {mesLabel(mes)}</span><span className="kpi-v">R$ {brl(tot)}</span>
           <span className="kpi-s">{pm ? <>{sinal(dlS)} nas mesmas empresas · {sinal(dl)} no total, vs {mesLabel(pm)}</> : 'primeiro mês na base'}</span></div>
-        <div className="kpi"><span className="kpi-l">Empresas</span><span className="kpi-v">{rows.length}</span>
-          <span className="kpi-s">{docs.length} {docs.length === 1 ? 'arquivo' : 'arquivos'} de {plural(uniq(docs.map((d) => fam(d.operadora))).length, 'seguradora', 'seguradoras')}</span></div>
-        <div className="kpi"><span className="kpi-l">Vidas</span><span className="kpi-v">{int(nVidas)}</span><span className="kpi-s">custo médio R$ {brl(tot / Math.max(1, nVidas))} por vida</span></div>
-        <div className="kpi"><span className="kpi-l">Boletos em aberto</span><span className="kpi-v">{nab.length}</span><span className="kpi-s">R$ {brl(sum(nab, (e) => e.valor))}</span></div>
+        <div className="kpi"><span className="kpi-l">Pagos</span><span className="kpi-v">{pagos.length}</span>
+          <span className="kpi-s">R$ {brl(sum(pagos, (r) => r.valor))} · {rows.length} empresas, {int(nVidas)} vidas</span></div>
+        <button type="button" className={'kpi' + (vencidos.length ? ' kpi-bad' : '')} onClick={() => setFf('vencido')} aria-label="Ver boletos vencidos">
+          <span className="kpi-l">Vencidos sem pagamento</span><span className="kpi-v">{vencidos.length}</span>
+          <span className="kpi-s">{vencidos.length ? <>R$ {brl(sum(vencidos, (r) => r.valor))} · ver quem</> : 'nenhum'}</span></button>
+        <button type="button" className="kpi" onClick={() => setFf('avencer')} aria-label="Ver boletos a vencer">
+          <span className="kpi-l">A vencer</span><span className="kpi-v">{aVencer.length}</span>
+          <span className="kpi-s">{aVencer.length ? `R$ ${brl(sum(aVencer, (r) => r.valor))}` : `nada a vencer em ${mesLabel(mes)}`}</span></button>
       </div>
       {pend.length > 0 && <p className="msg aviso">Ainda sem fatura em {mesLabel(mes)}: {pend.map((p) => `${p.empresa} — ${p.motivo}`).join('; ')}.</p>}
 
@@ -94,7 +99,8 @@ function Lista({ rows, mes, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }
 }) {
   const q = fq.trim().toUpperCase();
   let L = q ? rows.filter((e) => e.nome.toUpperCase().includes(q) || e.eid.toUpperCase().includes(q)) : rows.slice();
-  if (ff === 'aberto') L = L.filter((e) => e.ab);
+  if (ff === 'vencido') L = L.filter((e) => e.vencido);
+  else if (ff === 'avencer') L = L.filter((e) => e.ab && !e.vencido);
   else if (ff === 'variou') L = L.filter((e) => e.d != null && Math.abs(e.d) > 0.009);
   else if (ff === 'div') L = L.filter((e) => e.div);
   const so: Record<Ordem, (a: Linha, b: Linha) => number> = {
@@ -116,13 +122,13 @@ function Lista({ rows, mes, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }
         </select>
       </div>
       <div className="chips" role="group" aria-label="Filtro">
-        {([['todas', 'Todas'], ['aberto', 'Em aberto'], ['variou', 'Mudou de valor'], ['div', 'Divergência']] as [Filtro, string][]).map(([k, t]) => (
+        {([['todas', 'Todas'], ['vencido', 'Vencidos'], ['avencer', 'A vencer'], ['variou', 'Mudou de valor'], ['div', 'Divergência']] as [Filtro, string][]).map(([k, t]) => (
           <button key={k} type="button" aria-pressed={ff === k} onClick={() => setFf(k)}>{t}</button>
         ))}
       </div>
       <ul>
         {L.map((e) => {
-          const st = e.div ? ['dv', 'divergência'] : e.ab ? ['ab', 'em aberto'] : ['', 'pago'];
+          const st = e.vencido ? ['dv', 'vencido'] : e.div ? ['dv', 'divergência'] : e.ab ? ['ab', 'a vencer'] : ['', 'pago'];
           const dv = e.d == null ? 'novo' : Math.abs(e.d) < 0.01 ? 'igual' : `${e.d > 0 ? '+' : '−'}R$ ${brl(Math.abs(e.d))}`;
           return (
             <li key={e.eid}>
@@ -181,6 +187,18 @@ function Geral({ itens, comps, mes, setMes, rows, setEmp }: { itens: Item[]; com
   );
 }
 
+// situação do boleto (ou do pior boleto do grupo) e como sabemos que foi pago
+function Boleto({ L, curto = false }: { L: Item[]; curto?: boolean }) {
+  const v = L.filter((r) => situacao(r) === 'vencido'), a = L.filter((r) => situacao(r) === 'avencer');
+  if (v.length) {
+    const d = Math.max(...v.map((r) => diasVencido(r)));
+    return <span className="pill p-bad" title="Venceu e não achamos baixa nem comissão desta fatura">{curto ? 'vencido' : `Vencido há ${plural(d, 'dia', 'dias')}`}</span>;
+  }
+  if (a.length) return <span className="pill p-warn">{curto ? 'a vencer' : 'A vencer'}</span>;
+  const como = uniq(L.map(comoPago).filter(Boolean));
+  return <><span className="pill p-ok">{curto ? 'pago' : 'Pago'}</span>{!curto && como.length === 1 && <small>{como[0]}</small>}</>;
+}
+
 function conf(r: Item): [string, string, number] {
   const ok = r.confValor === 'OK' && (r.confVidas === 'OK' || !r.confVidas);
   return ok ? ['OK', 'p-ok', 0] : r.confValor === 'Sem vidas' ? ['Sem vidas', 'p-idle', 1] : r.confValor === 'OK' ? ['Vidas divergem', 'p-bad', 2] : ['Divergência', 'p-bad', 3];
@@ -209,7 +227,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
   const n_ = norm(nome);
   const cit = comissaoItens(comissoes ?? []).filter((i) => i.eid === eid || (!i.eid && norm(i.empresa) === n_ && ops.some((o) => fam(o) === fam(i.operadora))));
   const c12 = cit.filter((i) => i.ext >= addMonth(ckey(today()), -11));
-  const venc = last.map((r) => r.venc).filter(Boolean).sort()[0] || '—', abr = last.some(aberto);
+  const venc = last.map((r) => r.venc).filter(Boolean).sort()[0] || '—';
   const fat12 = sum(all.filter((r) => r.comp >= addMonth(ckey(today()), -12)), (r) => r.valor);
   const hist = v && !v.none ? v.hist : undefined;
   const mov = (cp: string, sub?: boolean) => {
@@ -226,7 +244,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
         <td className="num">{int(r.ativos ?? r.vidas)}</td>
         <td className="num">{mov(r.comp, sub)}</td>
         <td className="num">{brl(r.valor)}</td>
-        <td><span className={`pill ${aberto(r) ? 'p-warn' : 'p-idle'}`}>{aberto(r) ? 'Em aberto' : 'Pago'}</span></td>
+        <td><Boleto L={[r]} /></td>
         <td><span className={`pill ${k[1]}`}>{k[0]}</span></td>
       </tr>
     );
@@ -244,7 +262,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
         </div>
         <div className="mini-k">
           <div><span className="kpi-l">Fatura {mesLabel(lc)}</span><div className="kpi-v">R$ {brl(vtot)}</div>
-            <span className="kpi-s">vence {venc} · <span className={`pill ${abr ? 'p-warn' : 'p-idle'}`}>{abr ? 'em aberto' : 'pago'}</span></span></div>
+            <span className="kpi-s">vence {venc} · <Boleto L={last} curto /></span></div>
           <div><span className="kpi-l">Vidas</span><div className="kpi-v">{int(vv)}</div><span className="kpi-s">R$ {brl(vtot / Math.max(1, vv))} por vida</span></div>
           {comissoes && <div><span className="kpi-l">Comissão 12 meses</span><div className="kpi-v">R$ {brl(sum(c12, (i) => i.comissao))}</div>
             <span className="kpi-s">{c12.length ? `${pct(sum(c12, (i) => i.comissao) / Math.max(1, fat12) * 100)} do faturado` : 'sem comissão encontrada'}</span></div>}
@@ -263,7 +281,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
               {comps.slice().reverse().flatMap((cp) => {
                 const G = all.filter((r) => r.comp === cp).sort((a, b) => (+b.valor || 0) - (+a.valor || 0));
                 if (G.length === 1) return [linha(G[0])];
-                const k = eid + '|' + cp, ab = G.some(aberto), w = G.map(conf).sort((a, b) => b[2] - a[2])[0];
+                const k = eid + '|' + cp, w = G.map(conf).sort((a, b) => b[2] - a[2])[0];
                 const vs = G.map((r) => r.venc).filter(Boolean).sort((a, b) => (pdate(a)?.getTime() ?? 0) - (pdate(b)?.getTime() ?? 0))[0];
                 return [
                   <tr key={cp} style={cp === mes ? { fontWeight: 700 } : undefined}>
@@ -273,7 +291,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
                     <td className="num">{int(sum(G, (r) => r.ativos ?? r.vidas))}</td>
                     <td className="num">{mov(cp)}</td>
                     <td className="num">{brl(sum(G, (r) => r.valor))}</td>
-                    <td><span className={`pill ${ab ? 'p-warn' : 'p-idle'}`}>{ab ? 'Em aberto' : 'Pago'}</span></td>
+                    <td><Boleto L={G} /></td>
                     <td><span className={`pill ${w[1]}`}>{w[0]}</span></td>
                   </tr>,
                   ...(abertos[k] ? G.map((r) => linha(r, true)) : []),
