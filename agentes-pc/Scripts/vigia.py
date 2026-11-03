@@ -203,7 +203,7 @@ def automatico(o, simular=False):
     novos = saida.get('arquivos', [])
     log(f"{ag} {op}: {len(novos)} arquivo(s) novo(s), {len(saida.get('repetidos', []))} já baixado(s)")
     if not novos:
-        return parar(o, 'concluida', 'Nada novo no portal.', simular)
+        return parar(o, 'concluida', saida.get('aviso') or 'Nada novo no portal.', simular)
     data, fim = hoje.isoformat(), ['--ordem', o['id']] + (['--simular'] if simular else [])
     if ag == 'faturas':
         extra = {'porto': ['--comp', comp, '--sem-baixar'], 'bradesco': ['--entrada', os.path.dirname(novos[0])],
