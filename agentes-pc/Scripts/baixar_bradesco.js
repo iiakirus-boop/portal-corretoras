@@ -105,7 +105,8 @@ async function faturas(comp, saida) {
     for (let t = 0; t < 90000 && !arqs.length; t += 2000) await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Ok' }).click({ timeout: 3000 }).catch(() => {});
   }
-  for (let t = 0, n = -1, parado = 0; arqs.length && t < 600000 && arqs.length < sel && parado < 30000; t += 2000) {
+  // alguns kits (apólices novas) só chegam minutos depois dos outros: espera até 4 min sem chegar nada (em 03/11 parava em 30 s e perdia 7)
+  for (let t = 0, n = -1, parado = 0; arqs.length && t < 1200000 && arqs.length < sel && parado < 240000; t += 2000) {
     parado = arqs.length === n && n > 0 ? parado + 2000 : 0; n = arqs.length;
     await page.waitForTimeout(2000);
   }
@@ -114,6 +115,7 @@ async function faturas(comp, saida) {
   const pasta = path.join(FAT, 'Faturas', 'Bradesco_portal', comp);
   for (const a of arqs) grava(pasta, a.nome, a.dados, saida);
   saida.faturas = { competencia: comp, selecionados: sel, recebidos: arqs.length, pasta };
+  if (arqs.length < sel) saida.aviso = `Bradesco ${rotulo}: o portal entregou ${arqs.length} de ${sel} kits; os que faltaram vêm na próxima rodada.`;
 }
 
 async function comissao(ini, fim, saida) {
