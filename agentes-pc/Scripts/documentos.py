@@ -42,7 +42,22 @@ def _arquivo(rel):
     if not rel or not rel.lower().endswith('.pdf'):
         return None
     p = rel if os.path.isabs(rel) else os.path.join(FAT, *rel.replace('\\', '/').split('/'))
-    return p if os.path.isfile(p) else None
+    return p if os.path.isfile(p) else _bradesco_portal(rel)
+
+
+def _bradesco_portal(rel):
+    """Bradesco: quando o PDF ainda não foi copiado para Faturas/AAAA-MM/Bradesco*/<apólice> - <nome>/, usa o que o
+    baixar_bradesco.js deixou em Faturas/Bradesco_portal/AAAA-MM/<NOME>_<apólice>_<n>_<MMAAAA>.pdf (só se for um só)."""
+    partes = rel.replace('\\', '/').split('/')
+    if len(partes) < 4 or not partes[2].startswith('Bradesco') or ' - ' not in partes[3]:
+        return None
+    comp, apolice = partes[1], partes[3].split(' - ')[0].strip()
+    pasta = os.path.join(FAT, 'Faturas', 'Bradesco_portal', comp)
+    if not apolice or not os.path.isdir(pasta):
+        return None
+    fim = f'_{comp[5:]}{comp[:4]}.pdf'
+    achou = [f for f in os.listdir(pasta) if f.lower().endswith(fim) and f'_{apolice}_' in f]
+    return os.path.join(pasta, achou[0]) if len(achou) == 1 else None
 
 
 def linhas_da_base(desde):
