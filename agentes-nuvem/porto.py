@@ -112,7 +112,7 @@ def main():
         if cod == 3:
             det = saida.get('detalhe') or 'login'
             status, msg = 'erro', f'A Porto não deixou entrar pela nuvem ({det}) em {seg}s. O PC continua fazendo a Porto.'
-            log(f'Login: não entrou ({det}).')
+            log('Login: não entrou (o motivo está no master).')  # o log é público
             return 1
         if cod:
             status, msg = 'erro', f"Download parou no passo \"{saida.get('passo', '?')}\" em {seg}s: {saida.get('motivo', '?')[:200]}"

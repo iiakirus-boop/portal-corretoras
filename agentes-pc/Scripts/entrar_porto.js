@@ -20,7 +20,13 @@ async function entrarPorto(page, { usuario, senha, cod, susep = 'BA6QXJ', espera
   if (!apareceu) {
     // só conta como captcha o desafio aberto na tela (o selo invisível do reCAPTCHA fica em toda página de login)
     const captcha = await page.locator('iframe[src*="recaptcha"][src*="bframe"], iframe[src*="hcaptcha"][src*="challenge"]').filter({ visible: true }).count();
-    throw new Error(captcha ? 'captcha' : 'a tela da SUSEP não apareceu depois do CPF e senha');
+    if (captcha) throw new Error('captcha');
+    // o que a tela diz (só frases de aviso da própria Porto, sem dados), para saber por que não seguiu
+    const aviso = await page.evaluate(() => document.body.innerText.split('\n').map(x => x.trim())
+      .filter(x => x && x.length < 200 && /inv[áa]lid|incorret|bloque|tente|erro|rob[ôo]|verifica|c[óo]digo|token|acesso|expir|senha/i.test(x))
+      .slice(0, 3).join(' | ')).catch(() => '');
+    const onde = page.url().split('?')[0].replace(/^https:\/\/[^/]+/, '');
+    throw new Error(`a tela da SUSEP não apareceu depois do CPF e senha (tela ${onde}${aviso ? `: "${aviso.slice(0, 250)}"` : ', sem aviso'})`);
   }
   await campoSusep.click();
   await campoSusep.pressSequentially(susep, { delay: 80 });
