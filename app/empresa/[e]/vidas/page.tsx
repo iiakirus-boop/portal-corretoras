@@ -13,7 +13,7 @@ export default async function Vidas({ params, searchParams }: P) {
   const x = await exigirEmpresa(e);
   if (!x.veVidas) redirect(`/empresa/${e}`);
   const db = await cliente();
-  const { data: fat } = await db.from('faturas').select('*').eq('empresa_id', e);
+  const { data: fat } = await db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null);
   const comps = [...new Set(((fat ?? []) as Fatura[]).map((f) => f.competencia))].sort().reverse();
   const comp = sp.mes && comps.includes(sp.mes) ? sp.mes : comps[0];
   let q = db.from('vidas').select('*').eq('empresa_id', e).eq('competencia', comp ?? '').order('familia').order('titular', { ascending: false });

@@ -12,6 +12,7 @@ export default async function MasterLayout({ children }: { children: React.React
           { href: '/master', rotulo: 'Visão geral', exato: true },
           { href: '/master/corretoras', rotulo: 'Corretoras' },
           { href: '/master/agentes', rotulo: 'Agentes' },
+          { href: '/master/corrigir', rotulo: 'Corrigir dados' },
           { href: '/master/cobranca', rotulo: 'Cobrança' },
         ]} />
       <main className="wrap">{children}</main>
