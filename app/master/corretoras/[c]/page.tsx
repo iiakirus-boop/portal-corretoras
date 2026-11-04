@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cliente, exigirSessao } from '@/lib/servidor';
-import { cnpj, competencia, data, moeda, num, seg } from '@/lib/formato';
+import { cnpj, competencia, data, moeda, num, seg, SEGURADORA } from '@/lib/formato';
+import { alternarLogin, salvarLogin } from '@/lib/acoes';
 import { mensalidade, vidasCarteira, vidasEmpresaPor, type Contrato, type VidaCarteira } from '@/lib/contas';
 import { Aviso } from '@/components/Aviso';
 import { Pessoas } from '@/components/Pessoas';
@@ -61,12 +62,53 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
 
       <div className="grid g2">
         <section className="card">
-          <div className="card-h"><h2>Códigos nas seguradoras</h2><span className="hint">os robôs entram por estes códigos</span></div>
+          <div className="card-h"><h2>Logins nas seguradoras</h2><span className="hint">os agentes entram por estes logins; pode ter vários por seguradora</span></div>
           <ul className="rows">
-            {((codigos ?? []) as CodigoSeguradora[]).map((x) => (
-              <li key={x.id}><div><b>{seg(x.seguradora_id)} {x.codigo}</b><small>{x.rotulo}</small></div>{x.ativo ? <Pill tom="ok">Ativo</Pill> : <Pill tom="idle">Parado</Pill>}</li>
-            ))}
+            {((codigos ?? []) as CodigoSeguradora[])
+              .sort((a, b) => a.seguradora_id.localeCompare(b.seguradora_id) || a.codigo.localeCompare(b.codigo))
+              .map((x) => (
+                <li key={x.id}>
+                  <div><b>{seg(x.seguradora_id)} {x.codigo}</b><small>{[x.rotulo, x.uso && x.uso !== 'ambos' ? `só ${x.uso === 'comissao' ? 'comissão' : 'faturas'}` : null].filter(Boolean).join(' · ')}</small></div>
+                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+                    {x.ativo ? <Pill tom="ok">Ativo</Pill> : <Pill tom="idle">Parado</Pill>}
+                    <form action={alternarLogin}>
+                      <input type="hidden" name="corretora_id" value={c} /><input type="hidden" name="id" value={x.id} />
+                      <input type="hidden" name="ligar" value={x.ativo ? '0' : '1'} />
+                      <button className="btn ghost">{x.ativo ? 'Parar' : 'Ligar'}</button>
+                    </form>
+                  </div>
+                </li>
+              ))}
           </ul>
+          <details className="more">
+            <summary>Cadastrar outro login</summary>
+            <form action={salvarLogin} className="form">
+              <input type="hidden" name="corretora_id" value={c} />
+              <div className="linha">
+                <label className="campo">Seguradora
+                  <select name="seguradora_id" required defaultValue="">
+                    <option value="" disabled>Escolha</option>
+                    {Object.entries(SEGURADORA).map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                  </select>
+                </label>
+                <label className="campo">Código do login <small>(ex.: 045M)</small><input name="codigo" required /></label>
+              </div>
+              <div className="linha">
+                <label className="campo">Nome para reconhecer<input name="rotulo" placeholder="Ex.: grupo de contratos 2" /></label>
+                <label className="campo">Serve para
+                  <select name="uso" defaultValue="ambos">
+                    <option value="ambos">Faturas e comissão</option><option value="faturas">Só faturas</option><option value="comissao">Só comissão</option>
+                  </select>
+                </label>
+              </div>
+              <div className="linha">
+                <label className="campo">Pasta no PC <small>(opcional)</small><input name="pasta" placeholder="Ex.: Hapvida_045M" /></label>
+                <label className="campo">Prefixo da ordem de comissão <small>(opcional)</small><input name="prefixo" placeholder="Ex.: HAP-045M-" /></label>
+              </div>
+              <p className="hint">A senha não vai para o site. Depois de cadastrar, no PC clique uma vez em &quot;Entrar na seguradora&quot; para guardar a senha deste login.</p>
+              <button className="btn">Cadastrar login</button>
+            </form>
+          </details>
         </section>
         <section className="card">
           <div className="card-h"><h2>CNPJs da corretora</h2></div>

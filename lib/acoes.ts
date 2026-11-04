@@ -155,6 +155,41 @@ export async function repetirOrdem(f: FormData) {
   volta(de, 'ok', 'Colocada de novo na fila, na frente das outras.');
 }
 
+// ---- logins nas seguradoras (corretora_codigos) ----
+// Um login por linha. Os agentes leem esta lista (agente_cadastro): login novo entra sem mexer no código.
+// A senha nunca vem para o site: fica no cofre do PC (atalho "Entrar na <seguradora>") ou nos segredos da nuvem.
+export async function salvarLogin(f: FormData) {
+  const c = txt(f, 'corretora_id');
+  const de = `/master/corretoras/${c}`;
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master cadastra logins.');
+  const seguradora = txt(f, 'seguradora_id'), codigo = txt(f, 'codigo').replace(/\s+/g, '');
+  if (!seguradora || !codigo) volta(de, 'erro', 'Escolha a seguradora e escreva o código do login.');
+  if (!/^[0-9A-Za-z_-]+$/.test(codigo)) volta(de, 'erro', 'O código do login só pode ter letras, números, - e _.');
+  const db = await cliente();
+  const { error } = await db.from('corretora_codigos').insert({
+    corretora_id: c, seguradora_id: seguradora, codigo, rotulo: txt(f, 'rotulo') || null,
+    pasta_arquivos: txt(f, 'pasta') || null, prefixo_ordem: txt(f, 'prefixo') || null,
+    uso: ['faturas', 'comissao'].includes(txt(f, 'uso')) ? txt(f, 'uso') : 'ambos', ativo: true,
+  });
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath(de);
+  volta(de, 'ok', `Login ${codigo} cadastrado. No PC, clique em "Entrar na seguradora" uma vez para guardar a senha dele; o vigia já passa a conferir este login.`);
+}
+
+export async function alternarLogin(f: FormData) {
+  const c = txt(f, 'corretora_id');
+  const de = `/master/corretoras/${c}`;
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master liga e para logins.');
+  const ligar = txt(f, 'ligar') === '1';
+  const db = await cliente();
+  const { error } = await db.from('corretora_codigos').update({ ativo: ligar }).eq('id', txt(f, 'id')).eq('corretora_id', c);
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath(de);
+  volta(de, 'ok', ligar ? 'Login ligado: os agentes voltam a usar.' : 'Login parado: os agentes deixam de usar até você ligar de novo.');
+}
+
 // ---- corretora ----
 export async function criarEmpresa(f: FormData) {
   const c = txt(f, 'corretora_id');

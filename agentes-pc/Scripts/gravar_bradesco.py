@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Grava na Base_Faturas_Vidas.xlsx as faturas Bradesco lidas por faturas_bradesco.py.
 Uso: python3 gravar_bradesco.py <json do parser> <planilha entrada> <planilha saida> <AAAA-MM-DD processamento>
-Nomes curtos por apolice em NOMES (acrescentar quando entrar empresa nova).
+Nomes curtos: da base (Empresas/Subestipulantes) e do cadastro do banco; empresa nova não exige mexer no código.
 """
 import json, sys, copy, re
 from datetime import datetime
@@ -11,14 +11,25 @@ from shaddai_comum import d, br, cs, last_row  # módulo comum
 from openpyxl.utils import get_column_letter as L
 from openpyxl.worksheet.cell_range import MultiCellRange
 
-NOMES = {'955411': 'AMANDA SANTOS', '407066': 'ANNA BRANZANI', '412008': 'BILSING', '1081597': 'CAXUANA',
-         '982693': 'CAXUANA', '457811': 'AFFONSO DOCERIA', '457988': 'ELIDE MIYASIRO', '1208623': 'ELUMA',
-         '1221645': 'IMF', '407067': 'JOSE ROBERTO LOURENCINI', '517208': 'JPA', '1208772': 'MICHELS',
-         '455621': 'MK ASSESSORIA', '460602': 'NOVA TRANS', '444357': 'OVERCASTING', '517273': 'PB PERFUMARIA',
-         '1061757': 'ROBERTO HEIDRICH', '610919': 'TFR', '1171927': 'TRANSCIARDI', '1189111': 'TRANSCIARDI',
-         '542827': 'QUATRO IRMAS', '151768': 'TRIMAQ', '525299': 'VC3', '1242221': 'WALTERMIC'}
-SUBNOMES = {'SANCO EMPREENDIMENTOS LTDA': 'SANCO', 'CASAS FRATERNAIS O NAZARENO': 'CASAS FRATERNAIS',
-            'RCM ADMINISTRACAO E GESTAO LTDA': 'RCM'}
+# Nomes curtos: vêm do cadastro, nunca do código. Ordem: aba Empresas/Subestipulantes da base (coluna "nome curto"),
+# depois o cadastro do banco (empresas.nome_curto / subestipulantes.nome_curto) e, para empresa nova, as 2 primeiras
+# palavras do nome no portal (nome_curto()). Empresa nova não exige mexer neste arquivo.
+NOMES = {}     # apólice -> nome curto
+SUBNOMES = {}  # nome da subestipulante no portal -> nome curto
+
+
+def carregar_nomes_do_banco():
+    """Nomes curtos do cadastro do banco (sem rede: a última cópia; sem nada: fica vazio e vale a base)."""
+    import contextlib
+    try:
+        with contextlib.redirect_stdout(sys.stderr):  # o stdout deste script é o JSON do resumo
+            import banco
+            n, s = banco.nomes_curtos('bradesco_saude', 'bradesco_dental')
+        NOMES.update(n); SUBNOMES.update(s)
+    except Exception as e:  # o banco nunca para a gravação
+        print(f'[gravar_bradesco] cadastro do banco indisponível ({e.__class__.__name__}); vale só a base.', file=sys.stderr)
+
+
 PAREN = {'': 'Titular', 'FILH': 'Filho(a)', 'CONJ': 'Cônjuge', 'OUTR': 'Outros', 'PAI': 'Pai', 'MAE': 'Mãe', 'AGRE': 'Agregado'}
 SUBFORM = ('=IF(C{r}="","",IF(ISNUMBER(SEARCH("Bradesco",IFERROR(INDEX(Empresas!$D:$D,MATCH(A{r},Empresas!$A:$A,0)),""))),'
            'B{r}&" - "&G{r},C{r}&" - "&G{r}))')
@@ -108,9 +119,13 @@ def main(js, xin, xout, proc):
     nid = max(int(E.cell(r, 1).value[1:]) for r in range(2, rE + 1) if E.cell(r, 1).value)
     ids = {str(E.cell(r, 5).value): E.cell(r, 1).value for r in range(2, rE + 1)
            if str(E.cell(r, 4).value or '').startswith('Bradesco')}
-    for r in range(2, rE + 1):
+    carregar_nomes_do_banco()
+    for r in range(2, rE + 1):  # a base vale mais que o banco (é o que a equipe edita hoje)
         if str(E.cell(r, 4).value or '').startswith('Bradesco') and E.cell(r, 11).value:
             NOMES[str(E.cell(r, 5).value)] = E.cell(r, 11).value
+    for r in range(2, S.max_row + 1):
+        if S.cell(r, 5).value and S.cell(r, 7).value and str(S.cell(r, 2).value or '') in ids:
+            SUBNOMES[str(S.cell(r, 5).value).strip()] = S.cell(r, 7).value
     # kit sem ficha de boleto (ex.: fatura de crédito, valor negativo): grava sem os dados do boleto
     pend = []
     for f in data:

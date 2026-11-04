@@ -2,7 +2,7 @@
 // não grava na base nem no Supabase.
 // Faturas: entra sozinho, um por vez, com cada login ativo do Portal Empresa cadastrado no atalho "Cadastrar login Hapvida" (logins.js),
 //   num Chrome visível próprio (sessões isoladas); junta tudo num JSON só, sem repetir contrato nem fatura. Login que falha é relatado e o próximo segue.
-// Comissão: precisa dos Chromes do webhap que o atalho "Entrar na Hapvida" deixa logados (9335 = 045K | 9336 = 045L | 9337 = 02JZ);
+// Comissão: precisa dos Chromes do webhap que o atalho "Entrar na Hapvida" deixa logados, um por login do cadastro (hoje 9335 = 045K | 9336 = 045L | 9337 = 02JZ);
 //   trabalha numa aba própria aberta a partir da aba logada e fecha no fim.
 // Uso:
 //   node baixar_hapvida.js faturas 2026-08-01            -> Faturas/Hapvida_portal/portal_hapvida_<hoje>.json (faturas com vencimento desde a data)
@@ -24,7 +24,8 @@ const PORTAL = 'portal-empresa.hapvidagndi.com.br', API = 'https://api.hapvida.c
 const LOGIN_PORTAL = 'https://hapvidaadb2bprd.b2clogin.com/hapvidaadb2bprd.onmicrosoft.com/oauth2/v2.0/authorize?p=B2C_1_portal-empresa-login'
   + '&client_id=a873a0fd-ed81-4cf2-bb25-0f6dca61bc46&nonce=defaultNonce&redirect_uri=https%3A%2F%2Fportal-empresa.hapvidagndi.com.br%2Fautenticando'
   + '&scope=openid%20offline_access&response_type=code+id_token&prompt=login';
-const LOGINS = { '045K': { porta: 9335, pasta: 'Hapvida' }, '045L': { porta: 9336, pasta: 'Hapvida_045L' }, '02JZ': { porta: 9337, pasta: 'Hapvida_02JZ' } };
+// logins do webhap (comissão): do cadastro do banco (corretora_codigos), via _cadastro.json; login novo entra sem mexer aqui
+const LOGINS = logins.doCadastro('hapvida', 'comissao');
 let passo = 'início', aba = null;
 const abas = [];
 const sai = (cod, obj) => { console.log(JSON.stringify(obj)); process.exit(cod); };
@@ -280,7 +281,7 @@ async function comissao(comp, login, saida) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === 'faturas' && /^\d{4}-\d{2}-\d{2}$/.test(args[i + 1])) tarefas.push(['faturas', args[++i]]);
     else if (args[i] === 'comissao' && /^\d{4}-\d{2}$/.test(args[i + 1])) {
-      const comp = args[++i], so = /^[0-9A-Z]{4}(,[0-9A-Z]{4})*$/.test(args[i + 1] || '') ? args[++i].split(',') : Object.keys(LOGINS);
+      const comp = args[++i], so = /^[0-9A-Za-z_-]+(,[0-9A-Za-z_-]+)*$/.test(args[i + 1] || '') && !/^(faturas|comissao)$/.test(args[i + 1]) ? args[++i].split(',') : Object.keys(LOGINS);
       if (so.some(l => !LOGINS[l])) sai(1, uso);
       for (const l of so) tarefas.push(['comissao', comp, l]);
     } else sai(1, uso);

@@ -8,7 +8,7 @@ REFERÊNCIA → RELATORIOS → em cada card (lote), EXCEL do "Relatório de Comi
 
 Uso:  python comissao_hapvida.py <Base_Faturas_Vidas.xlsx> <pasta Comissoes/AAAA-MM/Hapvida> [outra pasta ...]
 
-A Shaddai tem três logins na Hapvida: 045K (Shaddai Proventus, CNPJ 0001-23, pasta Hapvida), 045L (Shaddai Proventus,
+Os logins vêm do cadastro do banco (corretora_codigos). Hoje a Shaddai tem três logins na Hapvida: 045K (Shaddai Proventus, CNPJ 0001-23, pasta Hapvida), 045L (Shaddai Proventus,
 CNPJ 0002-04, pasta Hapvida_045L) e 02JZ (Shaddai Corretora de Seguros, CNPJ 02.195.141/0001-32, pasta Hapvida_02JZ).
 O nº do lote se repete entre logins, por isso a ordem do 02JZ é HAP-02JZ-<lote>. Passe as duas pastas do mês juntas para o painel do mês sair completo.
 
@@ -25,6 +25,22 @@ O nº do lote se repete entre logins, por isso a ordem do 02JZ é HAP-02JZ-<lote
 import sys, os, csv, glob, json, datetime, collections
 import openpyxl
 from shaddai_comum import classe_por_taxa, VERIFICAR, preparar, _prox, _w, MOEDA, DATA, CINZA, PAG, COM
+
+
+def prefixo_da_pasta(pasta):
+    """Prefixo da ordem pelo login da pasta. O nº do lote se repete entre logins: 045K/045L ficam "HAP-<lote>" (já
+    gravados assim) e os demais levam o código ("HAP-02JZ-<lote>"). Vem do cadastro do banco (corretora_codigos:
+    pasta_arquivos e prefixo_ordem, copiado em _cadastro.json pelo vigia); login novo sem prefixo leva o código."""
+    nome = os.path.basename(os.path.abspath(pasta))
+    try:
+        cad = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "_cadastro.json"), encoding="utf-8"))
+        for l in cad.get("logins", []):
+            if l.get("seguradora") == "hapvida" and l.get("pasta") == nome:
+                return l.get("prefixo_ordem") or f"HAP-{l['codigo']}-"
+    except (OSError, ValueError):
+        pass
+    cod = nome.split("_", 1)[1] if "_" in nome else "045K"
+    return "HAP-" if cod in ("045K", "045L") else f"HAP-{cod}-"
 
 
 def _n(s):
@@ -123,9 +139,7 @@ def importar(wb, pastas, rel_de):
         P = painel.setdefault(comp, dict(ordens=[], itens=[], obs=[]))
         for L in lotes:
             path = arqs.get(L["lote"])
-            # o nº do lote se repete entre logins: 045K/045L ficam "HAP-<lote>" (já gravados assim); os demais levam o código
-            cod_pasta = os.path.basename(os.path.abspath(pasta)).split("_", 1)[1] if "_" in os.path.basename(os.path.abspath(pasta)) else "045K"
-            op = f"HAP-{L['lote']}" if cod_pasta in ("045K", "045L") else f"HAP-{cod_pasta}-{L['lote']}"
+            op = prefixo_da_pasta(pasta) + L["lote"]
             if not path:
                 rel.append((op, "SEM ARQUIVO", f"{L['tipo']} {L['valor']:.2f} — baixar o Excel do card"))
                 continue

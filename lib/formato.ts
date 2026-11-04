@@ -111,7 +111,7 @@ export const PAGO_ROTULO = { portal: 'Pago no portal', comissao: 'Pago pela comi
 export const seg = (id: string | null | undefined) => (id ? SEGURADORA[id] ?? id : '—');
 
 export const AGENTE: Record<string, string> = {
-  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação', conferencia: 'Conferência', supervisor: 'Supervisor', criar_agente: 'Criar agente',
+  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação', conferencia: 'Conferência', supervisor: 'Supervisor', criar_agente: 'Criar agente', teste_nuvem: 'Teste na nuvem',
 };
 
 export const ORDEM_TOM = { pendente: 'idle', em_execucao: 'info', concluida: 'ok', erro: 'bad', cancelada: 'idle', aguardando_voce: 'warn' } as const;

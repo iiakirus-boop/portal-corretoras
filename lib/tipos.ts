@@ -44,6 +44,10 @@ export type CodigoSeguradora = {
   codigo: string;
   rotulo: string | null;
   cnpj_login: string | null;
+  pasta_arquivos?: string | null;
+  prefixo_ordem?: string | null;
+  porta_pc?: number | null;
+  uso?: 'ambos' | 'faturas' | 'comissao' | null;
   ativo: boolean;
 };
 
