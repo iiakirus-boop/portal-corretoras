@@ -32,6 +32,25 @@ rodados à mão como antes.
 import sys, os, glob, json, shutil, subprocess, tempfile, datetime
 import banco, fumaca
 
+
+def _pdftotext_no_path():
+    """O vigia roda fora do Git Bash e o PATH dele não tem o pdftotext (vem com o Git): sem isso toda leitura de
+    PDF falha com FileNotFoundError (aconteceu nas faturas Porto de 03/11/2026)."""
+    if shutil.which('pdftotext'):
+        return
+    raizes = [os.environ.get('ProgramFiles', r'C:\Program Files'), os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'),
+              os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs')]
+    for r in raizes:
+        for sub in (r'Git\mingw64\bin', r'Git\usr\bin'):
+            d = os.path.join(r, sub)
+            if os.path.isfile(os.path.join(d, 'pdftotext.exe')):
+                os.environ['PATH'] = d + os.pathsep + os.environ.get('PATH', '')
+                return
+    print('AVISO: pdftotext não encontrado; a leitura dos PDFs vai falhar.', flush=True)
+
+
+_pdftotext_no_path()
+
 AQUI = os.path.dirname(os.path.abspath(__file__))
 FAT = os.path.dirname(AQUI)
 BASE = os.path.join(FAT, 'Base_Faturas_Vidas.xlsx')
