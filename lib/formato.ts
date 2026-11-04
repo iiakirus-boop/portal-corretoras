@@ -100,10 +100,18 @@ export const SEGURADORA: Record<string, string> = {
   porto_saude: 'Porto Saúde', porto_odonto: 'Porto Odonto', bradesco_saude: 'Bradesco Saúde', bradesco_dental: 'Bradesco Dental',
   amil: 'Amil', amil_dental: 'Amil Dental', santa_helena: 'Santa Helena', hapvida: 'Hapvida', sulamerica: 'SulAmérica',
 };
+// Como sabemos que o boleto foi pago, do mais certo para o menos: o portal da seguradora mostra pago (baixa da Bradesco
+// em data_pagamento, ou Porto/Hapvida em pago_no_portal) ou a comissão daquela fatura caiu (provável). Sem nada: em aberto.
+export type Pagamento = { via: 'portal' | 'comissao'; em: string } | null;
+export const pagamento = (f: { data_pagamento?: string | null; pago_no_portal?: string | null; pago_pela_comissao?: string | null }): Pagamento =>
+  f.data_pagamento ? { via: 'portal', em: f.data_pagamento } : f.pago_no_portal ? { via: 'portal', em: f.pago_no_portal }
+    : f.pago_pela_comissao ? { via: 'comissao', em: f.pago_pela_comissao } : null;
+export const PAGO_ROTULO = { portal: 'Pago no portal', comissao: 'Pago pela comissão' } as const;
+
 export const seg = (id: string | null | undefined) => (id ? SEGURADORA[id] ?? id : '—');
 
 export const AGENTE: Record<string, string> = {
-  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação', conferencia: 'Conferência', supervisor: 'Supervisor', criar_agente: 'Criar agente',
+  faturas: 'Faturas', comissao: 'Comissões', vidas: 'Vidas', projecao: 'Projeção', mantem_vivo: 'Mantém logins ativos', pedido: 'Movimentação', conferencia: 'Conferência', supervisor: 'Supervisor', criar_agente: 'Criar agente', teste_nuvem: 'Teste na nuvem',
 };
 
 export const ORDEM_TOM = { pendente: 'idle', em_execucao: 'info', concluida: 'ok', erro: 'bad', cancelada: 'idle', aguardando_voce: 'warn' } as const;

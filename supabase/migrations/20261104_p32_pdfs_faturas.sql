@@ -1,4 +1,4 @@
--- p29: PDFs de fatura e boleto no portal.
+-- p32: PDFs de fatura e boleto no portal.
 -- Os agentes do PC (documentos.py) sobem os PDFs pela função agente-arquivo, que guarda no bucket "documentos"
 -- e chama agente_documento: a fatura ganha fatura_doc_id / boleto_doc_id e a empresa baixa no login dela.
 -- Sem DROP: só create or replace.
@@ -15,6 +15,7 @@ begin
       from faturas f
      where f.corretora_id = p_corretora
        and (p_desde is null or f.competencia >= p_desde)
+       and f.excluido_em is null
        and (f.fatura_doc_id is null or f.boleto_doc_id is null)), '[]'::jsonb);
 end $$;
 
@@ -55,33 +56,60 @@ grant execute on function public.agente_docs_faltando(text, uuid, text) to anon,
 grant execute on function public.agente_documento_alvo(text, uuid) to anon, authenticated, service_role;
 grant execute on function public.agente_documento(text, uuid, text, text, text) to anon, authenticated, service_role;
 
--- 4. A sincronização da planilha não apaga mais a ligação com os PDFs (a planilha não conhece os ids dos documentos)
+-- 4. A cópia da planilha (sincronizar_lote) não apaga mais a ligação com os PDFs: igual à p31e, só muda o "update set"
+--    de fatura_doc_id / boleto_doc_id / vidas_doc_id para manter o que já está no banco quando a planilha manda vazio.
 create or replace function public.sincronizar_lote(p_token text, p_tabela text, p_linhas jsonb)
 returns integer language plpgsql security definer set search_path to 'public', 'privado' as $function$
-declare cols text; upd text; n integer;
+declare cols text; upd text; n integer; v jsonb := coalesce(p_linhas, '[]'::jsonb);
 begin
   if not privado.token_agente_ok(p_token) then raise exception 'token inválido'; end if;
   if p_tabela not in ('empresas', 'apolices', 'subestipulantes',
                       'faturas', 'vidas', 'comissao_pagamentos', 'comissao_lancamentos') then
     raise exception 'tabela não permitida: %', p_tabela;
   end if;
-  if jsonb_array_length(p_linhas) = 0 then return 0; end if;
+  if jsonb_array_length(v) = 0 then return 0; end if;
+  if p_tabela = 'faturas' then
+    select coalesce(jsonb_agg(x), '[]'::jsonb) into v from jsonb_array_elements(v) x
+     where not exists (select 1 from faturas f
+                        where f.corretora_id = (x->>'corretora_id')::uuid and f.seguradora_id = x->>'seguradora_id'
+                          and f.competencia = x->>'competencia' and f.numero = x->>'numero'
+                          and (f.id <> (x->>'id')::uuid or f.origem = 'agente' or f.excluido_em is not null));
+  elsif p_tabela = 'vidas' then
+    select coalesce(jsonb_agg(x), '[]'::jsonb) into v from jsonb_array_elements(v) x
+     where (x->>'fatura_id' is null or exists (select 1 from faturas f where f.id = (x->>'fatura_id')::uuid and f.origem <> 'agente'))
+       and not exists (select 1 from vidas w
+                        where w.corretora_id = (x->>'corretora_id')::uuid and w.empresa_id = (x->>'empresa_id')::uuid
+                          and w.seguradora_id = x->>'seguradora_id' and w.competencia = x->>'competencia' and w.origem = 'agente');
+  elsif p_tabela = 'comissao_pagamentos' then
+    select coalesce(jsonb_agg(x), '[]'::jsonb) into v from jsonb_array_elements(v) x
+     where not exists (select 1 from comissao_pagamentos p
+                        where p.corretora_id = (x->>'corretora_id')::uuid and p.seguradora_id = x->>'seguradora_id'
+                          and p.ordem = x->>'ordem' and (p.id <> (x->>'id')::uuid or p.origem = 'agente'));
+  elsif p_tabela = 'comissao_lancamentos' then
+    select coalesce(jsonb_agg(case when x->>'fatura_id' is not null
+                                    and not exists (select 1 from faturas f where f.id = (x->>'fatura_id')::uuid)
+                                   then x || '{"fatura_id": null}'::jsonb else x end), '[]'::jsonb) into v
+      from jsonb_array_elements(v) x
+     where exists (select 1 from comissao_pagamentos p where p.id = (x->>'pagamento_id')::uuid and p.origem <> 'agente');
+  end if;
+  if jsonb_array_length(v) = 0 then return 0; end if;
   select string_agg(quote_ident(k), ','),
          string_agg(case when p_tabela = 'faturas' and k in ('fatura_doc_id', 'boleto_doc_id', 'vidas_doc_id')
-                         then format('%1$I = coalesce(excluded.%1$I, %2$I.%1$I)', k, p_tabela)
+                         then format('%1$I = coalesce(excluded.%1$I, faturas.%1$I)', k)
                          else format('%1$I = excluded.%1$I', k) end, ',') filter (where k <> 'id')
-    into cols, upd from jsonb_object_keys(p_linhas->0) k;
+    into cols, upd from jsonb_object_keys(v->0) k;
   if p_tabela = 'vidas' then
-    delete from vidas v using (select distinct corretora_id, empresa_id, seguradora_id, competencia
-                               from jsonb_populate_recordset(null::vidas, p_linhas)) g
-     where v.corretora_id = g.corretora_id and v.empresa_id = g.empresa_id and v.seguradora_id = g.seguradora_id and v.competencia = g.competencia;
+    delete from vidas w using (select distinct corretora_id, empresa_id, seguradora_id, competencia
+                               from jsonb_populate_recordset(null::vidas, v)) g
+     where w.corretora_id = g.corretora_id and w.empresa_id = g.empresa_id and w.seguradora_id = g.seguradora_id
+       and w.competencia = g.competencia and w.origem <> 'agente';
   elsif p_tabela = 'comissao_lancamentos' then
     delete from comissao_lancamentos l using (select distinct corretora_id, pagamento_id
-                                              from jsonb_populate_recordset(null::comissao_lancamentos, p_linhas)) g
-     where l.corretora_id = g.corretora_id and l.pagamento_id = g.pagamento_id;
+                                              from jsonb_populate_recordset(null::comissao_lancamentos, v)) g
+     where l.corretora_id = g.corretora_id and l.pagamento_id = g.pagamento_id and l.excluido_em is null;
   end if;
   execute format('insert into public.%I (%s) select %s from jsonb_populate_recordset(null::public.%I, $1) on conflict (id) do update set %s',
-                 p_tabela, cols, cols, p_tabela, upd) using p_linhas;
+                 p_tabela, cols, cols, p_tabela, upd) using v;
   get diagnostics n = row_count;
   return n;
 end $function$;

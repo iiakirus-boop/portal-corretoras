@@ -12,7 +12,7 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
   const db = await cliente();
   const desde = new Date(Date.now() - 120 * 86400000).toISOString();
   const [{ data: faturas }, { data: pedidos }, { data: movs }, { data: apolices }] = await Promise.all([
-    x.veFaturas || x.veVidas ? db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false }) : Promise.resolve({ data: [] }),
+    x.veFaturas || x.veVidas ? db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null).order('competencia', { ascending: false }) : Promise.resolve({ data: [] }),
     db.from('pedidos').select('*').eq('empresa_id', e).in('status', ABERTOS).order('criado_em', { ascending: false }),
     db.from('pedidos').select('*').eq('empresa_id', e).in('tipo', ['inclusao', 'exclusao']).neq('status', 'cancelado').gte('criado_em', desde),
     db.from('apolices').select('id, seguradora_id').eq('empresa_id', e),
@@ -83,7 +83,7 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
             <ul className="rows">
               {fs.slice(0, 5).map((f) => (
                 <li key={f.id}>
-                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : f.pago_pela_comissao ? 'paga' : `${f.vencimento && f.vencimento < h ? 'venceu' : 'vence'} ${data(f.vencimento)}`}</small></div>
+                  <div><b>{competencia(f.competencia)}, {seg(f.seguradora_id)}</b><small>{f.data_pagamento ? `paga em ${data(f.data_pagamento)}` : f.pago_no_portal || f.pago_pela_comissao ? 'paga' : `${f.vencimento && f.vencimento < h ? 'venceu' : 'vence'} ${data(f.vencimento)}`}</small></div>
                   <span className="r">{moeda(f.valor_boleto ?? f.valor_total)}</span>
                 </li>
               ))}

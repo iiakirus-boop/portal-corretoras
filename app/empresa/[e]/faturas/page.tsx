@@ -10,7 +10,7 @@ export default async function Faturas({ params }: { params: Promise<{ e: string 
   const x = await exigirEmpresa(e);
   if (!x.veFaturas) redirect(`/empresa/${e}`);
   const db = await cliente();
-  const { data } = await db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false });
+  const { data } = await db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null).order('competencia', { ascending: false });
   const fs = (data ?? []) as Fatura[];
   const ano = new Date().getFullYear().toString();
   return (

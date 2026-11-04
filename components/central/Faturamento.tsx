@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   type Doc, type Item, type Linha, FAIXAS, FCOL, addMonth, brl, ckey, comissaoItens, empRows, fam, famsIn, fatItems,
-  comoPago, diasVencido, int, mesLabel, norm, pct, pdate, situacao, sum, today, uniq, vidas,
+  comoPago, diasVencido, int, mesLabel, norm, pagoPelaComissao, pct, pdate, situacao, sum, today, uniq, vidas,
 } from '@/lib/central/modelo';
 import { plural } from '@/lib/formato';
 import { Barras } from './Barras';
@@ -36,11 +36,10 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
 
   const { rows, pm } = empRows(faturas, mes);
   const tot = sum(rows, (e) => e.valor), docs = faturas.filter((f) => f.comp === mes);
-  const itM = itens.filter((r) => r.comp === mes), pagos = itM.filter((r) => situacao(r) === 'pago'), vencidos = itM.filter((r) => situacao(r) === 'vencido'), aVencer = itM.filter((r) => situacao(r) === 'avencer');
+  const itM = itens.filter((r) => r.comp === mes), pagos = itM.filter((r) => situacao(r) === 'pago'), pagosCom = pagos.filter(pagoPelaComissao), vencidos = itM.filter((r) => situacao(r) === 'vencido'), aVencer = itM.filter((r) => situacao(r) === 'avencer');
   const pIt = pm ? itens.filter((r) => r.comp === pm) : [], ptot = sum(pIt, (r) => r.valor), dl = ptot ? (tot - ptot) / ptot * 100 : 0;
   const eN = new Set(rows.map((e) => e.eid)), eP = new Set(pIt.map((r) => r.eid));
   const sN = sum(rows.filter((e) => eP.has(e.eid)), (e) => e.valor), sP = sum(pIt.filter((r) => eN.has(r.eid)), (r) => r.valor), dlS = sP ? (sN - sP) / sP * 100 : 0;
-  const nVidas = sum(rows, (e) => e.vidas);
   const pend = docs.flatMap((d) => d.pendentes || []) as { empresa: string; motivo: string }[];
   const up = docs.map((d) => d.atualizadoEm).filter(Boolean).sort().pop();
 
@@ -71,7 +70,7 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
         <div className="kpi"><span className="kpi-l">Faturado em {mesLabel(mes)}</span><span className="kpi-v">R$ {brl(tot)}</span>
           <span className="kpi-s">{pm ? <>{sinal(dlS)} nas mesmas empresas · {sinal(dl)} no total, vs {mesLabel(pm)}</> : 'primeiro mês na base'}</span></div>
         <div className="kpi"><span className="kpi-l">Pagos</span><span className="kpi-v">{pagos.length}</span>
-          <span className="kpi-s">R$ {brl(sum(pagos, (r) => r.valor))} · {rows.length} empresas, {int(nVidas)} vidas</span></div>
+          <span className="kpi-s">R$ {brl(sum(pagos, (r) => r.valor))} · {pagos.length - pagosCom.length} no portal{pagosCom.length ? `, ${pagosCom.length} pela comissão` : ''}</span></div>
         <button type="button" className={'kpi' + (vencidos.length ? ' kpi-bad' : '')} onClick={() => setFf('vencido')} aria-label="Ver boletos vencidos">
           <span className="kpi-l">Vencidos sem pagamento</span><span className="kpi-v">{vencidos.length}</span>
           <span className="kpi-s">{vencidos.length ? <>R$ {brl(sum(vencidos, (r) => r.valor))} · ver quem</> : 'nenhum'}</span></button>
@@ -196,7 +195,10 @@ function Boleto({ L, curto = false }: { L: Item[]; curto?: boolean }) {
   }
   if (a.length) return <span className="pill p-warn">{curto ? 'a vencer' : 'A vencer'}</span>;
   const como = uniq(L.map(comoPago).filter(Boolean));
-  return <><span className="pill p-ok">{curto ? 'pago' : 'Pago'}</span>{!curto && como.length === 1 && <small>{como[0]}</small>}</>;
+  // pago no portal (certo) x pago pela comissão (provável: a comissão daquela fatura caiu, o portal ainda não confirmou)
+  const soComissao = L.every(pagoPelaComissao);
+  return <><span className={'pill ' + (soComissao ? 'p-info' : 'p-ok')} title={soComissao ? 'A comissão desta fatura caiu; o portal da seguradora ainda não mostrou o pagamento' : 'O portal da seguradora mostra o boleto pago'}>
+    {curto ? (soComissao ? 'pago (comissão)' : 'pago') : (soComissao ? 'Pago pela comissão' : 'Pago no portal')}</span>{!curto && como.length === 1 && <small>{como[0]}</small>}</>;
 }
 
 function conf(r: Item): [string, string, number] {

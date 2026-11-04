@@ -1,5 +1,5 @@
 // Agente Projeção na nuvem. Roda o MESMO modelo da página Projeção da Central (public/modelo-projecao.js do site, gerado do central.html)
-// com as faturas e comissões que estão no banco, e guarda a rodada em central_docs/projecoes, como o motor_projecao.js do PC.
+// com as faturas das tabelas (central_faturas_docs) e as comissões que estão no banco, e guarda a rodada em central_docs/projecoes, como o motor_projecao.js do PC.
 // Chamado de hora em hora pelo pg_cron. A cada chamada:
 //   1. atende as ordens pendentes do agente 'projecao' (pedidas no master ou disparadas depois de uma comissão);
 //   2. se a rotina "Projeção diária" estiver ligada e ainda não houve rodada hoje (a partir das 7h de Brasília), faz a do dia.
@@ -36,7 +36,9 @@ async function docs(corretora: string, colecao: string) {
 
 // Mesma conta do motor_projecao.js do PC
 async function projetar(corretora: string, gatilho: string) {
-  const fat = (await docs(corretora, 'faturas')).map((d) => d.dados);
+  // faturas das tabelas (mesma função das telas do portal, p31); sem ela no banco, os documentos da Central
+  const tab = await db.rpc('central_faturas_docs', { p_corretora: corretora });
+  const fat = !tab.error && Array.isArray(tab.data) ? tab.data : (await docs(corretora, 'faturas')).map((d) => d.dados);
   const com = (await docs(corretora, 'comissoes')).map((d) => d.dados);
   const agcfg: Record<string, unknown> = {};
   for (const d of await docs(corretora, 'agenciamentos')) agcfg[d.doc_id] = d.dados;

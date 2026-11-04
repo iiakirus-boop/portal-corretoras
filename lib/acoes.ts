@@ -155,6 +155,41 @@ export async function repetirOrdem(f: FormData) {
   volta(de, 'ok', 'Colocada de novo na fila, na frente das outras.');
 }
 
+// ---- logins nas seguradoras (corretora_codigos) ----
+// Um login por linha. Os agentes leem esta lista (agente_cadastro): login novo entra sem mexer no código.
+// A senha nunca vem para o site: fica no cofre do PC (atalho "Entrar na <seguradora>") ou nos segredos da nuvem.
+export async function salvarLogin(f: FormData) {
+  const c = txt(f, 'corretora_id');
+  const de = `/master/corretoras/${c}`;
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master cadastra logins.');
+  const seguradora = txt(f, 'seguradora_id'), codigo = txt(f, 'codigo').replace(/\s+/g, '');
+  if (!seguradora || !codigo) volta(de, 'erro', 'Escolha a seguradora e escreva o código do login.');
+  if (!/^[0-9A-Za-z_-]+$/.test(codigo)) volta(de, 'erro', 'O código do login só pode ter letras, números, - e _.');
+  const db = await cliente();
+  const { error } = await db.from('corretora_codigos').insert({
+    corretora_id: c, seguradora_id: seguradora, codigo, rotulo: txt(f, 'rotulo') || null,
+    pasta_arquivos: txt(f, 'pasta') || null, prefixo_ordem: txt(f, 'prefixo') || null,
+    uso: ['faturas', 'comissao'].includes(txt(f, 'uso')) ? txt(f, 'uso') : 'ambos', ativo: true,
+  });
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath(de);
+  volta(de, 'ok', `Login ${codigo} cadastrado. No PC, clique em "Entrar na seguradora" uma vez para guardar a senha dele; o vigia já passa a conferir este login.`);
+}
+
+export async function alternarLogin(f: FormData) {
+  const c = txt(f, 'corretora_id');
+  const de = `/master/corretoras/${c}`;
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master liga e para logins.');
+  const ligar = txt(f, 'ligar') === '1';
+  const db = await cliente();
+  const { error } = await db.from('corretora_codigos').update({ ativo: ligar }).eq('id', txt(f, 'id')).eq('corretora_id', c);
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath(de);
+  volta(de, 'ok', ligar ? 'Login ligado: os agentes voltam a usar.' : 'Login parado: os agentes deixam de usar até você ligar de novo.');
+}
+
 // ---- corretora ----
 export async function criarEmpresa(f: FormData) {
   const c = txt(f, 'corretora_id');
@@ -275,4 +310,134 @@ export async function aprovarPedido(f: FormData) {
   if (error) volta(de, 'erro', traduzir(error.message));
   revalidatePath(de);
   volta(de, 'ok', 'Pedido aprovado e enviado para a corretora.');
+}
+
+// ---- master: corrigir dados ----
+// Excluir nunca apaga: marca o registro (some das telas e da Conferência) e guarda em exclusoes, para o PC
+// não trazer de volta na próxima sincronização e para dar para desfazer.
+const TABELAS_EXCLUIVEIS = ['faturas', 'comissao_lancamentos'] as const;
+const deCorrigir = (f: FormData) => txt(f, 'de') || '/master/corrigir';
+
+export async function excluirRegistro(f: FormData) {
+  const de = deCorrigir(f);
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master exclui.');
+  const tabela = txt(f, 'tabela') as (typeof TABELAS_EXCLUIVEIS)[number];
+  if (!TABELAS_EXCLUIVEIS.includes(tabela)) volta(de, 'erro', 'Tipo de registro não pode ser excluído.');
+  const id = txt(f, 'id');
+  const motivo = txt(f, 'motivo') || null;
+  const db = await cliente();
+  const { data: r } = await db.from(tabela).select('id, corretora_id').eq('id', id).maybeSingle();
+  if (!r) volta(de, 'erro', 'Registro não encontrado.');
+  const agora = new Date().toISOString();
+  const { error: e1 } = await db.from('exclusoes').upsert({
+    tabela, registro_id: id, corretora_id: r.corretora_id, resumo: txt(f, 'resumo') || null, motivo,
+    excluido_por: s.userId, excluido_em: agora, desfeito_em: null, desfeito_por: null,
+  });
+  if (e1) volta(de, 'erro', traduzir(e1.message));
+  const { error } = await db.from(tabela).update({ excluido_em: agora, excluido_por: s.userId, excluido_motivo: motivo }).eq('id', id);
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath('/', 'layout');
+  volta(de, 'ok', `${tabela === 'faturas' ? 'Fatura excluída' : 'Lançamento excluído'}. Se foi engano, desfaça em "Excluídos".`);
+}
+
+export async function desfazerExclusao(f: FormData) {
+  const de = deCorrigir(f);
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master desfaz exclusões.');
+  const tabela = txt(f, 'tabela') as (typeof TABELAS_EXCLUIVEIS)[number];
+  if (!TABELAS_EXCLUIVEIS.includes(tabela)) volta(de, 'erro', 'Tipo de registro inválido.');
+  const id = txt(f, 'id');
+  const db = await cliente();
+  const { error: e1 } = await db.from('exclusoes').update({ desfeito_em: new Date().toISOString(), desfeito_por: s.userId })
+    .eq('tabela', tabela).eq('registro_id', id);
+  if (e1) volta(de, 'erro', traduzir(e1.message));
+  const { error } = await db.from(tabela).update({ excluido_em: null, excluido_por: null, excluido_motivo: null }).eq('id', id);
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath('/', 'layout');
+  volta(de, 'ok', 'Exclusão desfeita. O registro voltou para as telas.');
+}
+
+// Aviso da Conferência que é normal (empresa cancelada, fatura que sai depois...): não volta mais
+export async function ignorarAviso(f: FormData) {
+  const de = deCorrigir(f);
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master resolve avisos.');
+  const db = await cliente();
+  const agora = new Date().toISOString();
+  const { error } = await db.from('conferencias').update({ ignorada_em: agora, ignorada_por: s.userId, resolvida_em: agora, nota: txt(f, 'nota') || null })
+    .eq('id', txt(f, 'id'));
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath('/master', 'layout');
+  volta(de, 'ok', 'Aviso marcado como normal. Ele não volta nas próximas conferências.');
+}
+
+export async function reabrirAviso(f: FormData) {
+  const de = deCorrigir(f);
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master reabre avisos.');
+  const db = await cliente();
+  const { error } = await db.from('conferencias').update({ ignorada_em: null, ignorada_por: null, resolvida_em: null, nota: null }).eq('id', txt(f, 'id'));
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath('/master', 'layout');
+  volta(de, 'ok', 'Aviso reaberto.');
+}
+
+// "Comissão sem empresa": liga o nome que vem no extrato a uma empresa do cadastro. Vale para os lançamentos
+// que já estão no banco e para os que vierem nas próximas sincronizações (tabela apelidos_empresa).
+export async function ligarEmpresa(f: FormData) {
+  const de = deCorrigir(f);
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master liga empresas.');
+  const empresa = txt(f, 'empresa_id');
+  if (!empresa) volta(de, 'erro', 'Escolha a empresa.');
+  const db = await cliente();
+  const { data: cf } = await db.from('conferencias').select('id, corretora_id, seguradora_id, chave').eq('id', txt(f, 'id')).maybeSingle();
+  if (!cf || !cf.seguradora_id) volta(de, 'erro', 'Aviso não encontrado.');
+  const segurado = String(cf.chave).slice(String(cf.seguradora_id).length + 1);
+  if (!segurado) volta(de, 'erro', 'O extrato não traz o nome do segurado neste aviso.');
+  const { error: e1 } = await db.from('apelidos_empresa').upsert({
+    corretora_id: cf.corretora_id, seguradora_id: cf.seguradora_id, segurado, empresa_id: empresa, criado_por: s.userId,
+  });
+  if (e1) volta(de, 'erro', traduzir(e1.message));
+  const { data: pags } = await db.from('comissao_pagamentos').select('id').eq('corretora_id', cf.corretora_id).eq('seguradora_id', cf.seguradora_id);
+  const ids = ((pags ?? []) as { id: string }[]).map((p) => p.id);
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error } = await db.from('comissao_lancamentos').update({ empresa_id: empresa })
+      .eq('corretora_id', cf.corretora_id).eq('segurado', segurado).is('empresa_id', null).in('pagamento_id', ids.slice(i, i + 200));
+    if (error) volta(de, 'erro', traduzir(error.message));
+  }
+  // o mesmo nome pode ter aviso em várias competências: todos se resolvem
+  await db.from('conferencias').update({ resolvida_em: new Date().toISOString() })
+    .eq('corretora_id', cf.corretora_id).eq('tipo', 'comissao_sem_empresa').eq('chave', cf.chave).is('resolvida_em', null);
+  revalidatePath('/', 'layout');
+  volta(de, 'ok', `"${segurado}" ligado à empresa. Os próximos extratos já chegam ligados.`);
+}
+
+// Tira do histórico do master uma execução velha (erro antigo, teste). Não desfaz o que ela gravou.
+export async function ocultarOrdem(f: FormData) {
+  const de = txt(f, 'de') || '/master/agentes';
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master tira execuções do histórico.');
+  const db = await cliente();
+  const { error } = await db.from('ordens_execucao').update({ oculta_em: new Date().toISOString() })
+    .eq('id', txt(f, 'id')).in('status', ['concluida', 'erro', 'cancelada', 'aguardando_voce']);
+  if (error) volta(de, 'erro', traduzir(error.message));
+  // se estava esperando você, deixa de esperar
+  await db.from('ordens_execucao').update({ status: 'cancelada', mensagem: 'Tirada do histórico pelo master' }).eq('id', txt(f, 'id')).eq('status', 'aguardando_voce');
+  revalidatePath('/master', 'layout');
+  volta(de, 'ok', 'Execução tirada do histórico.');
+}
+
+// Empresa que saiu da carteira ou foi cadastrada errado: desativa (some das listas, os dados ficam)
+export async function alternarEmpresa(f: FormData) {
+  const de = txt(f, 'de') || '/master/corretoras';
+  const s = await exigirSessao();
+  if (!ehMaster(s)) volta(de, 'erro', 'Só o master desativa empresas.');
+  const ativar = txt(f, 'ativar') === '1';
+  const db = await cliente();
+  const { error } = await db.from('empresas').update({ ativa: ativar }).eq('id', txt(f, 'id'));
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath('/', 'layout');
+  volta(de, 'ok', ativar ? 'Empresa reativada.' : 'Empresa desativada. Os dados dela continuam guardados.');
 }
