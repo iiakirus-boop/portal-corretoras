@@ -12,7 +12,7 @@ export default async function InicioEmpresa({ params }: { params: Promise<{ e: s
   const db = await cliente();
   const desde = new Date(Date.now() - 120 * 86400000).toISOString();
   const [{ data: faturas }, { data: pedidos }, { data: movs }, { data: apolices }] = await Promise.all([
-    x.veFaturas || x.veVidas ? db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false }) : Promise.resolve({ data: [] }),
+    x.veFaturas || x.veVidas ? db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null).order('competencia', { ascending: false }) : Promise.resolve({ data: [] }),
     db.from('pedidos').select('*').eq('empresa_id', e).in('status', ABERTOS).order('criado_em', { ascending: false }),
     db.from('pedidos').select('*').eq('empresa_id', e).in('tipo', ['inclusao', 'exclusao']).neq('status', 'cancelado').gte('criado_em', desde),
     db.from('apolices').select('id, seguradora_id').eq('empresa_id', e),

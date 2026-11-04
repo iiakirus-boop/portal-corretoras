@@ -124,6 +124,15 @@ class Consulta implements PromiseLike<Resultado> {
   }
   insert(v: Linha | Linha[]) { this.modo = 'insert'; this.valores = v; return this; }
   update(v: Linha) { this.modo = 'update'; this.valores = v; return this; }
+  // grava ou atualiza pela chave da tabela (como o upsert do banco)
+  upsert(v: Linha) {
+    const chaves: Record<string, string[]> = { exclusoes: ['tabela', 'registro_id'], apelidos_empresa: ['corretora_id', 'seguradora_id', 'segurado'] };
+    const k = chaves[this.tabela] ?? ['id'];
+    const existe = bancoDemo()[this.tabela]?.find((r) => k.every((c) => r[c] === v[c]));
+    if (!existe) return this.insert(v);
+    for (const c of k) this.eq(c, v[c]);
+    return this.update(v);
+  }
   eq(c: string, v: any) { this.filtros.push((r) => r[c] === v); return this; }
   neq(c: string, v: any) { this.filtros.push((r) => r[c] !== v); return this; }
   in(c: string, vs: any[]) { this.filtros.push((r) => vs.includes(r[c])); return this; }
