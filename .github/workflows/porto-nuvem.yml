@@ -11,8 +11,10 @@ on:
       competencia:
         description: 'Competência das faturas (AAAA-MM). Vazio = regra do Supervisor (mês atual até o dia 19, seguinte a partir do 20)'
         required: false
-  schedule:
-    - cron: '30 11 * * 1-5'   # 08:30 de Brasília, segunda a sexta
+  # horário desligado em 04/11/2026: a Porto recusou o login vindo do servidor do GitHub ("Por motivos de segurança, não
+  # conseguimos validar seu acesso"). Tentar todo dia arrisca bloquear o login. Só roda manual até decidir onde rodar.
+  # schedule:
+  #   - cron: '30 11 * * 1-5'   # 08:30 de Brasília, segunda a sexta
 
 concurrency:
   group: porto-nuvem
