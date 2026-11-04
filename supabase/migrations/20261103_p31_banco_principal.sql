@@ -89,7 +89,11 @@ returns jsonb language sql stable set search_path to 'public' as $$
     select f.*, e.codigo_interno, e.razao_social
       from faturas f join empresas e on e.id = f.empresa_id
      where f.corretora_id = p_corretora and f.vencimento is not null and f.excluido_em is null
-       and f.competencia >= coalesce(p_desde, to_char(now() - interval '18 months', 'YYYY-MM'))),
+       -- sem p_desde: desde o mês mais antigo que a Central já mostrava (as telas e a Projeção seguem iguais);
+       -- corretora sem Central: últimos 18 meses
+       and f.competencia >= coalesce(p_desde,
+             (select min(split_part(d.doc_id, '_', 1)) from central_docs d where d.corretora_id = p_corretora and d.colecao = 'faturas'),
+             to_char(now() - interval '18 months', 'YYYY-MM'))),
   v as (
     select fatura_id, subestipulante as sub, count(*) as linhas, count(*) filter (where situacao = 'Ativo') as ativos,
            round(sum(coalesce(valor_total, coalesce(premio_base, 0) + coalesce(pro_rata, 0) + coalesce(copart_total, 0))), 2) as soma
