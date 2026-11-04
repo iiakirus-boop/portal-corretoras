@@ -1,4 +1,4 @@
--- p28 (2026-11-03): a corretora de demonstração (contas de venda, dados fictícios) fica fora do Supervisor.
+-- p32 (2026-11-04): a corretora de demonstração (contas de venda, dados fictícios) fica fora do Supervisor.
 -- Sem isto, o Supervisor veria "faturas atrasadas" na demonstração e mandaria os agentes do PC entrarem
 -- nos portais das seguradoras por ela. A marca é config_agentes.demo = true na tabela corretoras.
 -- Mesma view da p27, só com o filtro novo (create or replace, sem drop).

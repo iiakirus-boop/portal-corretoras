@@ -480,11 +480,34 @@ commit;
 const remover = `-- Remove a corretora de demonstração "${CORRETORA.nome}" e tudo que é dela. Não toca em nenhuma outra corretora.
 begin;
 ${['downloads where documento_id in (select id from documentos where corretora_id = $C)', 'documentos', 'pedido_eventos', 'pedidos', 'conferencias', 'ordens_execucao', 'rotinas', 'projecao_itens', 'projecao_rodadas',
-  'central_docs', 'comissao_lancamentos', 'comissao_pagamentos', 'vidas', 'faturas', 'subestipulantes', 'apolices', 'convites', 'membros', 'empresas', 'corretora_codigos', 'corretora_cnpjs', 'corretoras']
+  'exclusoes', 'apelidos_empresa', 'faturas_situacao_portal', 'central_eid', 'cobranca_fechamentos', 'execucoes', 'central_docs', 'comissao_lancamentos', 'comissao_pagamentos', 'vidas', 'faturas', 'subestipulantes', 'apolices', 'convites', 'membros', 'empresas', 'corretora_codigos', 'corretora_cnpjs', 'corretoras']
   .map((t) => t.includes(' where ') ? `delete from ${t.replace('$C', `'${CID}'`)};` : `delete from ${t} where ${t === 'corretoras' ? 'id' : 'corretora_id'} = '${CID}';`).join('\n')}
 commit;
 `;
 fs.writeFileSync(path.join(SAIDA, 'demo_vendas_carga.sql'), sql);
+// A mesma carga em JSON (sem os convites, que têm e-mails), para o banco buscar por endereço (pg_net) quando o SQL
+// é grande demais para colar: demo_vendas_carga_via_url.sql lê o JSON de net._http_response e insere na mesma ordem.
+const ORDEM = [
+  ['corretoras', [{ id: CID, nome: CORRETORA.nome, razao_social: CORRETORA.razao_social, cnpj: CORRETORA.cnpj, slug: CORRETORA.slug, cor_primaria: CORRETORA.cor_primaria,
+    ativa: true, contrato: { demo: true, observacao: 'conta de demonstração, sem mensalidade' }, config_agentes: config }]],
+  ['corretora_cnpjs', [{ cnpj: CORRETORA.cnpj, corretora_id: CID, razao_social: CORRETORA.razao_social, principal: true }]],
+  ['empresas', T.empresas], ['apolices', T.apolices], ['faturas', T.faturas], ['vidas', T.vidas], ['comissao_pagamentos', T.comissao_pagamentos],
+  ['comissao_lancamentos', T.comissao_lancamentos], ['central_docs', docsLinhas], ['pedidos', T.pedidos], ['conferencias', T.conferencias],
+];
+fs.writeFileSync(path.join(SAIDA, 'demo_vendas_carga.json'), JSON.stringify(Object.fromEntries([...ORDEM, ['pedido_eventos', T.pedido_eventos]])));
+const viaUrl = `-- Carga da demonstração a partir do JSON buscado pelo banco. Antes: select net.http_get('<endereço do demo_vendas_carga.json>');
+-- e troque :ID pelo número que voltou. Só insere (on conflict do nothing).
+begin;
+create temporary table _demo on commit drop as select content::jsonb as j from net._http_response where id = :ID and status_code = 200;
+${ORDEM.map(([t, linhas]) => { const cols = Object.keys(linhas[0]).join(', ');
+  return `insert into ${t} (${cols}) select ${cols} from jsonb_populate_recordset(null::${t}, (select j->'${t}' from _demo)) on conflict do nothing;`; }).join('\n')}
+insert into pedido_eventos (pedido_id, corretora_id, em, autor_agente, de_status, para_status, mensagem, visivel_empresa)
+select v.pedido_id, v.corretora_id, v.em, v.autor_agente, v.de_status, v.para_status, v.mensagem, v.visivel_empresa
+  from jsonb_populate_recordset(null::pedido_eventos, (select j->'pedido_eventos' from _demo)) v
+ where not exists (select 1 from pedido_eventos x where x.pedido_id = v.pedido_id and x.mensagem = v.mensagem);
+${inserts('convites', T.convites)}commit;
+`;
+fs.writeFileSync(path.join(SAIDA, 'demo_vendas_carga_via_url.sql'), viaUrl);
 // cópia dos documentos da Central em pastas, para ver as telas no modo demonstração do site sem banco:
 //   CENTRAL_DEMO_DIR=<saída>/central npm run dev   (entra como a administradora da Shaddai no seletor de perfil)
 for (const [col, ds] of Object.entries(CD)) {
@@ -495,7 +518,7 @@ fs.writeFileSync(path.join(SAIDA, 'demo_vendas_remover.sql'), remover);
 const atualizar = `-- Atualiza a demonstração "${CORRETORA.nome}" para a data desta geração (${br(HOJE)}): apaga só os dados que andam com o tempo
 -- (faturas, vidas, comissões, Central, pedidos, conferências) e carrega de novo. Corretora, empresas, contratos e logins ficam.
 begin;
-${['pedido_eventos', 'pedidos', 'conferencias', 'ordens_execucao', 'central_docs', 'comissao_lancamentos', 'comissao_pagamentos', 'vidas', 'faturas']
+${['pedido_eventos', 'pedidos', 'conferencias', 'ordens_execucao', 'exclusoes', 'faturas_situacao_portal', 'central_docs', 'comissao_lancamentos', 'comissao_pagamentos', 'vidas', 'faturas']
   .map((t) => `delete from ${t} where corretora_id = '${CID}';`).join('\n')}
 commit;
 `;
