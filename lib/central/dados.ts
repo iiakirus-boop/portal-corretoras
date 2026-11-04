@@ -4,15 +4,34 @@ import { centralDemo } from './demo';
 import { pedidosComoTarefas } from './pedidos';
 import { type Doc, aberto } from './modelo';
 
-// Documentos da Central (tabela central_docs) de várias coleções de uma vez, já separados por coleção.
-// O banco entrega no máximo 1000 linhas por vez: busca em páginas até acabar.
+// Faturas das TABELAS (faturas + vidas + empresas), no mesmo formato dos documentos da Central: um número só em
+// todo lugar (função central_faturas_docs do banco, p31; a Projeção da nuvem usa a mesma). Sem a função no banco
+// ainda, devolve null e a tela segue com os documentos da Central.
+export async function faturasDasTabelas(db: Cliente, c: string): Promise<Doc[] | null> {
+  const { data, error } = await db.rpc('central_faturas_docs', { p_corretora: c });
+  if (error || !Array.isArray(data)) return null;
+  const docs = data as Doc[];
+  // o que o agente anotou no documento do mês (faturas que faltaram, mês ainda parcial) continua valendo
+  const { data: notas } = await db.from('central_docs').select('doc_id,pendentes:dados->pendentes,parcial:dados->parcial')
+    .eq('corretora_id', c).eq('colecao', 'faturas');
+  type Nota = { doc_id: string; pendentes: unknown; parcial: unknown };
+  const nm = new Map(((notas ?? []) as unknown as Nota[]).map((n) => [n.doc_id, n]));
+  for (const d of docs) { const n = nm.get(d.id); if (n) { d.pendentes = n.pendentes ?? []; d.parcial = n.parcial ?? false; } }
+  return docs;
+}
+
+// Documentos da Central de várias coleções de uma vez, já separados por coleção. As faturas vêm das tabelas;
+// o resto, da tabela central_docs. O banco entrega no máximo 1000 linhas por vez: busca em páginas até acabar.
 export async function docsCentral(db: Cliente, c: string, cols: string[]): Promise<Record<string, Doc[]>> {
   const out: Record<string, Doc[]> = Object.fromEntries(cols.map((col) => [col, []]));
+  const tab = !MODO_DEMO && cols.includes('faturas') ? await faturasDasTabelas(db, c) : null;
+  const doCentral = tab ? cols.filter((col) => col !== 'faturas') : cols;
+  if (tab) out.faturas = tab;
   if (MODO_DEMO) {
     for (const col of cols) out[col] = Object.entries(centralDemo(c)[col] ?? {}).map(([id, dados]) => ({ ...(dados as object), id }));
-  } else for (let de = 0; ; de += 1000) {
+  } else if (doCentral.length) for (let de = 0; ; de += 1000) {
     const { data, error } = await db.from('central_docs').select('colecao,doc_id,dados')
-      .eq('corretora_id', c).in('colecao', cols).order('colecao').order('doc_id').range(de, de + 999);
+      .eq('corretora_id', c).in('colecao', doCentral).order('colecao').order('doc_id').range(de, de + 999);
     if (error) throw new Error(error.message);
     for (const r of data ?? []) out[r.colecao].push({ ...(r.dados ?? {}), id: r.doc_id });
     if (!data || data.length < 1000) break;
