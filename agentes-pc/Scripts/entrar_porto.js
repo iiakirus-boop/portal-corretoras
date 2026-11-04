@@ -18,7 +18,8 @@ async function entrarPorto(page, { usuario, senha, cod, susep = 'BA6QXJ', espera
   const campoSusep = page.locator('#susepsAutocomplete');
   const apareceu = await campoSusep.waitFor({ state: 'visible', timeout: esperaHumano }).then(() => true, () => false);
   if (!apareceu) {
-    const captcha = await page.locator('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], [class*=captcha i]').count();
+    // só conta como captcha o desafio aberto na tela (o selo invisível do reCAPTCHA fica em toda página de login)
+    const captcha = await page.locator('iframe[src*="recaptcha"][src*="bframe"], iframe[src*="hcaptcha"][src*="challenge"]').filter({ visible: true }).count();
     throw new Error(captcha ? 'captcha' : 'a tela da SUSEP não apareceu depois do CPF e senha');
   }
   await campoSusep.click();
