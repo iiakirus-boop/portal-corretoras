@@ -293,7 +293,7 @@ async function comissao(ini, fim, saida) {
     aba = page;
     // sem pessoa para resolver: captcha ou código pedido = código 3 (login), com o motivo
     try { await entrarPorto(page, { usuario: process.env.PORTO_USER, senha: process.env.PORTO_PASS, cod: process.env.PORTO_COD,
-      susep: process.env.PORTO_SUSEP || 'BA6QXJ', esperaHumano: 30000 }); }
+      susep: process.env.PORTO_SUSEP || 'BA6QXJ', esperaHumano: 50000 }); } // < 60 s: código pedido sem PORTO_COD vira 'codigo'
     catch (e) {
       e.aba = aba;
       if (/^(captcha|codigo)$|validar seu acesso|login não terminou|SUSEP não apareceu/.test(e.message)) { e.detalhe = e.message; e.message = 'login'; }
