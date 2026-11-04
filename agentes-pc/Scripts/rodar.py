@@ -10,10 +10,12 @@ Uso (dentro de FATURAS\\Scripts):
   python rodar.py vidas [<Operadora>]
 
 O que cada um faz:
-  faturas  : confere que a base está fechada -> backup -> lê os arquivos (faturas_<op>.py) -> grava (gravar_<op>.py)
+  faturas  : lê os arquivos (faturas_<op>.py) -> Porto/Bradesco/Hapvida: GRAVA NO BANCO (gravar_banco.py, a base principal)
+             -> cópia na planilha: confere que ela está fechada -> backup -> gravar_<op>.py
              -> Porto/Bradesco: painel_<op>.py (faturas e comissões da Central; Porto + painel_subs.py)
              -> Agente Vidas (vidas.py gravar, vidas_central.py, vidas_lista_central.py <Op>) -> lista o que subir na Central.
-  comissao : confere que a base está fechada -> backup -> comissao_<op>.py -> Porto/Bradesco: painel_<op>.py
+  comissao : Porto/Bradesco: GRAVA NO BANCO (gravar_banco.py) -> cópia na planilha: confere que ela está fechada
+             -> backup -> comissao_<op>.py -> Porto/Bradesco: painel_<op>.py
              -> lembra de rodar o Agente Projeção.
   vidas    : só a sequência do Agente Vidas (as três etapas).
   --simular: roda numa cópia temporária (base e scripts) e mostra o resultado, sem tocar na base nem no painel.
@@ -54,6 +56,38 @@ class Parou(Exception):
 
 # teste de fumaça (fumaca.py): o que não bateu nesta rodada. Com algo aqui, a rodada termina como "erro" no master.
 PROBLEMAS = []
+# avisos que vão na mensagem do master sem virar erro (ex.: planilha aberta no Excel, banco já gravado)
+NOTAS = []
+# operadoras que gravam direto no banco (gravar_banco.py); as outras seguem planilha -> sincronizar.py
+DIRETO_FATURAS = ('porto', 'bradesco', 'hapvida')
+DIRETO_COMISSAO = ('porto', 'bradesco')
+
+
+def no_banco(tipo, op, *args):
+    """Grava direto no banco (base principal). Devolve True se gravou; sem rede/token, avisa e a planilha segue como antes."""
+    print(f'\n== Gravação no banco ({tipo} {op})', flush=True)
+    r = subprocess.run([PY, 'gravar_banco.py', tipo, op, *args], cwd=AQUI, stdout=subprocess.PIPE, text=True,
+                       encoding='utf-8', errors='replace', env={**os.environ, 'PYTHONIOENCODING': 'utf-8', 'PYTHONUTF8': '1'})
+    print(r.stdout, end='', flush=True)
+    try:
+        res = json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        res = {}
+    if r.returncode or 'erro' in res:
+        NOTAS.append(f'Banco não gravado direto ({res.get("erro") or "código " + str(r.returncode)}); vai pela planilha.')
+        return False
+    pend = res.get('pendencias') or []
+    if pend:
+        NOTAS.append(f'{len(pend)} fatura(s) sem cadastro no banco: ' + ', '.join(str(p.get('numero')) for p in pend[:8]) + '.')
+    if tipo == 'faturas':
+        NOTAS.append(f'Banco: {res.get("gravadas", 0)} fatura(s) nova(s), {res.get("atualizadas", 0)} atualizada(s), {res.get("vidas", 0)} vidas.')
+    else:
+        NOTAS.append(f'Banco: {res.get("ordens", 0)} ordem(ns), {res.get("lancamentos", 0)} lançamento(s).')
+    return True
+
+
+def planilha_aberta():
+    return os.path.exists(os.path.join(FAT, '~$Base_Faturas_Vidas.xlsx'))
 
 
 def mes_antes(comp, k=1):
@@ -168,7 +202,8 @@ def faturas(args):
     entrada = entrada or (os.path.join(ENTRADA, pasta) if pasta else None)
     if not entrada:
         raise Parou('Bradesco: passe a pasta dos kits em PDF com --entrada <pasta>.')
-    base_fechada()
+    if op not in DIRETO_FATURAS or simular:
+        base_fechada()
     js = os.path.join(AQUI, f'_ultimo_{op}.json')
     inicio = datetime.datetime.now().timestamp()
     if op == 'porto' and not simular and '--sem-baixar' not in args:
@@ -217,8 +252,14 @@ def faturas(args):
         if PROBLEMAS:
             print('Teste da rodada com problema:\n  ' + '\n  '.join(PROBLEMAS))
         return
+    direto = op in DIRETO_FATURAS and no_banco('faturas', op, js)
+    if direto and planilha_aberta():
+        # o banco (base principal) já tem tudo; a cópia na planilha fica para a próxima rodada
+        NOTAS.append('Planilha aberta no Excel: a cópia na planilha não foi feita (o banco está completo).')
+        return
+    base_fechada()
     backup(rotulo, data)
-    etapa(f'Gravação {nome}', [PY, f'gravar_{op}.py', js, BASE, BASE] + pasta_fat + [data], saida=gravou)
+    etapa(f'Gravação {nome}' + (' (cópia na planilha)' if direto else ''), [PY, f'gravar_{op}.py', js, BASE, BASE] + pasta_fat + [data], saida=gravou)
     mostrar_gravacao(op, lidas, gravou)
     painel_central(op, comp)
     vidas(nome if op != 'bradesco' else None)
@@ -247,7 +288,8 @@ def comissao(args):
         raise Parou('Passe os arquivos (ou as pastas, na Hapvida) do extrato.')
     if op == 'porto' and not comp:
         raise Parou('Porto: passe a competência do extrato com --comp AAAA-MM.')
-    base_fechada()
+    if op not in DIRETO_COMISSAO or simular:
+        base_fechada()
     porto = [comp] if op == 'porto' else []
     if simular:
         tmp = caixa_de_areia()
@@ -259,8 +301,13 @@ def comissao(args):
             shutil.rmtree(tmp, ignore_errors=True)
         print('\nSimulação concluída. Nada foi gravado. Para gravar, rode de novo sem --simular.')
         return
+    direto = op in DIRETO_COMISSAO and no_banco('comissao', op, *arqs, *(['--comp', comp] if comp else []))
+    if direto and planilha_aberta():
+        NOTAS.append('Planilha aberta no Excel: a cópia na planilha não foi feita (o banco está completo).')
+        return
+    base_fechada()
     backup(COMISSAO[op], datetime.date.today().isoformat())
-    etapa(f'Comissão {op}', [PY, f'comissao_{op}.py', BASE] + porto + arqs)
+    etapa(f'Comissão {op}' + (' (cópia na planilha)' if direto else ''), [PY, f'comissao_{op}.py', BASE] + porto + arqs)
     painel_central(op)
     print('\nPronto. Próximo passo obrigatório: Agente Projeção (comissão e projeção conferem uma à outra).')
 
@@ -290,13 +337,13 @@ def main():
         print(f'\nPARADO: {e}')
         if not simular:
             publicar_painel(inicio)  # o que já foi gravado na base antes de parar também vai para a Central
-            banco.fim(ordem, 'aguardando_voce' if 'aberta no Excel' in str(e) else 'erro', str(e))
+            banco.fim(ordem, 'aguardando_voce' if 'aberta no Excel' in str(e) else 'erro', ' '.join([str(e)] + NOTAS))
         sys.exit(1)
     if not simular:
         pain = publicar_painel(inicio)
         # portal (empresa e master): faturas, vidas e comissões iguais à base. Se falhar, só avisa.
         sinc = subprocess.run([PY, 'sincronizar.py'], cwd=AQUI).returncode
-        nota = f'{len(pain)} arquivo(s) do painel atualizados.' + ('' if sinc == 0 else ' Portal não sincronizado: rode sincronizar.py.')
+        nota = ' '.join(NOTAS + [f'{len(pain)} arquivo(s) do painel atualizados.']) + ('' if sinc == 0 else ' Cópia da planilha não sincronizada: rode sincronizar.py.')
         if PROBLEMAS:  # teste de fumaça: o que deu para gravar foi gravado, mas a rodada não está completa
             print('\nTESTE DA RODADA COM PROBLEMA:\n  ' + '\n  '.join(PROBLEMAS))
             banco.fim(ordem, 'erro', 'Teste da rodada: ' + ' | '.join(PROBLEMAS) + ' ' + nota)

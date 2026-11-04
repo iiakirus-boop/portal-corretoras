@@ -6,3 +6,4 @@ tsconfig.tsbuildinfo
 agentes-pc/Scripts/_cadastro.json
 agentes-pc/Scripts/_socorro/
 agentes-nuvem/__pycache__/
+__pycache__/
