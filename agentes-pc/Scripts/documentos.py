@@ -12,7 +12,7 @@ colunas U (fatura) e W (boleto) para a função agente-arquivo, que guarda no bu
 à fatura. Só envia o que falta: rodar de novo não duplica. Só lê a planilha; nunca grava nela.
 Sem rede ou sem token, avisa e segue.
 """
-import datetime, json, os, sys, urllib.error, urllib.parse, urllib.request
+import datetime, json, os, re, sys, urllib.error, urllib.parse, urllib.request
 import banco
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -57,6 +57,9 @@ def _bradesco_portal(rel):
         return None
     fim = f'_{comp[5:]}{comp[:4]}.pdf'
     achou = [f for f in os.listdir(pasta) if f.lower().endswith(fim) and f'_{apolice}_' in f]
+    sub = re.search(r' SUB0*(\d+) ', partes[-1])  # várias subfaturas: o 3º número do nome do portal é a SUB
+    if len(achou) > 1 and sub:
+        achou = [f for f in achou if f'_{apolice}_{sub.group(1)}_' in f]
     return os.path.join(pasta, achou[0]) if len(achou) == 1 else None
 
 
