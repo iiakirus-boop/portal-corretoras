@@ -1,10 +1,14 @@
-# Entrar na Hapvida (comissao): na 1a vez pede usuario e senha de cada login do webhap (045K, 045L, 02JZ) nesta janela e guarda
+# Entrar na Hapvida (comissao): na 1a vez pede usuario e senha de cada login do webhap nesta janela e guarda
 # criptografados (so o seu usuario do Windows abre). Enter no usuario pula aquele login.
 # Os logins de FATURAS (Portal Empresa) sao outros: cadastre no atalho "Cadastrar login Hapvida"; o baixar_hapvida.js entra sozinho.
 # Para trocar uma senha: apague %LOCALAPPDATA%\Shaddai\hapvida_<login>.cred e rode de novo.
 $dir = Join-Path $env:LOCALAPPDATA 'Shaddai'
 New-Item -ItemType Directory -Force $dir | Out-Null
-foreach ($l in '045K', '045L', '02JZ') {
+# Os logins vem do cadastro do banco (master > corretora; hoje 045K, 045L e 02JZ): login novo cadastrado la aparece aqui sozinho.
+$lista = (node (Join-Path $PSScriptRoot 'logins.js') portal hapvida comissao)
+if (-not $lista) { $lista = '045K:9335,045L:9336,02JZ:9337' }
+$env:HAP_LOGINS = $lista
+foreach ($l in ($lista -split ',' | ForEach-Object { ($_ -split ':')[0] })) {
   $arq = Join-Path $dir "hapvida_$l.cred"
   if (-not (Test-Path $arq)) {
     Write-Host "Primeira vez: digite o login $l do webhap (fica guardado criptografado). Enter no usuario pula."

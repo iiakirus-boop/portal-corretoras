@@ -63,6 +63,70 @@ def fila():
     return _rpc('agente_fila', dict(p_corretora=CORRETORA)) or {'ordens': [], 'rotinas': []}
 
 
+CACHE_CADASTRO = os.path.join(AQUI, '_cadastro.json')
+# só para o PC continuar de pé na 1ª vez sem rede (sem _cadastro.json ainda); o cadastro de verdade é o do banco
+LOGINS_PADRAO = [
+    dict(seguradora='porto_saude', codigo='BA6QXJ', pasta='PortoSaude', porta=9334, uso='ambos'),
+    dict(seguradora='bradesco_saude', codigo='Portal', pasta=None, porta=9333, uso='ambos'),
+    dict(seguradora='hapvida', codigo='045K', pasta='Hapvida', prefixo_ordem='HAP-', porta=9335, uso='comissao'),
+    dict(seguradora='hapvida', codigo='045L', pasta='Hapvida_045L', prefixo_ordem='HAP-', porta=9336, uso='comissao'),
+    dict(seguradora='hapvida', codigo='02JZ', pasta='Hapvida_02JZ', prefixo_ordem='HAP-02JZ-', porta=9337, uso='comissao'),
+]
+_cadastro = None
+
+
+def cadastro(renovar=False):
+    """Cadastro da corretora no banco (master > corretora): logins de cada seguradora e nomes curtos.
+    {logins: [{seguradora, codigo, rotulo, pasta, prefixo_ordem, portal_url, porta, uso}],
+     nomes: {seguradora: {apólice: nome curto}}, subnomes: {seguradora: {nome no portal: nome curto}}}
+    Guarda uma cópia em _cadastro.json (também lida pelos .js e .ps1); sem rede, usa a última cópia."""
+    global _cadastro
+    if _cadastro is not None and not renovar:
+        return _cadastro
+    c = _rpc('agente_cadastro', dict(p_corretora=CORRETORA))
+    if isinstance(c, dict) and c.get('logins') is not None:
+        _portas_livres(c['logins'])
+        try:
+            with open(CACHE_CADASTRO, 'w', encoding='utf-8') as f:
+                json.dump(c, f, ensure_ascii=False, indent=1)
+        except OSError:
+            pass
+    else:
+        try:
+            c = json.load(open(CACHE_CADASTRO, encoding='utf-8'))
+            print('[banco] cadastro: sem resposta do banco, usando a última cópia (_cadastro.json).')
+        except (OSError, ValueError):
+            c = dict(logins=[dict(x) for x in LOGINS_PADRAO], nomes={}, subnomes={})
+            print('[banco] cadastro: sem banco e sem cópia; usando os logins de sempre.')
+    _cadastro = c
+    return c
+
+
+def _portas_livres(logins):
+    """Login novo sem porta no cadastro ganha a próxima porta livre (9340 em diante), sempre a mesma pela ordem."""
+    usadas = {x['porta'] for x in logins if x.get('porta')}
+    p = 9340
+    for x in logins:
+        if not x.get('porta'):
+            while p in usadas:
+                p += 1
+            x['porta'] = p; usadas.add(p)
+
+
+def logins_de(seguradora, uso=None):
+    """Logins ativos de uma seguradora (ex.: 'hapvida', uso 'comissao')."""
+    seg = SEG.get(seguradora, seguradora)
+    return [x for x in cadastro()['logins'] if x['seguradora'] == seg and (not uso or x.get('uso') in (uso, 'ambos'))]
+
+
+def nomes_curtos(*seguradoras):
+    """(nomes por apólice, nomes por subestipulante) das seguradoras pedidas, juntos."""
+    c = cadastro(); n, s = {}, {}
+    for seg in seguradoras:
+        n.update((c.get('nomes') or {}).get(seg) or {}); s.update((c.get('subnomes') or {}).get(seg) or {})
+    return n, s
+
+
 def _docs_do_painel(arquivos):
     pasta = os.path.join(AQUI, '_painel')
     for f in arquivos:

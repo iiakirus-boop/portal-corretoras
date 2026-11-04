@@ -13,9 +13,13 @@
 // 1ª unidade: ResumoFaturaFull.aspx?comp=MMAAAA&nest&nsub&nuni; os botões Imprimir/Exportação/Boleto são links baixados por fetch.
 // Comissão: Comissões > Pagamentos/Pendências > TODAS, Pagamentos, Período > cada ordem > planilha (gerarplanilhaanalitico.do).
 // Os parâmetros de sessão (sesnum, cpf, webusrcod) são lidos da aba logada na hora e nunca vão para a saída nem para o _socorro.
-const { chromium } = require('C:/Users/bruno/.claude/plugins/cache/playwright-skill/playwright-skill/5.0.0/skills/playwright-skill/node_modules/playwright');
+const { entrarPorto, playwright } = require('./entrar_porto');
+const { chromium } = playwright();
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
-const FAT = path.dirname(__dirname);
+// Nuvem (PORTO_NUVEM=1): abre um Chromium sem janela e faz o login sozinho com PORTO_USER/PORTO_PASS/PORTO_COD (segredos da
+// nuvem), em vez de usar o Chrome do PC na porta 9334. SHADDAI_FAT = pasta de trabalho (no PC é a pasta FATURAS).
+const NUVEM = process.env.PORTO_NUVEM === '1';
+const FAT = process.env.SHADDAI_FAT || path.dirname(__dirname);
 const COL = 'https://corretor.portoseguro.com.br/novocol/';
 const RFC = 'https://wwws.portoseguro.com.br/ResumoFaturamentoCol/Pages/';
 const EMPRESA = { 1: 'SEGUROS GERAIS', 31: 'PORTOMED', 50: 'SEGURO SAUDE', 32: 'ODONTO', 14: 'VIDA' };
@@ -73,6 +77,7 @@ function unzip(buf) {
 // nome curto por subestipulante, tirado das pastas/arquivos que a equipe já usa (Faturas/AAAA-MM/PortoSaude)
 function nomesCurtos() {
   const m = {}, re = /^(\d+) - (.+?)(?: (?:VIDAS|BOLETO|FATURADOS) PORTO (?:SAUDE|ODONTO).*)?$/;
+  if (!fs.existsSync(path.join(FAT, 'Faturas'))) return m; // nuvem: pasta nova, os nomes vêm do cadastro (nomeCadastro)
   for (const mes of fs.readdirSync(path.join(FAT, 'Faturas')).filter(d => /^\d{4}-\d\d$/.test(d)).sort()) {
     const ps = path.join(FAT, 'Faturas', mes, 'PortoSaude');
     if (!fs.existsSync(ps)) continue;
@@ -82,6 +87,13 @@ function nomesCurtos() {
     }
   }
   return m;
+}
+// nome curto do cadastro do banco (subestipulantes.nome_curto pelo nome no portal), copiado em _cadastro.json
+let SUBNOMES = null;
+function nomeCadastro(portal) {
+  if (!SUBNOMES) { try { SUBNOMES = JSON.parse(fs.readFileSync(path.join(__dirname, '_cadastro.json'), 'utf8')).subnomes?.porto_saude || {}; } catch (e) { SUBNOMES = {}; } }
+  const n = String(portal || '').replace(/^\d+ - /, '').trim();
+  return SUBNOMES[n] || null;
 }
 // shortcut: sub novo sem pasta anterior recebe as 2 primeiras palavras do nome no portal; a equipe confere pelo aviso
 const curtoPortal = s => s.replace(/^\d+ - /, '').replace(/\b(LTDA|EIRELI|ME|EPP|S\/?A|SOCIEDADE|DE|DA|DO|E)\b/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
@@ -127,7 +139,7 @@ async function listarAlvos(saida) {
 async function faturas(comp, saida, so) {
   const [y, m] = comp.split('-'), mmaa = `${m}-${y.slice(2)}`, nomes = nomesCurtos();
   const { alvos, subNome } = await listarAlvos(saida);
-  const nomeDe = sub => nomes[sub] || (saida.avisos.push(`sub ${sub} sem pasta anterior: nome curto "${curtoPortal(subNome[sub] || sub)}" tirado do portal, confira`), nomes[sub] = curtoPortal(subNome[sub] || sub));
+  const nomeDe = sub => nomes[sub] || (nomeCadastro(subNome[sub]) && (nomes[sub] = nomeCadastro(subNome[sub]))) || (saida.avisos.push(`sub ${sub} sem pasta anterior: nome curto "${curtoPortal(subNome[sub] || sub)}" tirado do portal, confira`), nomes[sub] = curtoPortal(subNome[sub] || sub));
   const titulos = new Set();
   saida.faturas = [];
   for (const a of alvos.filter(x => !so || so.includes(x.sub))) {
@@ -269,15 +281,36 @@ async function comissao(ini, fim, saida) {
   }
   if (!tarefas.length) sai(1, uso);
 
-  passo = 'conectar no Chrome (porta 9334)';
-  const browser = await chromium.connectOverCDP('http://localhost:9334').catch(() => null);
-  if (!browser) sai(3, { ok: false, motivo: 'login' });
-  const ctx = browser.contexts()[0];
-  const logada = ctx && ctx.pages().find(p => p.url().startsWith(COL));
-  if (!logada) sai(3, { ok: false, motivo: 'login' });
-  passo = 'abrir aba de trabalho';
-  [page] = await Promise.all([ctx.waitForEvent('page'), logada.evaluate(u => { window.open(u, '_blank'); }, COL + 'homepage')]);
-  const aba = page;
+  let aba;
+  if (NUVEM) {
+    passo = 'nuvem: login no Corretor Online';
+    if (!process.env.PORTO_USER || !process.env.PORTO_PASS) sai(3, { ok: false, motivo: 'login', detalhe: 'sem PORTO_USER/PORTO_PASS nos segredos', passo });
+    const browser = await chromium.launch({ headless: true });
+    // o portal vê um Chrome comum (sem "HeadlessChrome" no navegador), no fuso e no idioma do Brasil
+    const ua = (await browser.newPage().then(async p => { const u = await p.evaluate(() => navigator.userAgent); await p.close(); return u; })).replace('HeadlessChrome', 'Chrome');
+    page = await (await browser.newContext({ acceptDownloads: true, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', userAgent: ua,
+      viewport: { width: 1366, height: 900 } })).newPage();
+    aba = page;
+    // sem pessoa para resolver: captcha ou código pedido = código 3 (login), com o motivo
+    try { await entrarPorto(page, { usuario: process.env.PORTO_USER, senha: process.env.PORTO_PASS, cod: process.env.PORTO_COD,
+      susep: process.env.PORTO_SUSEP || 'BA6QXJ', esperaHumano: 30000 }); }
+    catch (e) {
+      e.aba = aba;
+      if (/^(captcha|codigo)$|validar seu acesso|login não terminou|SUSEP não apareceu/.test(e.message)) { e.detalhe = e.message; e.message = 'login'; }
+      throw e; // portal fora do ar, rede etc.: erro comum (código 2, com print)
+    }
+    await page.goto(COL + 'homepage', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  } else {
+    passo = 'conectar no Chrome (porta 9334)';
+    const browser = await chromium.connectOverCDP('http://localhost:9334').catch(() => null);
+    if (!browser) sai(3, { ok: false, motivo: 'login' });
+    const ctx = browser.contexts()[0];
+    const logada = ctx && ctx.pages().find(p => p.url().startsWith(COL));
+    if (!logada) sai(3, { ok: false, motivo: 'login' });
+    passo = 'abrir aba de trabalho';
+    [page] = await Promise.all([ctx.waitForEvent('page'), logada.evaluate(u => { window.open(u, '_blank'); }, COL + 'homepage')]);
+    aba = page;
+  }
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3000);
 
@@ -290,7 +323,7 @@ async function comissao(ini, fim, saida) {
   sai(0, saida);
 })().catch(async e => {
   const aba = e.aba || (page && page.close ? page : null);
-  if (e.message === 'login') { if (aba) await aba.close().catch(() => {}); sai(3, { ok: false, motivo: 'login', passo }); }
+  if (e.message === 'login') { if (aba) await aba.close().catch(() => {}); sai(3, { ok: false, motivo: 'login', passo, ...(e.detalhe ? { detalhe: semSessao(e.detalhe) } : {}) }); }
   const so = path.join(__dirname, '_socorro'), q = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19).replace(/:/g, '-').replace('T', '_');
   fs.mkdirSync(so, { recursive: true });
   const png = path.join(so, `porto_${q}.png`);

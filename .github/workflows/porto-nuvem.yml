@@ -1,0 +1,52 @@
+# Agente Porto na nuvem: entra no Corretor Online sem o PC, baixa faturas e comissão, lê e registra no master.
+# Começa em modo "medição" (não grava nada; o PC continua gravando a Porto). Ver agentes-nuvem/LEIA-ME.md.
+# Segredos (Settings > Secrets and variables > Actions): PORTO_USER, PORTO_PASS, PORTO_COD (opcional), SHADDAI_AGENTES_TOKEN.
+# Variável opcional SHADDAI_PORTO_MODO = medicao (padrão) ou gravar.
+# O repositório é público: o script só escreve contagens no log; os arquivos baixados não são guardados.
+name: Porto na nuvem
+
+on:
+  workflow_dispatch:
+    inputs:
+      competencia:
+        description: 'Competência das faturas (AAAA-MM). Vazio = regra do Supervisor (mês atual até o dia 19, seguinte a partir do 20)'
+        required: false
+  schedule:
+    - cron: '30 11 * * 1-5'   # 08:30 de Brasília, segunda a sexta
+
+concurrency:
+  group: porto-nuvem
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  porto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar leitores e navegador
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils > /dev/null
+          pip install -q openpyxl
+          cd agentes-pc/Scripts && npm init -y > /dev/null && npm i -s playwright@1.48.2 && npx playwright install --with-deps chromium > /dev/null
+      - name: Rodar a Porto
+        env:
+          PORTO_USER: ${{ secrets.PORTO_USER }}
+          PORTO_PASS: ${{ secrets.PORTO_PASS }}
+          PORTO_COD: ${{ secrets.PORTO_COD }}
+          SHADDAI_AGENTES_TOKEN: ${{ secrets.SHADDAI_AGENTES_TOKEN }}
+          SHADDAI_PORTO_MODO: ${{ vars.SHADDAI_PORTO_MODO || 'medicao' }}
+          SHADDAI_MAQUINA: Nuvem (GitHub)
+          SHADDAI_EXECUCAO_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TZ: America/Sao_Paulo
+        run: |
+          if [ -n "${{ inputs.competencia }}" ]; then python agentes-nuvem/porto.py --faturas "${{ inputs.competencia }}"; else python agentes-nuvem/porto.py; fi
