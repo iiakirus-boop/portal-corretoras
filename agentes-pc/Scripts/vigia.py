@@ -10,7 +10,8 @@ O que ele roda sozinho:
   - Vidas: sempre (só usa a base).
   - Ciclo automático (pedidos do Supervisor ou do master, sem arquivos no pedido): faturas e comissão da Porto, do Bradesco
     e da Hapvida. 1) confere o login (Chrome do "Entrar na Porto" na porta 9334, "Entrar na Bradesco" na 9333, "Entrar na
-    Hapvida" nas 9335/9336/9337 para a comissão, os três logins; a Hapvida faturas entra sozinha); 2) baixa com
+    Hapvida" num Chrome por login do webhap para a comissão; a Hapvida faturas entra sozinha). As portas e os logins vêm
+    do cadastro do banco (corretora_codigos), copiado em _cadastro.json a cada volta; 2) baixa com
     baixar_<op>.js (faturas: competência do pedido ou a próxima; comissão: do último pagamento já importado até hoje;
     Hapvida: mês de referência do pedido ou o atual); 3) rodar.py --ordem <id>, que grava, publica na Central e sincroniza.
     Login caído: o vigia abre sozinho o "Entrar na <op>" (login_<op>.ps1, senha do cofre do Windows) e espera até 5 min o login terminar;
@@ -34,7 +35,7 @@ import sys, os, time, datetime, subprocess, json, urllib.request
 import banco
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-VERSAO = 'vigia 2026-10-27c'
+VERSAO = 'vigia 2026-11-03 logins do cadastro'
 INTERVALO = int(os.environ.get('SHADDAI_VIGIA_MINUTOS', '2')) * 60
 MAQUINA = os.environ.get('SHADDAI_MAQUINA', 'PC do Bruno')
 LOG = os.path.join(AQUI, '_vigia.log')
@@ -52,7 +53,8 @@ def log(msg):
 def sinal():
     banco._rpc('agente_sinal', dict(p_maquina=MAQUINA, p_versao=VERSAO))
     try:
-        banco.logins([dict(seguradora=banco.SEG[op], codigo=cod, ativa=logado(op, porta, dom)) for op, cod, porta, dom in LOGINS],
+        banco.cadastro(renovar=True)  # login novo no cadastro do banco já entra nesta volta (e vai para _cadastro.json)
+        banco.logins([dict(seguradora=banco.SEG[op], codigo=cod, ativa=logado(op, porta, dom)) for op, cod, porta, dom in logins_pc()],
                      MAQUINA)
     except Exception as e:  # o estado dos logins nunca para o vigia
         log(f'estado dos logins: {e.__class__.__name__}: {e}')
@@ -90,26 +92,49 @@ def comando(o):
 # Ciclo automático (pedidos do Supervisor ou do master): baixa do portal -> rodar.py, que grava, publica e sincroniza.
 AUTO = {('faturas', 'porto'), ('faturas', 'bradesco'), ('faturas', 'hapvida'),
         ('comissao', 'porto'), ('comissao', 'bradesco'), ('comissao', 'hapvida')}
-PORTA = {'porto': (9334, 'portoseguro.com.br'), 'bradesco': (9333, 'bradescoseguros.com.br')}  # Chrome dos atalhos "Entrar na ..."
-WEBHAP = {9335: 'Hapvida', 9336: 'Hapvida_045L', 9337: 'Hapvida_02JZ'}  # comissão Hapvida: um Chrome por login (045K, 045L, 02JZ)
+# Logins dos portais: vêm do cadastro do banco (corretora_codigos, uma linha por login, com a porta do Chrome do atalho
+# "Entrar na <op>"). Login novo (ex.: outro grupo de contratos da Hapvida) entra cadastrando lá, sem mexer neste arquivo.
+DOMINIO = {'porto': 'portoseguro.com.br', 'bradesco': 'bradescoseguros.com.br', 'hapvida': 'webhap.hapvida.com.br'}
 NOME = {'porto': 'Porto', 'bradesco': 'Bradesco', 'hapvida': 'Hapvida'}
-# o que vai para o master: (op, código na corretora_codigos, porta, domínio)
-LOGINS = [('porto', 'BA6QXJ', 9334, 'portoseguro.com.br'), ('bradesco', 'Portal', 9333, 'bradescoseguros.com.br'),
-          ('hapvida', '045K', 9335, 'webhap.hapvida.com.br'), ('hapvida', '045L', 9336, 'webhap.hapvida.com.br'),
-          ('hapvida', '02JZ', 9337, 'webhap.hapvida.com.br')]
+UM_LOGIN = {'porto', 'bradesco'}  # portais em que o atalho abre um login só (o primeiro do cadastro)
+
+
+def logins_pc(op=None):
+    """[(op, código, porta, domínio)] dos logins de portal que o PC mantém abertos (o que vai para o master).
+    Hapvida: só os do webhap (comissão); as faturas Hapvida entram sozinhas com os logins do logins.js."""
+    out = []
+    for o in DOMINIO:
+        ls = banco.logins_de(o, 'comissao' if o == 'hapvida' else None)
+        out += [(o, l['codigo'], l['porta'], DOMINIO[o]) for l in (ls[:1] if o in UM_LOGIN else ls)]
+    return [x for x in out if not op or x[0] == op]
+
+
+def pastas_comissao(op):
+    """Pasta de cada login dentro de Comissoes/AAAA-MM (Hapvida: Hapvida, Hapvida_045L, Hapvida_02JZ...)."""
+    return [l.get('pasta') or f"Hapvida_{l['codigo']}" for l in banco.logins_de(op, 'comissao')]
+
+
 # login automático: o mesmo atalho "Entrar na <op>", que só pede senha quando ela não está no cofre (aí fica com você)
 COFRE = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Shaddai')
-ENTRAR = {'porto': ('login_porto.ps1', ['porto.cred']), 'bradesco': ('login_bradesco.ps1', ['bradesco.cred']),
-          'hapvida': ('login_hapvida.ps1', ['hapvida_045K.cred', 'hapvida_045L.cred', 'hapvida_02JZ.cred'])}
+ENTRAR = {'porto': 'login_porto.ps1', 'bradesco': 'login_bradesco.ps1', 'hapvida': 'login_hapvida.ps1'}
+
+
+def senhas(op):
+    """Arquivos do cofre que o atalho precisa: porto.cred / bradesco.cred; Hapvida um por login (hapvida_<código>.cred)."""
+    return [f'{op}.cred'] if op in UM_LOGIN else [f'{op}_{cod}.cred' for _, cod, _, _ in logins_pc(op)]
 TENTOU = {}  # op -> quando o vigia abriu o login pela última vez
 SEGURADORA = {'porto': ('PORTO SEGURO - SEGURO SAUDE', 'PORTOMED'), 'bradesco': ('BRADESCO',)}
 
 
-def logado(op, porta=None, dominio='webhap.hapvida.com.br'):
+def logado(op, porta=None, dominio=None):
     """Chrome do atalho aberto na porta CDP com uma aba do portal. Só uma olhada rápida: a tela de login de verdade o
     baixar_<op>.js confere (sai com código 3)."""
     if not porta:
-        porta, dominio = PORTA[op]
+        ls = logins_pc(op)
+        if not ls:
+            return False
+        _, _, porta, dominio = ls[0]
+    dominio = dominio or DOMINIO[op]
     try:
         abas = json.loads(urllib.request.urlopen(f'http://localhost:{porta}/json/list', timeout=5).read())
     except Exception:
@@ -118,15 +143,15 @@ def logado(op, porta=None, dominio='webhap.hapvida.com.br'):
 
 
 def todos_logados(op, ag):
-    if op in PORTA:
+    if op in UM_LOGIN:
         return logado(op)
-    return ag != 'comissao' or all(logado(op, p) for p in WEBHAP)  # Hapvida faturas entra sozinha no baixar
+    return ag != 'comissao' or all(logado(op, p, d) for _, _, p, d in logins_pc(op))  # Hapvida faturas entra sozinha no baixar
 
 
 def entrar(op, ag):
     """Abre o "Entrar na <op>" numa janela própria (como o atalho) e espera o portal ficar logado. Só com a senha no
     cofre e no máximo uma vez a cada 30 min, para não bloquear o login com tentativas repetidas."""
-    ps1, creds = ENTRAR[op]
+    ps1, creds = ENTRAR[op], senhas(op)
     if not all(os.path.exists(os.path.join(COFRE, c)) for c in creds):
         return 'sem a senha no cofre: clique uma vez em Entrar na ' + NOME[op] + ' para guardar'
     if time.time() - TENTOU.get(op, 0) < 30 * 60:
@@ -138,10 +163,10 @@ def entrar(op, ag):
     marca = os.path.join(COFRE, f'{op}.logado')  # Porto e Bradesco: o login_<op>.js grava quando entrou de verdade
     for _ in range(30):  # até 5 min
         time.sleep(10)
-        if op in PORTA and not (os.path.exists(marca) and os.path.getmtime(marca) >= TENTOU[op]):
+        if op in UM_LOGIN and not (os.path.exists(marca) and os.path.getmtime(marca) >= TENTOU[op]):
             continue
         if todos_logados(op, ag):
-            if op not in PORTA:
+            if op not in UM_LOGIN:
                 time.sleep(30)  # webhap: só o Chrome aberto; dá tempo de o login terminar
             log(f'{op}: login automático feito')
             return None
@@ -156,6 +181,14 @@ def ultimo_pagamento(op):
              if r[2] and isinstance(r[3], datetime.datetime) and any(s in str(r[1] or '').upper() for s in SEGURADORA[op])]
     wb.close()
     return max(datas).date() if datas else datetime.date.today().replace(day=1)
+
+
+def mes_antes(comp, k=1):
+    y, m = map(int, comp.split('-'))
+    m -= k
+    while m < 1:
+        m += 12; y -= 1
+    return f'{y}-{m:02d}'
 
 
 def proxima_comp(hoje):
@@ -184,6 +217,8 @@ def automatico(o, simular=False):
     comp = (o.get('competencia') or '').strip() or proxima_comp(hoje)
     if ag == 'faturas':
         args = ['faturas', f'{comp}-01' if op == 'hapvida' else comp]
+        if op == 'porto':  # aproveita o portal aberto: boleto dos 2 meses anteriores já foi pago? (só lê, não baixa)
+            args += sum((['situacao', mes_antes(comp, k)] for k in (1, 2)), [])
     elif op == 'hapvida':
         comp = (o.get('competencia') or '').strip() or hoje.strftime('%Y-%m')  # mês de referência do webhap
         args = ['comissao', comp]
@@ -200,6 +235,11 @@ def automatico(o, simular=False):
     if r.returncode:
         return parar(o, 'erro', f"Download parou no passo \"{saida.get('passo', '?')}\": {saida.get('motivo', r.stderr[-200:])}."
                      f" Print em Scripts/_socorro ({os.path.basename(saida.get('print') or '')}).", simular)
+    if not simular:
+        try:  # "pago no portal" no site; nunca para a rodada
+            banco.situacao_do_download(op, saida)
+        except Exception as e:
+            log(f'{ag} {op}: situação dos boletos não enviada ({e.__class__.__name__}: {e})')
     novos = saida.get('arquivos', [])
     log(f"{ag} {op}: {len(novos)} arquivo(s) novo(s), {len(saida.get('repetidos', []))} já baixado(s)")
     if not novos:
@@ -215,7 +255,7 @@ def automatico(o, simular=False):
             meses.setdefault(os.path.basename(os.path.dirname(os.path.dirname(f))), []).append(f)
         cmds = [['comissao', 'porto', *fs, '--comp', m] for m, fs in sorted(meses.items())]
     elif op == 'hapvida':  # as três pastas do mês (lote já gravado é pulado)
-        pastas = [os.path.join(os.path.dirname(AQUI), 'Comissoes', comp, p) for p in WEBHAP.values()]
+        pastas = [os.path.join(os.path.dirname(AQUI), 'Comissoes', comp, p) for p in pastas_comissao(op)]
         cmds = [['comissao', 'hapvida', *[p for p in pastas if os.path.isdir(p)]]]
     else:
         cmds = [['comissao', op, *novos]]

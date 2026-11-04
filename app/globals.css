@@ -49,7 +49,7 @@ a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 /* controles: toque responde na hora (sem a espera do duplo toque) e segurar o dedo não seleciona o texto */
-button, a.btn, .sair, .perfil, a.kpi { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+button, a.btn, .sair, .perfil, a.kpi, button.kpi { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .wrap { max-width: 1280px; margin: 0 auto; padding-inline: 1.25rem; }
 @media (max-width: 640px) { .wrap { padding-inline: 1rem; } }
@@ -121,6 +121,10 @@ main.wrap { padding-block: 1.5rem 4rem; }
 .kpi-s { font-size: .77rem; color: var(--muted); line-height: 1.45; }
 .kpi.alerta { border-color: var(--warn-fg); background: var(--warn-bg); }
 .kpi.alerta .kpi-l, .kpi.alerta .kpi-s { color: var(--warn-fg); }
+button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+button.kpi:hover { border-color: var(--accent); }
+.kpi.kpi-bad { border-color: var(--bad-fg); }
+.kpi.kpi-bad .kpi-v { color: var(--bad-fg); }
 @media (max-width: 640px) { .page-head h1 { font-size: 1.3rem; } }
 @media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; } .kpi-v { font-size: 1.15rem; } }
 
@@ -164,8 +168,9 @@ tr.tot td { font-weight: 800; background: var(--sunken); border-top: 2px solid v
 .form .linha { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .85rem; }
 label.campo { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; font-weight: 800; color: var(--muted); }
 label.campo small { font-weight: 500; }
-.campo input, .campo select, .campo textarea, input.busca, select.sel {
+.campo input, .campo select, .campo textarea, input.busca, select.sel, .acoes input, .acoes select {
   min-height: 38px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: .45rem .65rem; font-size: .88rem; font-weight: 500; color: var(--fg); width: 100%; }
+.acoes input, .acoes select { width: auto; min-height: 32px; padding: .3rem .55rem; font-size: .82rem; }
 .campo textarea { min-height: 84px; resize: vertical; }
 .msg { border-radius: var(--r-md); padding: .65rem .9rem; font-size: .85rem; font-weight: 600; }
 .msg.ok { background: var(--ok-bg); color: var(--ok-fg); } .msg.erro { background: var(--bad-bg); color: var(--bad-fg); } .msg.aviso { background: var(--warn-bg); color: var(--warn-fg); }
@@ -240,6 +245,18 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .seg::-webkit-scrollbar { display: none; }
 .seg button { flex: 0 0 auto; min-height: 30px; padding: 0 .7rem; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; font-size: .8rem; white-space: nowrap; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--marca); color: var(--marca-fg); }
+.seg a { flex: 0 0 auto; min-height: 30px; padding: 0 .7rem; border-radius: 7px; display: inline-flex; align-items: center; color: var(--muted); font-weight: 700; font-size: .8rem; white-space: nowrap; text-decoration: none; }
+.seg a:hover { color: var(--fg); }
+.seg a[aria-current="page"] { background: var(--marca); color: var(--marca-fg); }
+/* quadro por seguradora no master (Agentes) */
+.saude { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
+.saude > div { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--ok-fg); border-radius: var(--r-md); padding: .75rem .9rem; display: flex; flex-direction: column; gap: .2rem; }
+.saude > div.amarelo { border-left-color: var(--warn-fg); }
+.saude > div.vermelho { border-left-color: var(--bad-fg); }
+.saude > div.parado { border-left-color: var(--faint); }
+.saude b { font-size: .92rem; }
+.saude small { font-size: .76rem; color: var(--muted); line-height: 1.45; }
+.saude .estado { font-weight: 800; font-size: .78rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chips button { min-height: 30px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-weight: 700; font-size: .78rem; display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
 .chips button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
@@ -461,9 +478,9 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
 }
 
 @media (pointer: coarse) {
-  .btn, .campo input, .campo select, input.busca, select.sel { min-height: 44px; }
+  .btn, .campo input, .campo select, input.busca, select.sel, .acoes input, .acoes select { min-height: 44px; }
   /* abaixo de 16px o iPhone dá zoom na página ao tocar no campo e não volta */
-  .campo input, .campo select, .campo textarea, input.busca, select.sel { font-size: 16px; }
+  .campo input, .campo select, .campo textarea, input.busca, select.sel, .acoes input, .acoes select { font-size: 16px; }
 }
 /* hover só onde existe mouse: no celular o toque deixava o hover grudado */
 @media (hover: hover) and (pointer: fine) {
@@ -523,3 +540,40 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
   .fxr:not(.sx) > :nth-child(6) { display: none; }
   .fxr.sx { grid-template-columns: 2.9rem minmax(1rem, 1fr) repeat(var(--n), 1.85rem) 2.2rem; gap: .3rem; font-size: .74rem; }
 }
+
+/* Comissões: mês atual, previsto × caiu, a cair por seguradora e semanas */
+.cx .falta { background: var(--s1); opacity: .35; }
+.cstack { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--sunken); }
+.cstack i { display: block; height: 100%; }
+.cleg { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem 1.2rem; margin-top: .65rem; font-size: .84rem; color: var(--muted); }
+.cleg b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.cleg > span > i { display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; margin-right: .35rem; }
+.sq { display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; margin-right: .4rem; flex: none; }
+.pxc tr.sel > td:first-child .lnk { font-weight: 800; }
+.pxc tr.sub td { color: var(--muted); font-size: .84rem; }
+.pxc tr.sub td:first-child { padding-left: 1.6rem; }
+.pxc .lnk { white-space: nowrap; }
+.acair { display: grid; }
+.acs { border-bottom: 1px solid var(--line-soft); }
+.acs:last-child { border-bottom: 0; }
+.acs > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto; gap: .9rem; align-items: center; padding: .6rem .2rem; }
+.acs > summary::-webkit-details-marker { display: none; }
+.acs .nm { font-weight: 800; display: flex; flex-wrap: wrap; align-items: center; }
+.acs .nm small, .acs .r small { display: block; width: 100%; font-weight: 500; color: var(--muted); font-size: .74rem; }
+.acs > summary .r { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.acs .trk { height: 10px; border-radius: 5px; background: var(--sunken); overflow: hidden; display: flex; }
+.acs .trk i { display: block; height: 100%; }
+.acs > ul { margin: 0 0 .6rem; padding-left: 1rem; }
+@media (max-width: 640px) { .acs > summary { grid-template-columns: minmax(0, 1fr) auto; } .acs .trk { grid-column: 1 / -1; grid-row: 2; } }
+.csems { display: grid; gap: .5rem; margin-top: .4rem; }
+.csem { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: .3rem; padding: .6rem .7rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); min-width: 0; }
+.csem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.csem.on { border-color: var(--accent); background: var(--accent-soft); }
+.csem .d { font-size: .74rem; font-weight: 700; color: var(--muted); }
+.csem .v { font-weight: 800; font-variant-numeric: tabular-nums; }
+.csem .mini { height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; display: flex; }
+.csem .mini i { display: block; height: 100%; }
+.csem .h { font-size: .72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csem .h.late { color: var(--bad-fg); font-weight: 700; }
+@media (max-width: 640px) { .csems { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+.cx-det { display: grid; gap: 1rem; }

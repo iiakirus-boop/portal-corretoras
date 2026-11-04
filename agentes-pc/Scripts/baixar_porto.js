@@ -5,16 +5,21 @@
 //   node baixar_porto.js faturas 2026-11                 -> Faturas/2026-11/PortoSaude/<sub> - <NOME CURTO>/<sub> - <NOME CURTO> VIDAS|BOLETO|FATURADOS PORTO SAUDE 11-26
 //   node baixar_porto.js comissao 2026-10-01 2026-10-26  -> Comissoes/<mês do pagamento>/PortoSaude/<OP> - PORTOMED|SEGURO SAUDE|SEGUROS GERAIS COMISSAO DD-MM-AA.html
 //   node baixar_porto.js faturas 2026-11 1979216,1808600  -> só essas subestipulantes (teste)
+//   node baixar_porto.js situacao 2026-10                -> não baixa nada: só lê se o boleto de cada título do mês já foi pago
 //   (dá para juntar os dois na mesma chamada).
-// Saída: uma linha JSON {"ok":true,"arquivos":[...],"repetidos":[...],"pagos":[...],"sem_dados":[...]}. Arquivo que já existe não é baixado de novo.
+// Saída: uma linha JSON {"ok":true,"arquivos":[...],"repetidos":[...],"pagos":[...],"sem_dados":[...],"faturas":[{comp,titulo,boleto}],"situacao":[{comp,titulo,boleto}]}. Arquivo que já existe não é baixado de novo.
 // Erros: código 3 + {"ok":false,"motivo":"login"} sem aba logada (ou tela de login/código/captcha); código 2 + print/passo em Scripts/_socorro/.
 // Caminho no portal: Saúde > links úteis > "Resumo da Fatura" (frame Filtros.aspx). Para cada estipulante ativo, cada subestipulante e a
 // 1ª unidade: ResumoFaturaFull.aspx?comp=MMAAAA&nest&nsub&nuni; os botões Imprimir/Exportação/Boleto são links baixados por fetch.
 // Comissão: Comissões > Pagamentos/Pendências > TODAS, Pagamentos, Período > cada ordem > planilha (gerarplanilhaanalitico.do).
 // Os parâmetros de sessão (sesnum, cpf, webusrcod) são lidos da aba logada na hora e nunca vão para a saída nem para o _socorro.
-const { chromium } = require('C:/Users/bruno/.claude/plugins/cache/playwright-skill/playwright-skill/5.0.0/skills/playwright-skill/node_modules/playwright');
+const { entrarPorto, playwright } = require('./entrar_porto');
+const { chromium } = playwright();
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
-const FAT = path.dirname(__dirname);
+// Nuvem (PORTO_NUVEM=1): abre um Chromium sem janela e faz o login sozinho com PORTO_USER/PORTO_PASS/PORTO_COD (segredos da
+// nuvem), em vez de usar o Chrome do PC na porta 9334. SHADDAI_FAT = pasta de trabalho (no PC é a pasta FATURAS).
+const NUVEM = process.env.PORTO_NUVEM === '1';
+const FAT = process.env.SHADDAI_FAT || path.dirname(__dirname);
 const COL = 'https://corretor.portoseguro.com.br/novocol/';
 const RFC = 'https://wwws.portoseguro.com.br/ResumoFaturamentoCol/Pages/';
 const EMPRESA = { 1: 'SEGUROS GERAIS', 31: 'PORTOMED', 50: 'SEGURO SAUDE', 32: 'ODONTO', 14: 'VIDA' };
@@ -72,6 +77,7 @@ function unzip(buf) {
 // nome curto por subestipulante, tirado das pastas/arquivos que a equipe já usa (Faturas/AAAA-MM/PortoSaude)
 function nomesCurtos() {
   const m = {}, re = /^(\d+) - (.+?)(?: (?:VIDAS|BOLETO|FATURADOS) PORTO (?:SAUDE|ODONTO).*)?$/;
+  if (!fs.existsSync(path.join(FAT, 'Faturas'))) return m; // nuvem: pasta nova, os nomes vêm do cadastro (nomeCadastro)
   for (const mes of fs.readdirSync(path.join(FAT, 'Faturas')).filter(d => /^\d{4}-\d\d$/.test(d)).sort()) {
     const ps = path.join(FAT, 'Faturas', mes, 'PortoSaude');
     if (!fs.existsSync(ps)) continue;
@@ -81,6 +87,13 @@ function nomesCurtos() {
     }
   }
   return m;
+}
+// nome curto do cadastro do banco (subestipulantes.nome_curto pelo nome no portal), copiado em _cadastro.json
+let SUBNOMES = null;
+function nomeCadastro(portal) {
+  if (!SUBNOMES) { try { SUBNOMES = JSON.parse(fs.readFileSync(path.join(__dirname, '_cadastro.json'), 'utf8')).subnomes?.porto_saude || {}; } catch (e) { SUBNOMES = {}; } }
+  const n = String(portal || '').replace(/^\d+ - /, '').trim();
+  return SUBNOMES[n] || null;
 }
 // shortcut: sub novo sem pasta anterior recebe as 2 primeiras palavras do nome no portal; a equipe confere pelo aviso
 const curtoPortal = s => s.replace(/^\d+ - /, '').replace(/\b(LTDA|EIRELI|ME|EPP|S\/?A|SOCIEDADE|DE|DA|DO|E)\b/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
@@ -98,8 +111,8 @@ async function abreFiltros() {
   return f;
 }
 
-async function faturas(comp, saida, so) {
-  const [y, m] = comp.split('-'), mmaa = `${m}-${y.slice(2)}`, nomes = nomesCurtos();
+// estipulantes ativos -> subestipulantes -> unidades de cobrança (cada unidade tem título próprio)
+async function listarAlvos(saida) {
   const f = await abreFiltros();
   passo = 'listar estipulantes, subestipulantes e unidades';
   const ws = (metodo, codigo) => f.evaluate(async ([metodo, codigo]) => {
@@ -120,7 +133,13 @@ async function faturas(comp, saida, so) {
       for (const u of us) alvos.push({ est: e.cod, sub: String(s.nr), nuni: u.cd.split(' - ')[0], portal: s.c });
     }
   }
-  const nomeDe = sub => nomes[sub] || (saida.avisos.push(`sub ${sub} sem pasta anterior: nome curto "${curtoPortal(subNome[sub] || sub)}" tirado do portal, confira`), nomes[sub] = curtoPortal(subNome[sub] || sub));
+  return { alvos, subNome };
+}
+
+async function faturas(comp, saida, so) {
+  const [y, m] = comp.split('-'), mmaa = `${m}-${y.slice(2)}`, nomes = nomesCurtos();
+  const { alvos, subNome } = await listarAlvos(saida);
+  const nomeDe = sub => nomes[sub] || (nomeCadastro(subNome[sub]) && (nomes[sub] = nomeCadastro(subNome[sub]))) || (saida.avisos.push(`sub ${sub} sem pasta anterior: nome curto "${curtoPortal(subNome[sub] || sub)}" tirado do portal, confira`), nomes[sub] = curtoPortal(subNome[sub] || sub));
   const titulos = new Set();
   saida.faturas = [];
   for (const a of alvos.filter(x => !so || so.includes(x.sub))) {
@@ -145,7 +164,7 @@ async function faturas(comp, saida, so) {
     const bt = k => Object.entries(links).find(([t]) => new RegExp(k, 'i').test(t))?.[1] || { off: true };
     const vidas = Number(pega(/Saldo Atual\s+\d+\s+R\$\s*[\d.,]+\s+\d+\s+R\$\s*[\d.,]+\s+(\d+)/));
     const total = pega(/\bTotal\s+R\$\s*([\d.,]+)/), venc = pega(/Vencimento:\s*(\d\d\/\d\d\/\d{4})/);
-    const reg = { sub: a.sub, unidade: Number(a.nuni), nome, titulo, vencimento: venc, vidas, total: total ? Number(total.replace(/\./g, '').replace(',', '.')) : null, boleto: 'aberto' };
+    const reg = { comp, sub: a.sub, unidade: Number(a.nuni), nome, titulo, vencimento: venc, vidas, total: total ? Number(total.replace(/\./g, '').replace(',', '.')) : null, boleto: 'aberto' };
     saida.faturas.push(reg);
     // FATURADOS (PDF)
     const pdf = path.join(pasta, `${base} FATURADOS PORTO SAUDE ${mmaa}${un}.pdf`);
@@ -172,6 +191,31 @@ async function faturas(comp, saida, so) {
       if (fs.existsSync(f2)) saida.repetidos.push(f2); else grava(f2, t.dados, saida);
     }
     if (txts.length === 1 && !/^02\|/m.test(txts[0].dados.toString('latin1'))) saida.avisos.push(`${base}: TXT sem linhas 02 (vidas)`);
+  }
+}
+
+// só lê a situação do boleto de um mês já baixado (nada é baixado): botão Boleto desabilitado = pago.
+// Serve para o site saber que o boleto do mês anterior foi pago depois do download.
+async function situacao(comp, saida) {
+  const [y, m] = comp.split('-');
+  const { alvos } = await listarAlvos({ sem_dados: [], avisos: [] });
+  const titulos = new Set();
+  saida.situacao = saida.situacao || [];
+  for (const a of alvos) {
+    passo = `situação ${a.sub} ${comp}`;
+    await page.goto(`${RFC}ResumoFaturaFull.aspx?comp=${m}${y}&nest=${a.est}&nsub=${a.sub.padStart(10, '0')}&nuni=${a.nuni}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    const txt = await page.locator('body').innerText({ timeout: 60000 });
+    if (/Ocorreu um erro ao realizar a requisi|SEM DADOS DISPON/i.test(txt) || !/T[íi]tulo:/.test(txt)) { await confereLogin(); continue; }
+    const titulo = (txt.match(/T[íi]tulo:\s*(\d+)/) || [])[1], ref = (txt.match(/Referencia:\s*(\d\d\/\d{4})/) || [])[1];
+    if (ref !== `${m}/${y}` || titulos.has(titulo)) continue;
+    titulos.add(titulo);
+    const off = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('[onclick]')].find(e => /boleto/i.test(e.title || e.innerText || ''));
+      if (!b) return null; // sem o botão na tela: não dá para saber, não marca nada
+      return b.classList.contains('button-disabled') || !/window\.open\('/.test(b.getAttribute('onclick') || '');
+    });
+    if (off === null) { saida.avisos.push(`situação ${a.sub} ${comp}: botão Boleto não está na tela`); continue; }
+    saida.situacao.push({ comp, sub: a.sub, unidade: Number(a.nuni), titulo, boleto: off ? 'pago' : 'aberto' });
   }
 }
 
@@ -228,36 +272,58 @@ async function comissao(ini, fim, saida) {
 
 (async () => {
   const args = process.argv.slice(2), tarefas = [];
-  const uso = { ok: false, motivo: 'uso: node baixar_porto.js faturas AAAA-MM | comissao AAAA-MM-DD AAAA-MM-DD' };
+  const uso = { ok: false, motivo: 'uso: node baixar_porto.js faturas AAAA-MM | situacao AAAA-MM | comissao AAAA-MM-DD AAAA-MM-DD' };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === 'faturas' && /^\d{4}-\d{2}$/.test(args[i + 1])) tarefas.push(['faturas', args[++i], /^\d+(,\d+)*$/.test(args[i + 1] || '') ? args[++i].split(',') : null]);
     else if (args[i] === 'comissao' && /^\d{4}-\d{2}-\d{2}$/.test(args[i + 1]) && /^\d{4}-\d{2}-\d{2}$/.test(args[i + 2])) tarefas.push(['comissao', args[++i], args[++i]]);
+    else if (args[i] === 'situacao' && /^\d{4}-\d{2}$/.test(args[i + 1])) tarefas.push(['situacao', args[++i]]);
     else sai(1, uso);
   }
   if (!tarefas.length) sai(1, uso);
 
-  passo = 'conectar no Chrome (porta 9334)';
-  const browser = await chromium.connectOverCDP('http://localhost:9334').catch(() => null);
-  if (!browser) sai(3, { ok: false, motivo: 'login' });
-  const ctx = browser.contexts()[0];
-  const logada = ctx && ctx.pages().find(p => p.url().startsWith(COL));
-  if (!logada) sai(3, { ok: false, motivo: 'login' });
-  passo = 'abrir aba de trabalho';
-  [page] = await Promise.all([ctx.waitForEvent('page'), logada.evaluate(u => { window.open(u, '_blank'); }, COL + 'homepage')]);
-  const aba = page;
+  let aba;
+  if (NUVEM) {
+    passo = 'nuvem: login no Corretor Online';
+    if (!process.env.PORTO_USER || !process.env.PORTO_PASS) sai(3, { ok: false, motivo: 'login', detalhe: 'sem PORTO_USER/PORTO_PASS nos segredos', passo });
+    const browser = await chromium.launch({ headless: true });
+    // o portal vê um Chrome comum (sem "HeadlessChrome" no navegador), no fuso e no idioma do Brasil
+    const ua = (await browser.newPage().then(async p => { const u = await p.evaluate(() => navigator.userAgent); await p.close(); return u; })).replace('HeadlessChrome', 'Chrome');
+    page = await (await browser.newContext({ acceptDownloads: true, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', userAgent: ua,
+      viewport: { width: 1366, height: 900 } })).newPage();
+    aba = page;
+    // sem pessoa para resolver: captcha ou código pedido = código 3 (login), com o motivo
+    try { await entrarPorto(page, { usuario: process.env.PORTO_USER, senha: process.env.PORTO_PASS, cod: process.env.PORTO_COD,
+      susep: process.env.PORTO_SUSEP || 'BA6QXJ', esperaHumano: 30000 }); }
+    catch (e) {
+      e.aba = aba;
+      if (/^(captcha|codigo)$|validar seu acesso|login não terminou|SUSEP não apareceu/.test(e.message)) { e.detalhe = e.message; e.message = 'login'; }
+      throw e; // portal fora do ar, rede etc.: erro comum (código 2, com print)
+    }
+    await page.goto(COL + 'homepage', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  } else {
+    passo = 'conectar no Chrome (porta 9334)';
+    const browser = await chromium.connectOverCDP('http://localhost:9334').catch(() => null);
+    if (!browser) sai(3, { ok: false, motivo: 'login' });
+    const ctx = browser.contexts()[0];
+    const logada = ctx && ctx.pages().find(p => p.url().startsWith(COL));
+    if (!logada) sai(3, { ok: false, motivo: 'login' });
+    passo = 'abrir aba de trabalho';
+    [page] = await Promise.all([ctx.waitForEvent('page'), logada.evaluate(u => { window.open(u, '_blank'); }, COL + 'homepage')]);
+    aba = page;
+  }
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(3000);
 
   const saida = { ok: true, arquivos: [], repetidos: [], pagos: [], sem_dados: [], avisos: [] };
   try {
     await confereLogin();
-    for (const [t, ...p] of tarefas) { page = aba; await (t === 'faturas' ? faturas(p[0], saida, p[1]) : comissao(p[0], p[1], saida)); }
+    for (const [t, ...p] of tarefas) { page = aba; await (t === 'faturas' ? faturas(p[0], saida, p[1]) : t === 'situacao' ? situacao(p[0], saida) : comissao(p[0], p[1], saida)); }
   } catch (e) { e.aba = aba; throw e; }
   await aba.close();
   sai(0, saida);
 })().catch(async e => {
   const aba = e.aba || (page && page.close ? page : null);
-  if (e.message === 'login') { if (aba) await aba.close().catch(() => {}); sai(3, { ok: false, motivo: 'login', passo }); }
+  if (e.message === 'login') { if (aba) await aba.close().catch(() => {}); sai(3, { ok: false, motivo: 'login', passo, ...(e.detalhe ? { detalhe: semSessao(e.detalhe) } : {}) }); }
   const so = path.join(__dirname, '_socorro'), q = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19).replace(/:/g, '-').replace('T', '_');
   fs.mkdirSync(so, { recursive: true });
   const png = path.join(so, `porto_${q}.png`);

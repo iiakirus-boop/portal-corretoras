@@ -41,7 +41,7 @@ export function criarBanco(): Banco {
     ],
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
-    maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [],
+    maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [], exclusoes: [], apelidos_empresa: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();

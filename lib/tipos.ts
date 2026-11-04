@@ -44,6 +44,10 @@ export type CodigoSeguradora = {
   codigo: string;
   rotulo: string | null;
   cnpj_login: string | null;
+  pasta_arquivos?: string | null;
+  prefixo_ordem?: string | null;
+  porta_pc?: number | null;
+  uso?: 'ambos' | 'faturas' | 'comissao' | null;
   ativo: boolean;
 };
 
@@ -83,6 +87,7 @@ export type Fatura = {
   vidas_informadas: number | null;
   data_pagamento: string | null;
   pago_pela_comissao: string | null; // a comissão dessa fatura caiu: o boleto foi pago (data do lançamento)
+  pago_no_portal?: string | null; // o portal da seguradora mostra o boleto pago (Porto, Hapvida; p29)
   conferencia_valor: string | null;
   fatura_doc_id: string | null;
   boleto_doc_id: string | null;

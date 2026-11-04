@@ -34,9 +34,26 @@ export const norm = (t: unknown) => {
 export const fatItems = (list: Doc[]): Item[] => list.flatMap((d) => (d.itens || []).map((r: Record<string, unknown>) => ({ comp: d.comp, operadora: d.operadora, ...r }) as Item));
 export const aberto = (r: Record<string, unknown>) => /aberto|Boleto OK/i.test(String(r.boleto || ''));
 
+// situação do boleto: pago, vencido (venceu e não achamos pagamento) ou a vencer
+export type Situacao = 'pago' | 'vencido' | 'avencer';
+export const situacao = (r: Record<string, unknown>, hoje: Date = today()): Situacao => {
+  if (!aberto(r)) return 'pago';
+  const v = pdate(r.venc as string);
+  return v && v < hoje ? 'vencido' : 'avencer';
+};
+const dm_ = (iso?: unknown) => { const s = String(iso || ''); return s.length >= 10 ? s.slice(8, 10) + '/' + s.slice(5, 7) : ''; };
+// como sabemos que foi pago (pagoVia vem de lib/central/dados.ts)
+export const comoPago = (r: Record<string, unknown>) =>
+  r.pagoVia === 'baixa' ? `baixa em ${dm_(r.pagoEm)}` : r.pagoVia === 'comissao' ? `comissão caiu em ${dm_(r.pagoEm)}`
+    : r.pagoVia === 'portal' ? (r.pagoEm ? `visto pago no portal em ${dm_(r.pagoEm)}` : 'visto pago no portal') : '';
+// as duas formas de pago que a tela separa: o portal da seguradora mostra pago (certo) ou só a comissão caiu (provável).
+// Item pago sem pagoVia é o que o agente já viu pago no dia do download: conta como portal.
+export const pagoPelaComissao = (r: Record<string, unknown>) => situacao(r) === 'pago' && r.pagoVia === 'comissao';
+export const diasVencido = (r: Record<string, unknown>, hoje: Date = today()) => { const v = pdate(r.venc as string); return v ? Math.round((hoje.getTime() - v.getTime()) / 864e5) : 0; };
+
 export type Linha = {
   eid: string; nome: string; ops: Set<string>; valor: number; vidas: number; itens: Item[]; venc: Date | null;
-  ab: boolean; div: boolean; subs: number; pend: boolean; prev?: number | null; d: number | null; fam: string;
+  ab: boolean; vencido: boolean; div: boolean; subs: number; pend: boolean; prev?: number | null; d: number | null; fam: string;
 };
 
 // uma linha por empresa no mês, com a variação contra o mês anterior
@@ -44,12 +61,13 @@ export function empRows(faturas: Doc[], mes: string) {
   const it = fatItems(faturas), m = it.filter((r) => r.comp === mes), comps = uniq(it.map((r) => r.comp)).sort(), pm = comps[comps.indexOf(mes) - 1];
   const g: Record<string, Linha> = {};
   m.forEach((r) => {
-    const e = (g[r.eid] ??= { eid: r.eid, nome: r.empresa, ops: new Set(), valor: 0, vidas: 0, itens: [], venc: null, ab: false, div: false, subs: 1, pend: false, d: null, fam: '' });
+    const e = (g[r.eid] ??= { eid: r.eid, nome: r.empresa, ops: new Set(), valor: 0, vidas: 0, itens: [], venc: null, ab: false, vencido: false, div: false, subs: 1, pend: false, d: null, fam: '' });
     if ((+r.subs || 1) > e.subs) e.subs = +r.subs;
     if (r.grupoPendente) e.pend = true;
     e.ops.add(r.operadora); e.valor += +r.valor || 0; e.vidas += +(r.ativos ?? r.vidas) || 0; e.itens.push(r);
     const d = pdate(r.venc); if (d && (!e.venc || d < e.venc)) e.venc = d;
     if (aberto(r)) e.ab = true;
+    if (situacao(r) === 'vencido') e.vencido = true;
     if (r.confValor && r.confValor !== 'OK' && r.confValor !== 'Sem vidas') e.div = true;
   });
   const pv: Record<string, number> = {};

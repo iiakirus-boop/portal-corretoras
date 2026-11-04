@@ -4,6 +4,7 @@
 // A senha só passa pela memória do processo que vai logar: nunca é impressa nem gravada em outro lugar.
 // Linha de comando (usada pelo cadastrar_login.ps1):  node logins.js cadastrar <op> <apelido> <usuario mascarado>
 //                                                     node logins.js listar [op]
+//                                                     node logins.js portal <seguradora> [uso]  -> "045K:9335,045L:9336,..." (login_hapvida.ps1)
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const DIR = path.join(process.env.LOCALAPPDATA, 'Shaddai'), LISTA = path.join(DIR, 'logins.json');
 const OK = /^[A-Za-z0-9_-]+$/;
@@ -48,11 +49,28 @@ async function preencheLogin(page, { usuario, senha }) {
   await s.press('Enter');
 }
 
-module.exports = { ativos, credencial, marca, cadastra, preencheLogin, arquivo };
+// Logins de PORTAL (um Chrome por login, aberto pelo atalho "Entrar na <op>") vêm do cadastro do banco (corretora_codigos),
+// que o vigia copia em Scripts/_cadastro.json a cada volta. Sem a cópia (1ª vez sem rede), valem os logins de sempre.
+const PADRAO = {
+  hapvida: [{ codigo: '045K', porta: 9335, pasta: 'Hapvida', uso: 'comissao' }, { codigo: '045L', porta: 9336, pasta: 'Hapvida_045L', uso: 'comissao' },
+            { codigo: '02JZ', porta: 9337, pasta: 'Hapvida_02JZ', uso: 'comissao' }],
+  porto_saude: [{ codigo: 'BA6QXJ', porta: 9334, pasta: 'PortoSaude', uso: 'ambos' }],
+  bradesco_saude: [{ codigo: 'Portal', porta: 9333, pasta: null, uso: 'ambos' }],
+};
+function doCadastro(seguradora, uso) {
+  let ls = null;
+  try { ls = JSON.parse(fs.readFileSync(path.join(__dirname, '_cadastro.json'), 'utf8')).logins.filter(l => l.seguradora === seguradora); } catch (e) { /* sem cópia */ }
+  if (!ls || !ls.length) ls = PADRAO[seguradora] || [];
+  return Object.fromEntries(ls.filter(l => l.porta && (!uso || [uso, 'ambos'].includes(l.uso || 'ambos')))
+    .map(l => [l.codigo, { porta: l.porta, pasta: l.pasta || `${seguradora}_${l.codigo}` }]));
+}
+
+module.exports = { ativos, credencial, marca, cadastra, preencheLogin, arquivo, doCadastro };
 
 if (require.main === module) {
   const [cmd, op, apelido, mascara] = process.argv.slice(2);
   if (cmd === 'cadastrar' && op && apelido) { cadastra(op, apelido, mascara || ''); console.log(`Login "${apelido}" da ${op} cadastrado.`); }
   else if (cmd === 'listar') console.log(JSON.stringify(op ? le()[op] || [] : le(), null, 2));
+  else if (cmd === 'portal' && op) console.log(Object.entries(doCadastro(op, apelido)).map(([c, x]) => `${c}:${x.porta}`).join(','));
   else { console.log('uso: node logins.js cadastrar <op> <apelido> <usuario mascarado> | listar [op]'); process.exit(1); }
 }

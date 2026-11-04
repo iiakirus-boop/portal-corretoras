@@ -20,7 +20,7 @@ export default async function FichaEmpresa({ params, searchParams }: P) {
   const em = emp as Empresa;
   const [{ data: apolices }, { data: faturas }, { data: pedidos }, { data: membros }, { data: convites }] = await Promise.all([
     db.from('apolices').select('*').eq('empresa_id', e),
-    db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false }),
+    db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null).order('competencia', { ascending: false }),
     db.from('pedidos').select('*').eq('empresa_id', e).order('criado_em', { ascending: false }).limit(20),
     db.from('membros').select('*').eq('empresa_id', e).eq('ativo', true),
     db.from('convites').select('*').eq('empresa_id', e),

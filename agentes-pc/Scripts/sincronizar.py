@@ -11,13 +11,18 @@ e manda para o banco pela função sincronizar_lote, com o token dos agentes:
   - faturas e ordens de comissão: atualiza a linha existente ou insere a nova;
   - vidas (por empresa + seguradora + mês) e lançamentos (por ordem): troca o grupo inteiro pela cópia da planilha.
 Só lê a planilha; nunca grava nela. Sem rede ou sem token, avisa e segue.
+
+Desde a p31 o banco é a base principal: Porto, Bradesco e Hapvida gravam direto nele (gravar_banco.py) e esta cópia
+não passa por cima do que o agente gravou nem do que foi excluído no master (o banco filtra em sincronizar_lote).
+Lotes pequenos e até 3 tentativas por lote, para não ficar com metade do mês quando o banco demora.
 """
-import csv, json, os, subprocess, sys, datetime
+import csv, json, os, subprocess, sys, time, datetime
 import banco
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 CARGA = os.path.join(os.path.dirname(AQUI), 'Carga_Supabase')
-LOTE = 500_000  # bytes por chamada
+LOTE = 150_000  # bytes por chamada (lotes grandes davam tempo esgotado em vidas e comissões)
+FALHAS = []
 SECO = False  # --seco: gera os CSV e só mostra as contagens, sem enviar
 
 
@@ -36,14 +41,24 @@ def enviar(tab, linhas, chave=None):
     for r in linhas:
         grupos.setdefault(chave(r) if chave else r['id'], []).append(r)
     lote, tam, total = [], 0, 0
+
+    def manda(lote):
+        for t in range(3):
+            r = banco._rpc('sincronizar_lote', dict(p_tabela=tab, p_linhas=lote))
+            if r is not None:
+                return r
+            time.sleep(5 * (t + 1))
+        FALHAS.append(f'{tab}: lote de {len(lote)} linha(s)')
+        return 0
+
     for g in grupos.values():
         n = len(json.dumps(g, ensure_ascii=False).encode())
         if lote and tam + n > LOTE:
-            total += banco._rpc('sincronizar_lote', dict(p_tabela=tab, p_linhas=lote)) or 0
+            total += manda(lote)
             lote, tam = [], 0
         lote += g; tam += n
     if lote:
-        total += banco._rpc('sincronizar_lote', dict(p_tabela=tab, p_linhas=lote)) or 0
+        total += manda(lote)
     print(f'[sincronizar] {tab}: {len(linhas)} linha(s) enviadas, {total} gravadas.')
     return total
 
@@ -78,6 +93,9 @@ def main():
     enviar('comissao_pagamentos', pag)
     enviar('vidas', vid, lambda r: (r['empresa_id'], r['seguradora_id'], r['competencia']))
     enviar('comissao_lancamentos', lan, lambda r: r['pagamento_id'])
+    if FALHAS:
+        print('[sincronizar] não foram depois de 3 tentativas: ' + '; '.join(FALHAS))
+        return 1
     return 0
 
 

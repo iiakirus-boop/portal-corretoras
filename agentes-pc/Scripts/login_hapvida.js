@@ -1,23 +1,21 @@
 // Abre o webhap da Hapvida (comissão) em Chromes visíveis, cada um com perfil próprio em %LOCALAPPDATA%\Shaddai\chrome_hapvida_<porta>,
 // e preenche o login com HAP_<LOGIN>_USER/PASS (vêm do login_hapvida.ps1, que guarda tudo criptografado no Windows).
-// Portas (o baixar_hapvida.js conecta nelas):
-//   9335 = webhap 045K  |  9336 = webhap 045L  |  9337 = webhap 02JZ
+// Portas (o baixar_hapvida.js conecta nelas): do cadastro do banco; hoje 9335 = webhap 045K  |  9336 = 045L  |  9337 = 02JZ
 // Faturas (Portal Empresa) não passam por aqui: o baixar_hapvida.js entra com cada login cadastrado no logins.js.
 // Um Chrome por login do webhap porque a sessão do webhap é por navegador: dois logins no mesmo Chrome se derrubam.
 // Captcha ou código: resolver na janela. Login sem senha guardada: o Chrome abre na tela de login para digitar na janela.
 const { chromium } = require('C:/Users/bruno/.claude/plugins/cache/playwright-skill/playwright-skill/5.0.0/skills/playwright-skill/node_modules/playwright');
 const path = require('path'), { preencheLogin } = require('./logins');
 const WEBHAP = 'https://webhap.hapvida.com.br/pls/webhap/pk_controle_comissao.Login';
-const CHROMES = [
-  { porta: 9335, abas: [['045K', WEBHAP]] },
-  { porta: 9336, abas: [['045L', WEBHAP]] },
-  { porta: 9337, abas: [['02JZ', WEBHAP]] },
-];
+// um Chrome por login do cadastro (HAP_LOGINS="045K:9335,045L:9336,..." vem do login_hapvida.ps1; sem ele, o cadastro copiado)
+const LISTA = process.env.HAP_LOGINS ? process.env.HAP_LOGINS.split(',').map(x => x.split(':'))
+  : Object.entries(require('./logins').doCadastro('hapvida', 'comissao')).map(([c, x]) => [c, x.porta]);
+const CHROMES = LISTA.map(([login, porta]) => ({ porta: Number(porta), abas: [[login, WEBHAP]] }));
 let abertos = CHROMES.length;
 
 async function entra(page, login, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  const usuario = process.env[`HAP_${login}_USER`], senha = process.env[`HAP_${login}_PASS`];
+  const usuario = process.env[`HAP_${login.toUpperCase()}_USER`], senha = process.env[`HAP_${login.toUpperCase()}_PASS`];
   if (!usuario || !senha) return console.log(`${login}: sem senha guardada, digite na janela.`);
   await preencheLogin(page, { usuario, senha });
   console.log(`${login}: login enviado.`);
