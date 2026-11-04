@@ -12,7 +12,7 @@ export default async function Master() {
     db.from('empresas').select('*').eq('ativa', true),
     db.from('vidas_carteira').select('*'),
     db.from('pedidos').select('*').in('status', ABERTOS).order('prazo'),
-    db.from('ordens_execucao').select('*').order('criada_em', { ascending: false }).limit(30),
+    db.from('ordens_execucao').select('*').is('oculta_em', null).order('criada_em', { ascending: false }).limit(30),
     db.from('maquinas').select('*').order('nome'),
     db.from('login_status').select('*'),
   ]);

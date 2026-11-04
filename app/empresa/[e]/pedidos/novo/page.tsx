@@ -28,7 +28,7 @@ export default async function NovoPedido({ params, searchParams }: P) {
   const db = await cliente();
   const [{ data: aps }, { data: fat }] = await Promise.all([
     db.from('apolices').select('*').eq('empresa_id', e).eq('ativa', true),
-    x.veFaturas ? db.from('faturas').select('*').eq('empresa_id', e).order('competencia', { ascending: false }).limit(12) : Promise.resolve({ data: [] }),
+    x.veFaturas ? db.from('faturas').select('*').eq('empresa_id', e).is('excluido_em', null).order('competencia', { ascending: false }).limit(12) : Promise.resolve({ data: [] }),
   ]);
   const apolices = (aps ?? []) as Apolice[];
   const permitidos: TipoPedido[] = x.soFinanceiro ? ['segunda_via']

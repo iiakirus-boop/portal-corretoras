@@ -4,6 +4,7 @@ import { cliente, exigirSessao } from '@/lib/servidor';
 import { cnpj, competencia, data, moeda, num, seg } from '@/lib/formato';
 import { mensalidade, vidasCarteira, vidasEmpresaPor, type Contrato, type VidaCarteira } from '@/lib/contas';
 import { Aviso } from '@/components/Aviso';
+import { alternarEmpresa } from '@/lib/acoes';
 import { Pessoas } from '@/components/Pessoas';
 import { Pill } from '@/components/Pill';
 import type { CodigoSeguradora, Convite, Corretora, Empresa, Membro } from '@/lib/tipos';
@@ -83,13 +84,20 @@ export default async function CorretoraMaster({ params, searchParams }: P) {
         {es.length === 0 ? <p className="empty">Nenhuma empresa cadastrada.</p> : (
           <div className="tbl">
             <table>
-              <thead><tr><th>Empresa</th><th>Seguradoras</th><th className="num">Vidas</th></tr></thead>
+              <thead><tr><th>Empresa</th><th>Seguradoras</th><th className="num">Vidas</th><th></th></tr></thead>
               <tbody>
                 {es.map((e) => (
-                  <tr key={e.id}>
+                  <tr key={e.id} style={e.ativa === false ? { opacity: .55 } : undefined}>
                     <td><Link href={`/corretora/${c}/empresas/${e.id}`}>{e.razao_social}</Link><small>{e.codigo_interno} {e.cnpj}</small></td>
                     <td>{(segsE.get(e.id) ?? []).join(', ') || '—'}</td>
                     <td className="num">{num(vidasE.get(e.id) ?? 0)}</td>
+                    <td>
+                      <form action={alternarEmpresa}>
+                        <input type="hidden" name="de" value={`/master/corretoras/${c}`} /><input type="hidden" name="id" value={e.id} />
+                        <input type="hidden" name="ativar" value={e.ativa === false ? '1' : '0'} />
+                        <button className={`btn sm ${e.ativa === false ? 'ghost' : 'perigo'}`}>{e.ativa === false ? 'Reativar' : 'Desativar'}</button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>

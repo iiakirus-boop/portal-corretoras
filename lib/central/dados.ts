@@ -17,7 +17,7 @@ export async function docsCentral(db: Cliente, c: string, cols: string[]): Promi
     for (const r of data ?? []) out[r.colecao].push({ ...(r.dados ?? {}), id: r.doc_id });
     if (!data || data.length < 1000) break;
   }
-  if (out.faturas?.length && !MODO_DEMO) await marcarPagamentos(db, c, out.faturas);
+  if (out.faturas?.length && !MODO_DEMO) { await tirarExcluidas(db, c, out.faturas); await marcarPagamentos(db, c, out.faturas); }
   // os pedidos do portal entram como tarefas do Agente Movimentações, como na Central
   if (out.tarefas) out.tarefas.push(...(await pedidosComoTarefas(db, c)).map((t: { id: string; dados: object }) => ({ ...t.dados, id: t.id })));
   return out;
@@ -27,6 +27,20 @@ export async function docCentral(db: Cliente, c: string, col: string, id: string
   if (MODO_DEMO) { const d = centralDemo(c)[col]?.[id]; return d ? { ...(d as object), id } : null; }
   const { data } = await db.from('central_docs').select('dados').eq('corretora_id', c).eq('colecao', col).eq('doc_id', id).maybeSingle();
   return data ? { ...(data.dados ?? {}), id } : null;
+}
+
+// Fatura que o master excluiu (errada ou duplicada) some das telas, mesmo que o pacote do PC ainda a traga.
+async function tirarExcluidas(db: Cliente, c: string, faturas: Doc[]) {
+  const { data, error } = await db.from('faturas').select('numero,competencia').eq('corretora_id', c).not('excluido_em', 'is', null).limit(1000);
+  if (error || !data?.length) return;
+  const fora = new Set((data as { numero: string; competencia: string }[]).map((r) => r.numero + '|' + String(r.competencia).trim()));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fica = (r: Record<string, any>, comp: string) => !r?.titulo || !fora.has(String(r.titulo) + '|' + comp);
+  for (const d of faturas) {
+    if (!Array.isArray(d.itens)) continue;
+    d.itens = d.itens.filter((r: Record<string, unknown>) => fica(r, d.comp));
+    for (const r of d.itens) if (Array.isArray(r.subsDet)) r.subsDet = r.subsDet.filter((x: Record<string, unknown>) => fica(x, d.comp));
+  }
 }
 
 // O "boleto" de cada fatura na Central é o que o agente viu no portal no dia em que baixou a fatura. Se a empresa pagou

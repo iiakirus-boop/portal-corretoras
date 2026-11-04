@@ -168,8 +168,9 @@ tr.tot td { font-weight: 800; background: var(--sunken); border-top: 2px solid v
 .form .linha { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .85rem; }
 label.campo { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; font-weight: 800; color: var(--muted); }
 label.campo small { font-weight: 500; }
-.campo input, .campo select, .campo textarea, input.busca, select.sel {
+.campo input, .campo select, .campo textarea, input.busca, select.sel, .acoes input, .acoes select {
   min-height: 38px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: .45rem .65rem; font-size: .88rem; font-weight: 500; color: var(--fg); width: 100%; }
+.acoes input, .acoes select { width: auto; min-height: 32px; padding: .3rem .55rem; font-size: .82rem; }
 .campo textarea { min-height: 84px; resize: vertical; }
 .msg { border-radius: var(--r-md); padding: .65rem .9rem; font-size: .85rem; font-weight: 600; }
 .msg.ok { background: var(--ok-bg); color: var(--ok-fg); } .msg.erro { background: var(--bad-bg); color: var(--bad-fg); } .msg.aviso { background: var(--warn-bg); color: var(--warn-fg); }
@@ -244,6 +245,18 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .seg::-webkit-scrollbar { display: none; }
 .seg button { flex: 0 0 auto; min-height: 30px; padding: 0 .7rem; border-radius: 7px; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; font-size: .8rem; white-space: nowrap; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--marca); color: var(--marca-fg); }
+.seg a { flex: 0 0 auto; min-height: 30px; padding: 0 .7rem; border-radius: 7px; display: inline-flex; align-items: center; color: var(--muted); font-weight: 700; font-size: .8rem; white-space: nowrap; text-decoration: none; }
+.seg a:hover { color: var(--fg); }
+.seg a[aria-current="page"] { background: var(--marca); color: var(--marca-fg); }
+/* quadro por seguradora no master (Agentes) */
+.saude { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .75rem; }
+.saude > div { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--ok-fg); border-radius: var(--r-md); padding: .75rem .9rem; display: flex; flex-direction: column; gap: .2rem; }
+.saude > div.amarelo { border-left-color: var(--warn-fg); }
+.saude > div.vermelho { border-left-color: var(--bad-fg); }
+.saude > div.parado { border-left-color: var(--faint); }
+.saude b { font-size: .92rem; }
+.saude small { font-size: .76rem; color: var(--muted); line-height: 1.45; }
+.saude .estado { font-weight: 800; font-size: .78rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chips button { min-height: 30px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-weight: 700; font-size: .78rem; display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
 .chips button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
@@ -465,9 +478,9 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
 }
 
 @media (pointer: coarse) {
-  .btn, .campo input, .campo select, input.busca, select.sel { min-height: 44px; }
+  .btn, .campo input, .campo select, input.busca, select.sel, .acoes input, .acoes select { min-height: 44px; }
   /* abaixo de 16px o iPhone dá zoom na página ao tocar no campo e não volta */
-  .campo input, .campo select, .campo textarea, input.busca, select.sel { font-size: 16px; }
+  .campo input, .campo select, .campo textarea, input.busca, select.sel, .acoes input, .acoes select { font-size: 16px; }
 }
 /* hover só onde existe mouse: no celular o toque deixava o hover grudado */
 @media (hover: hover) and (pointer: fine) {
