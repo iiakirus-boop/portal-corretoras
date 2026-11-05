@@ -26,7 +26,6 @@ const ABAS = [
   { id: 'supervisor', rotulo: 'Supervisor' },
   { id: 'rotinas', rotulo: 'Rotinas' },
   { id: 'maquinas', rotulo: 'Máquinas e custo' },
-  { id: 'pedir', rotulo: 'Pedir execução' },
 ];
 
 type Ultima = Pick<Ordem, 'agente' | 'seguradora_id' | 'status' | 'terminada_em' | 'criada_em' | 'mensagem'>;
@@ -54,7 +53,9 @@ export default async function Agentes({ searchParams }: P) {
   ]);
   const cs = (corretoras ?? []) as Corretora[];
   const nomeC = (id: string | null) => (id ? cs.find((c) => c.id === id)?.nome ?? '—' : 'Todas');
-  const comp = new Date().toISOString().slice(0, 7);
+  // mesma regra do Supervisor: até o dia 19 é a fatura do mês atual; do dia 20 em diante, a do mês seguinte
+  const hoje = new Date(Date.now() - 3 * 36e5); // horário de Brasília
+  const comp = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() + (hoje.getUTCDate() >= 20 ? 1 : 0), 1)).toISOString().slice(0, 7);
   const os = (ordens ?? []) as Ordem[];
   const rodando = os.filter((o) => o.status === 'em_execucao');
   const fila = os.filter((o) => o.status === 'pendente');
@@ -76,7 +77,10 @@ export default async function Agentes({ searchParams }: P) {
   const ul = (ultimas ?? []) as Ultima[];
   const ms = (maquinas ?? []) as Maquina[];
   const pc = ms.find((m) => !/nuvem/i.test(m.nome));
-  const sessao = (o: Ordem) => o.sessao_url ? <a className="go" href={o.sessao_url} target="_blank" rel="noreferrer">Ver passo a passo</a> : null;
+  // corretora padrão do pedido: a que mais aparece na fila (a de verdade, não a demonstração)
+  const vezes = (id: string) => os.filter((o) => o.corretora_id === id).length;
+  const padrao = [...cs].sort((a, b) => vezes(b.id) - vezes(a.id))[0];
+  const sessao = (o: Ordem) => o.sessao_url ? <a className="btn ghost sm" href={o.sessao_url} target="_blank" rel="noreferrer">Ver passo a passo</a> : null;
 
   // ---- quadro por seguradora: verde (em dia), amarelo (atenção), vermelho (parou), cinza (pausado) ----
   const segs = [...new Set(ags.filter((a) => a.seguradora_id && (a.agente === 'faturas' || a.agente === 'comissao')).map((a) => a.seguradora_id!))];
@@ -102,11 +106,60 @@ export default async function Agentes({ searchParams }: P) {
       <div className="page-head">
         <div>
           <h1>Agentes</h1>
-          <p>Está tudo rodando? O quadro abaixo responde por seguradora. O resto fica nas abas.</p>
+          <p>Peça o faturamento logo abaixo. O quadro mostra, por seguradora, se está tudo em dia.</p>
         </div>
       </div>
       <AutoAtualiza />
       <Aviso sp={sp} />
+
+      <section className="card pedir">
+        <div className="card-h"><h2>Solicitar faturamento</h2>
+          <span className="hint">o PC pega em até 2 minutos · Faturas dispara Vidas e Comissões dispara Projeção sozinhos</span></div>
+        <form action={criarOrdem} className="pedir-f">
+          <input type="hidden" name="de" value={aqui} />
+          {cs.length > 1 ? (
+            <label className="campo">Corretora
+              <select name="corretora_id" required defaultValue={padrao?.id}>{cs.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+            </label>
+          ) : <input type="hidden" name="corretora_id" value={padrao?.id ?? ''} />}
+          <label className="campo">Seguradora
+            <select name="seguradora_id" required defaultValue=""><option value="" disabled>Escolha…</option>
+              {Object.entries(SEGURADORA).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+            </select>
+          </label>
+          <label className="campo">O quê
+            <select name="agente" required defaultValue="faturas">
+              <option value="faturas">Faturas (boletos e vidas)</option>
+              <option value="comissao">Comissão</option>
+            </select>
+          </label>
+          <label className="campo">Competência<input type="month" name="competencia" defaultValue={comp} /></label>
+          <button className="btn">Solicitar</button>
+        </form>
+        <details className="mais">
+          <summary>Rodar outro agente (Vidas, Projeção, Conferência)</summary>
+          <form action={criarOrdem} className="pedir-f">
+            <input type="hidden" name="de" value={aqui} />
+            {cs.length > 1 ? (
+              <label className="campo">Corretora
+                <select name="corretora_id" required defaultValue={padrao?.id}>{cs.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+              </label>
+            ) : <input type="hidden" name="corretora_id" value={padrao?.id ?? ''} />}
+            <label className="campo">Agente
+              <select name="agente" required defaultValue="vidas">
+                {['vidas', 'projecao', 'conferencia'].map((a) => <option key={a} value={a}>{AGENTE[a]}</option>)}
+              </select>
+            </label>
+            <label className="campo">Seguradora
+              <select name="seguradora_id" defaultValue=""><option value="">Todas</option>
+                {Object.entries(SEGURADORA).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+              </select>
+            </label>
+            <label className="campo">Competência<input type="month" name="competencia" defaultValue={comp} /></label>
+            <button className="btn ghost">Colocar na fila</button>
+          </form>
+        </details>
+      </section>
 
       <section className="card">
         <div className="card-h"><h2>Seguradoras</h2>
@@ -122,10 +175,21 @@ export default async function Agentes({ searchParams }: P) {
               <small>Faturas: {q.fat ? quando(q.fat) : 'nunca'} · Comissão: {q.com ? quando(q.com) : 'nunca'}</small>
               {q.lgs.length > 0 && <small>Login: {q.lgs.filter((l) => l.ativa).length} de {q.lgs.length} ativo{q.lgs.length > 1 ? 's' : ''}</small>}
               {q.motivo && <small title={q.motivo}>{q.motivo.length > 90 ? q.motivo.slice(0, 90) + '…' : q.motivo}</small>}
+              {padrao && (
+                <div className="acoes atalho">
+                  {(['faturas', 'comissao'] as const).map((ag) => (
+                    <form key={ag} action={criarOrdem}>
+                      <input type="hidden" name="de" value={aqui} /><input type="hidden" name="corretora_id" value={padrao.id} />
+                      <input type="hidden" name="seguradora_id" value={q.s} /><input type="hidden" name="agente" value={ag} /><input type="hidden" name="competencia" value={comp} />
+                      <button className="btn ghost sm">{ag === 'faturas' ? 'Baixar faturas' : 'Baixar comissão'}</button>
+                    </form>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
-        <p className="note">Verde: em dia. Amarelo: login caído ou o Supervisor acha que algo atrasou (ele mesmo põe na fila). Vermelho: a última rodada deu erro ou espera você. Cinza: agente pausado.
+        <p className="note">Verde: em dia. Amarelo: login caído ou atraso (o Supervisor põe na fila sozinho). Vermelho: deu erro ou espera você. Cinza: pausado.{cs.length > 1 && padrao ? ` Os botões dos quadros pedem para ${padrao.nome}, competência ${competencia(comp)}.` : ` Os botões pedem a competência ${competencia(comp)}.`}
           {nAvisos ? <> A Conferência tem <Link href="/master/corrigir">{nAvisos} avisos em aberto</Link>.</> : null}</p>
       </section>
 
@@ -152,7 +216,7 @@ export default async function Agentes({ searchParams }: P) {
         </section>
       )}
 
-      <nav className="seg" aria-label="Mais detalhes" style={{ margin: '1rem 0' }}>
+      <nav className="seg" aria-label="Mais detalhes">
         {ABAS.map((a) => <Link key={a.id} href={`/master/agentes${a.id === 'historico' ? '' : `?aba=${a.id}`}`} aria-current={aba === a.id ? 'page' : undefined}>{a.rotulo}</Link>)}
       </nav>
 
@@ -266,34 +330,6 @@ export default async function Agentes({ searchParams }: P) {
         </section>
       )}
 
-      {aba === 'pedir' && (
-        <section className="card">
-          <div className="card-h"><h2>Pedir uma execução agora</h2></div>
-          <form action={criarOrdem} className="form">
-            <input type="hidden" name="de" value={aqui} />
-            <div className="linha">
-              <label className="campo">Corretora
-                <select name="corretora_id" required>{cs.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
-              </label>
-              <label className="campo">Agente
-                <select name="agente" required>
-                  {['faturas', 'comissao', 'vidas', 'projecao', 'conferencia'].map((a) => <option key={a} value={a}>{AGENTE[a]}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="linha">
-              <label className="campo">Seguradora
-                <select name="seguradora_id" defaultValue=""><option value="">Todas</option>
-                  {Object.entries(SEGURADORA).map(([id, n]) => <option key={id} value={id}>{n}</option>)}
-                </select>
-              </label>
-              <label className="campo">Competência<input type="month" name="competencia" defaultValue={comp} /></label>
-            </div>
-            <div><button className="btn">Colocar na fila</button></div>
-            <p className="note">Você não precisa pedir: o Supervisor põe na fila o que estiver atrasado. Faturas sempre dispara Vidas, e Comissões sempre dispara Projeção. Projeção, Conferência e Supervisor rodam na nuvem; os outros, no PC (o vigia pega em até 2 minutos).</p>
-          </form>
-        </section>
-      )}
     </div>
   );
 }
