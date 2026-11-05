@@ -2,29 +2,24 @@
 // Início (Visão geral) da Central de Agentes como tela do portal: mesmas contas e a mesma Projeção
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { type Doc, type Item, aberto, addMonth, brl, ckey, fam, famsIn, fatItems, int, kfmt, mesLabel, pct, pdate, sum, uniq, vidas } from '@/lib/central/modelo';
+import { type Doc, addMonth, brl, ckey, fam, fatItems, int, kfmt, mesLabel, pct, sum, uniq, vidas } from '@/lib/central/modelo';
 import { type Credito, mergeCom, projAll } from '@/lib/central/projecao.gen';
-import { plural } from '@/lib/formato';
+import { plural, STATUS_PEDIDO, TIPO_PEDIDO } from '@/lib/formato';
+import type { StatusPedido, TipoPedido } from '@/lib/tipos';
 
 const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const DS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const d2 = (d: Date) => String(d.getUTCDate()).padStart(2, '0') + '/' + MES[d.getUTCMonth()];
 const dk = (d: Date) => d.toISOString().slice(0, 10);
 const wkStart = (d: Date) => new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 864e5);
-const ICON: Record<string, React.ReactNode> = {
-  projecao: <><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,
-  faturas: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
-  vidas: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /></>,
-  movimentacoes: <><path d="M7 4 3 8l4 4" /><path d="M3 8h14" /><path d="m17 20 4-4-4-4" /><path d="M21 16H7" /></>,
-  comissoes: <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" />,
-  financeiro: <><path d="M3 10 12 4l9 6" /><path d="M5 10v8M12 10v8M19 10v8" /></>,
-};
-const STATUS: Record<string, [string, string]> = { trabalhando: ['Trabalhando', 'p-info'], em_dia: ['Em dia', 'p-ok'], aguardando: ['Aguardando você', 'p-warn'], em_breve: ['Em breve', 'p-idle'], parado: ['Parado', 'p-bad'] };
 const sinal = (v: number) => <span className={v >= 0 ? 'up' : 'down'}>{v >= 0 ? '+' : '−'}{pct(Math.abs(v))}</span>;
 
-export type DadosInicio = { faturas: Doc[]; comissoes: Doc[]; agenciamentos: Doc[]; implantacoes: Doc[]; tarefas: Doc[]; agentes: Doc[] };
+export type DadosInicio = { faturas: Doc[]; comissoes: Doc[]; agenciamentos: Doc[]; implantacoes: Doc[]; tarefas: Doc[] };
+export type MovInicio = { id: string; tipo: TipoPedido; status: StatusPedido; protocolo: string; empresa: string; pessoa: string; carteirinha: string; prazo: string | null; noticia: string; em: string };
+export type FaltaInicio = { eid: string; empresa: string; seguradora: string; vidas: number };
+type Carteira = { vidas: number; empresas: number; contratos: number; novo: string };
 
-export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje: string; admin: boolean }) {
+export function Inicio({ c, d, hoje, admin, carteira, faltam, movs }: { c: string; d: DadosInicio; hoje: string; admin: boolean; carteira: Carteira; faltam: FaltaInicio[]; movs: MovInicio[] }) {
   const [hday, setHday] = useState<string | null>(null);
   const base = `/corretora/${c}`, pend = `/corretora/${c}/pendencias`;
   const fichaUrl = (eid: string) => `${base}/faturamento?emp=${encodeURIComponent(eid)}`;
@@ -38,21 +33,15 @@ export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje:
 
   const fitems = fatItems(d.faturas), comps = uniq(fitems.map((r) => r.comp)).sort(), fm = comps[comps.length - 1], pm = comps[comps.length - 2];
   const fr = fitems.filter((r) => r.comp === fm), prev = fitems.filter((r) => r.comp === pm), ftot = sum(fr, (r) => r.valor);
-  // comparação justa: só as empresas que aparecem nos dois meses
-  const eNow = new Set(fr.map((r) => r.eid)), ePrev = new Set(prev.map((r) => r.eid));
-  const lfN = sum(fr.filter((r) => ePrev.has(r.eid)), (r) => r.valor), lfP = sum(prev.filter((r) => eNow.has(r.eid)), (r) => r.valor), dlt = lfP ? (lfN - lfP) / lfP * 100 : 0;
   const ptt = sum(prev, (r) => r.valor), dtt = ptt ? (ftot - ptt) / ptt * 100 : 0;
-  const cnt = (L: Item[]) => { const o: Record<string, number> = {}; L.forEach((r) => { const f = fam(r.operadora); o[f] = (o[f] || 0) + 1; }); return o; }, cN = cnt(fr), cP = cnt(prev);
-  const faltF = famsIn(Object.keys(cP)).filter((f) => (cN[f] || 0) < cP[f]), nFalt = sum(faltF, (f) => cP[f] - (cN[f] || 0)), faltTxt = faltF.map((f) => f + ' −' + (cP[f] - (cN[f] || 0))).join(', ');
-  const vid = (r: Item) => +(r.ativos || r.vidas) || 0, vN = sum(fr, vid), vdl = sum(fr.filter((r) => ePrev.has(r.eid)), vid) - sum(prev.filter((r) => eNow.has(r.eid)), vid);
-  const novas = [...eNow].filter((e) => !ePrev.has(e)).length;
+  const empF = sum(faltam.filter((x, i) => faltam.findIndex((y) => y.eid === x.eid) === i), () => 1);
   const C: Credito[] = M ? M.com : [];
   const mCom = C.filter((x) => ckey(x.data) === cm), caiu = sum(mCom.filter((x) => x.tipo === 'real'), (x) => x.valor), falta = sum(mCom.filter((x) => x.tipo !== 'real'), (x) => x.valor);
   const atrC = C.filter((x) => x.atraso && x.tipo !== 'real'), nm = addMonth(cm, 1), pNext = sum(C.filter((x) => ckey(x.data) === nm), (x) => x.valor), vAtr = sum(atrC, (x) => x.valor);
   // débitos que a seguradora descontou nas ordens do mês e estimativas sem histórico deixadas fora da soma
   const debM = sum(mergeCom(d.comissoes).flatMap((x) => x.ordens || []).filter((o: Doc) => String(o.dataISO || '').slice(0, 7) === cm), (o: Doc) => o.debcred);
   const semH = M ? sum(((M.semHist || []) as Credito[]).filter((x) => ckey(x.data) === cm), (x) => x.valor) : 0;
-  const need = d.tarefas.filter((t) => t.coluna === 'precisa'), doing = d.tarefas.filter((t) => t.coluna === 'andamento');
+  const need = d.tarefas.filter((t) => t.coluna === 'precisa');
 
   // comissão desta semana, dia a dia (e o total da próxima)
   const mon = wkStart(T);
@@ -71,34 +60,49 @@ export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje:
     return <li>{x.eid ? <Link className="linha-a" href={fichaUrl(x.eid)}>{corpo}</Link> : corpo}</li>;
   };
 
-  // vencimentos dos próximos 15 dias
-  const lim = new Date(T.getTime() + 15 * 864e5);
-  const abAll = fitems.filter(aberto).map((r) => Object.assign({}, r, { d: pdate(r.venc) as Date }) as Item & { d: Date }).filter((r) => !!r.d);
-  const ab = abAll.filter((r) => r.d >= T && r.d <= lim).sort((a, b) => +a.d - +b.d), atr = abAll.filter((r) => r.d < T && r.d >= new Date(T.getTime() - 60 * 864e5));
-  // movimentações e agentes
-  const mv = d.tarefas.filter((t) => t.agente === 'movimentacoes' || t.tipo === 'movimentacao'), ma = mv.filter((t) => t.coluna !== 'concluido'), mc = mv.filter((t) => t.coluna === 'concluido');
-  const pendAg: Record<string, number> = {}; d.tarefas.forEach((t) => { if (t.coluna === 'precisa') pendAg[t.agente] = (pendAg[t.agente] || 0) + 1; });
-  const agentes = d.agentes.slice().sort((a, b) => (+a.ordem || 99) - (+b.ordem || 99));
+  const movAbertas = movs.filter((x) => x.status !== 'concluido'), movProntas = movs.filter((x) => x.status === 'concluido');
+  const tomC: Record<string, string> = { warn: 'p-warn', info: 'p-info', ok: 'p-ok', idle: 'p-idle', bad: 'p-bad' };
+  const Mov = ({ x }: { x: MovInicio }) => {
+    const st = STATUS_PEDIDO[x.status];
+    return <li><Link className="linha-a" href={`${base}/pedidos/${x.id}`}>
+      <span style={{ minWidth: 0 }}><b>{TIPO_PEDIDO[x.tipo]} · {x.empresa}</b>
+        <small>{[x.pessoa, x.carteirinha ? `carteirinha ${x.carteirinha}` : '', x.protocolo].filter(Boolean).join(' · ')}</small>
+        {x.noticia && <small>“{x.noticia.length > 110 ? x.noticia.slice(0, 110) + '…' : x.noticia}”</small>}</span>
+      <span className="r"><span className={`pill ${tomC[st?.tom ?? 'idle']}`}>{st?.rotulo ?? x.status}</span></span>
+    </Link></li>;
+  };
+  const novoL = carteira.novo ? mesLabel(carteira.novo) : mesLabel(fm);
 
   return (
     <div className="page cx">
-      <div className="page-head"><div><h1>Visão geral</h1><p>O que importa hoje: os números do mês{admin ? ', a comissão desta semana' : ''}, os boletos vencendo e o que os agentes estão fazendo. <a href={`/central/${c}#inicio`}>Ver na Central antiga</a></p></div></div>
+      <div className="page-head"><div><h1>Início</h1><p>Os totais do mês, as movimentações em andamento e as empresas que ainda não tiveram a fatura de {novoL} gerada.{need.length > 0 && <> <Link href={pend}><b>{plural(need.length, 'pendência', 'pendências')} com você</b></Link>.</>} <a href={`/central/${c}#inicio`}>Ver na Central antiga</a></p></div></div>
       <div className="kpis">
-        <Link className="kpi" href={`${base}/faturamento`}><span className="kpi-l">Carteira · {mesLabel(fm)}</span><span className="kpi-v">{int(eNow.size)} <span className="kpi-un">empresas</span></span>
-          <span className="kpi-s">{vidas(vN)}{pm && <> · <span className={vdl >= 0 ? 'up' : 'down'}>{vdl >= 0 ? '+' : '−'}{int(Math.abs(vdl))}</span> vs {mesLabel(pm)}</>}{pm && novas ? ` · ${novas} ${novas > 1 ? 'novas' : 'nova'}` : ''}</span></Link>
-        <Link className="kpi" href={`${base}/faturamento`}><span className="kpi-l">Faturado · {mesLabel(fm)}</span><span className="kpi-v">R$ {brl(ftot)}</span>
-          <span className="kpi-s">{pm && <>{sinal(dlt)} nas mesmas empresas · {sinal(dtt)} no total, vs {mesLabel(pm)}</>}{nFalt > 0 && <><br /><span className="down">{plural(nFalt, 'fatura', 'faturas')} a menos</span> ({faltTxt})</>}</span></Link>
+        <Link className="kpi" href={`${base}/faturamento`}><span className="kpi-l">Faturamento · {mesLabel(fm)}</span><span className="kpi-v">R$ {brl(ftot)}</span>
+          <span className="kpi-s">{plural(new Set(fr.map((r) => r.eid)).size, 'empresa', 'empresas')} até agora{pm && <><br />{mesLabel(pm)} fechou em R$ {brl(ptt)}{faltam.length === 0 && <> · {sinal(dtt)}</>}</>}</span></Link>
         {admin && (
-          <Link className="kpi" href={`${base}/projecao`} title={['Bruto, pela data do crédito.', debM ? `Líquido R$ ${brl(caiu + debM)}, depois de R$ ${brl(-debM)} de débitos.` : '', semH ? `R$ ${brl(semH)} sem histórico de comissão, fora da soma.` : ''].filter(Boolean).join(' ')}>
-            <span className="kpi-l">Comissão que cai no mês · {mesLabel(cm)}</span><span className="kpi-v">R$ {brl(caiu + falta)}</span>
+          <Link className="kpi" href={`${base}/comissoes`} title={['Bruto, pela data do crédito.', debM ? `Líquido R$ ${brl(caiu + debM)}, depois de R$ ${brl(-debM)} de débitos.` : '', semH ? `R$ ${brl(semH)} sem histórico de comissão, fora da soma.` : ''].filter(Boolean).join(' ')}>
+            <span className="kpi-l">Comissão · {mesLabel(cm)}</span><span className="kpi-v">R$ {brl(caiu + falta)}</span>
             <span className="kpi-s">R$ {brl(caiu)} já caiu · R$ {brl(falta)} a cair{vAtr ? <>, <b style={{ color: 'var(--bad-fg)' }}>R$ {brl(vAtr)} em atraso</b></> : null}<br />{mesLabel(nm)}: R$ {brl(pNext)}</span>
           </Link>
         )}
-        <Link className="kpi" href={pend}><span className="kpi-l">Pendências</span><span className="kpi-v">{need.length} <span className="kpi-un">com você</span></span><span className="kpi-s">{doing.length} em andamento com os agentes</span></Link>
+        <Link className="kpi" href={`${base}/empresas`}><span className="kpi-l">Carteira</span><span className="kpi-v">{int(carteira.vidas)} <span className="kpi-un">vidas</span></span>
+          <span className="kpi-s">{plural(carteira.empresas, 'empresa', 'empresas')} · {plural(carteira.contratos, 'contrato', 'contratos')}<br />último mês fechado, mais entradas e saídas</span></Link>
+        <a className="kpi" href="#faltam"><span className="kpi-l">Falta gerar faturamento · {novoL}</span><span className="kpi-v">{int(empF)} <span className="kpi-un">{empF === 1 ? 'empresa' : 'empresas'}</span></span>
+          <span className="kpi-s">{faltam.length ? <>{plural(faltam.length, 'contrato', 'contratos')} · {vidas(sum(faltam, (x) => x.vidas))}</> : 'Todas as faturas do mês já saíram'}</span></a>
+        <Link className="kpi" href={`${base}/pedidos`}><span className="kpi-l">Movimentações</span><span className="kpi-v">{int(movAbertas.length)} <span className="kpi-un">em andamento</span></span>
+          <span className="kpi-s">{plural(movProntas.length, 'concluída', 'concluídas')} nos últimos 15 dias</span></Link>
       </div>
 
       <div className="grid g32" style={{ alignItems: 'start' }}>
         <div className="coluna">
+          <section className="card">
+            <div className="card-h"><h2>Movimentações</h2><span className="hint">Em andamento e concluídas nos últimos 15 dias</span><Link className="lnk" href={`${base}/pedidos`}>Ver pedidos</Link></div>
+            {movs.length ? <>
+              {movAbertas.length > 0 && <ul className="rows">{movAbertas.slice(0, 8).map((x) => <Mov key={x.id} x={x} />)}</ul>}
+              {movAbertas.length > 8 && <p className="hint">Mais {movAbertas.length - 8} em andamento em Pedidos.</p>}
+              {movProntas.length > 0 && <details className="more" open={movAbertas.length === 0}><summary>{plural(movProntas.length, 'concluída', 'concluídas')} nos últimos 15 dias</summary><ul className="rows">{movProntas.map((x) => <Mov key={x.id} x={x} />)}</ul></details>}
+            </> : <p className="empty">Nenhuma movimentação em andamento. Quando uma empresa pedir inclusão, exclusão ou troca de plano, ela aparece aqui até a carteirinha sair.</p>}
+          </section>
           {admin && (
             <section className="card">
               <div className="card-h"><h2>Comissão desta semana</h2>{M && <span className="hint">Próxima semana: R$ {brl(sum(w1.it, (x) => x.valor))}</span>}<Link className="lnk" href={`${base}/projecao`}>Abrir projeção</Link></div>
@@ -134,44 +138,16 @@ export function Inicio({ c, d, hoje, admin }: { c: string; d: DadosInicio; hoje:
               </> : <p className="empty">A projeção aparece depois da primeira rodada do Agente Faturas.</p>}
             </section>
           )}
-          <section className="card">
-            <div className="card-h"><h2>Agentes</h2><span className="hint">Clique para ver as tarefas de cada um</span></div>
-            <div className="agents">
-              {agentes.length ? agentes.map((a) => {
-                const n = pendAg[a.id] || 0, st = n ? [`Com você (${n})`, 'p-warn'] : STATUS[a.status] || STATUS.em_dia;
-                return (
-                  <Link key={a.id} className="agent" href={`${pend}?agente=${encodeURIComponent(a.id)}`} title={a.atividade || ''}>
-                    <span className="ic"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICON[a.id] || ICON.faturas}</svg></span>
-                    {String(a.nome || a.id).replace(/^Agente /, '')}<span className={`pill ${st[1]}`}>{st[0]}</span>
-                  </Link>
-                );
-              }) : <p className="empty">Os agentes aparecem aqui assim que a base responder.</p>}
-            </div>
-            <div className="hmov">
-              {mv.length ? (
-                <div className="facts"><span><b>{ma.length}</b> {ma.length === 1 ? 'pedido de movimentação aberto' : 'pedidos de movimentação abertos'}</span><span><b>{mc.length}</b> {mc.length === 1 ? 'concluído' : 'concluídos'}</span><Link className="lnk" href={`${base}/pedidos`}>Ver pedidos</Link></div>
-              ) : <p className="hint" style={{ margin: 0 }}>Nenhum pedido de movimentação ainda. Para pedir, abra uma empresa em Empresas.</p>}
-            </div>
-          </section>
         </div>
-        <section className="card">
-          <div className="card-h"><h2>Próximos vencimentos</h2><span className="hint">Boletos em aberto</span></div>
-          <ul className="rows">
-            {ab.slice(0, 7).map((r) => {
-              const soon = +r.d - +T <= 3 * 864e5;
-              return (
-                <li key={r.eid + r.comp + r.titulo}><Link className="linha-a lrow" href={fichaUrl(r.eid)}>
-                  <span className={'date' + (soon ? ' soon' : '')}>{String(r.d.getUTCDate()).padStart(2, '0')}<br />{MES[r.d.getUTCMonth()]}</span>
-                  <span style={{ minWidth: 0 }}><b>{r.empresa}</b><small>{r.operadora}</small></span><span className="r">R$ {brl(r.valor)}</span>
-                </Link></li>
-              );
-            })}
-            {ab.length > 7 && <li><span className="hint">Mais {ab.length - 7} até {String(lim.getUTCDate()).padStart(2, '0')}/{MES[lim.getUTCMonth()]}</span></li>}
-            {!ab.length && <li><span className="empty">Nenhum boleto vencendo nos próximos 15 dias.</span></li>}
-            {atr.length > 0 && (
-              <li><Link className="linha-a" href={`${base}/faturamento`}><span><b style={{ color: 'var(--bad-fg)' }}>{plural(atr.length, 'boleto vencido', 'boletos vencidos')} ainda em aberto</b><small>R$ {brl(sum(atr, (r) => r.valor))} · vale confirmar se já foram pagos</small></span><span className="lnk">Ver boletos</span></Link></li>
-            )}
-          </ul>
+        <section className="card" id="faltam">
+          <div className="card-h"><h2>Falta gerar faturamento</h2><span className="hint">Sem fatura de {novoL} ainda</span></div>
+          {faltam.length ? <ul className="rows">
+            {faltam.map((x) => (
+              <li key={x.eid + x.seguradora}><Link className="linha-a" href={fichaUrl(x.eid)}>
+                <span style={{ minWidth: 0 }}><b>{x.empresa}</b><small>{x.seguradora}</small></span><span className="r">{vidas(x.vidas)}</span>
+              </Link></li>
+            ))}
+          </ul> : <p className="empty">Todas as empresas já têm a fatura de {novoL}.</p>}
         </section>
       </div>
     </div>
