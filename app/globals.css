@@ -579,3 +579,12 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
 .cx-det { display: grid; gap: 1rem; }
 .cx-det-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .3rem 1rem; margin-top: .4rem; }
 .cx-det-h h2 { font-size: 1.05rem; font-weight: 800; }
+
+/* Agentes (master): pedido de faturamento no topo */
+.pedir { border-top: 3px solid var(--accent); }
+.pedir-f { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; align-items: end; }
+.pedir-f .btn { min-height: 40px; }
+.pedir details.mais { margin-top: .8rem; border-top: 1px solid var(--line); padding-top: .7rem; }
+.pedir details.mais > summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.pedir details.mais[open] > summary { margin-bottom: .75rem; }
+.saude .atalho { margin-top: auto; padding-top: .5rem; gap: .4rem; }
