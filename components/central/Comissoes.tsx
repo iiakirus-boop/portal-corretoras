@@ -106,13 +106,10 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
     <div className="page cx">
       {cabeca}
       {PM && <MesAtual PM={PM} op={op} fotos={d.projecoes} />}
-      {PM && <PrevistoCaiu PM={PM} op={op} fotos={d.projecoes} mes={mes} setMes={setMes} />}
-      {PM && <ACair PM={PM} fichaUrl={fichaUrl} />}
-      <Semanas PM={PM} mes={mes} op={op} fotos={d.projecoes} centralUrl={centralUrl} fichaUrl={fichaUrl} />
 
-      <details className="fold">
-        <summary><h2>Detalhes do extrato de {mesLabel(mes)}</h2><span className="hint">Comissão bruta, empresas, taxas, ordens de pagamento e lançamentos sem fatura</span></summary>
-        <div className="fb cx-det">
+      {/* o extrato do mês fica logo abaixo do mês atual, sempre aberto */}
+      <div className="cx-det">
+      <div className="cx-det-h"><h2>Extrato de {mesLabel(mes)}</h2><span className="hint">Comissão bruta, empresas, taxas, ordens de pagamento e lançamentos sem fatura · troque o mês no alto da página</span></div>
       <div className="kpis">
         <div className="kpi"><span className="kpi-l">Comissão bruta {mesLabel(mes)}</span><span className="kpi-v">R$ {brl(br)}</span>
           <span className="kpi-s">{pd && <><span className={dl >= 0 ? 'up' : 'down'}>{dl >= 0 ? '+' : '−'}{pct(Math.abs(dl))}</span> vs {mesLabel(comps[pi - 1])} · </>}pelo mês do extrato</span></div>
@@ -194,8 +191,11 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
           {!Object.keys(gx).length && <li><span className="empty">Nada fora das faturas neste mês.</span></li>}
         </ul></div>
       </details>
-        </div>
-      </details>
+      </div>
+
+      {PM && <PrevistoCaiu PM={PM} op={op} fotos={d.projecoes} mes={mes} setMes={setMes} />}
+      {PM && <ACair PM={PM} fichaUrl={fichaUrl} />}
+      <Semanas PM={PM} mes={mes} op={op} fotos={d.projecoes} centralUrl={centralUrl} fichaUrl={fichaUrl} />
     </div>
   );
 }
@@ -281,7 +281,7 @@ function PrevistoCaiu({ PM, op, fotos, mes, setMes }: { PM: Modelo; op: string; 
           </tbody>
         </table>
       </div>
-<p className="note">O previsto de cada mês é a primeira projeção guardada dentro dele. Mês sem projeção guardada mostra só o que caiu. Caiu = comissão das faturas, pela data da ordem de pagamento (bônus, odonto e seguros sem fatura ficam nos Detalhes do extrato).</p>
+<p className="note">O previsto de cada mês é a primeira projeção guardada dentro dele. Mês sem projeção guardada mostra só o que caiu. Caiu = comissão das faturas, pela data da ordem de pagamento (bônus, odonto e seguros sem fatura ficam no Extrato, mais acima).</p>
     </section>
   );
 }
