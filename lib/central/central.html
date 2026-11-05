@@ -850,6 +850,40 @@ function projAll(fat,comMerged,o){o=o||{};
       let d=util(new Date(Date.UTC(a,mm-1,Math.min(day,last_))));const atras=d<T;if(atras)d=util(new Date(T.getTime()+864e5));
       extra.push({tipo:'proj',atraso:atras,op:L.op,kind:'vit',empresa:L.empresa,eid:'',data:d,valor:v,comp:m,taxa:vit[0].taxa,parc:null,
         how:`Repete a última comissão vitalícia paga (${mesLabel(L.comp)}, R$ ${brl(v)}). Empresa sem fatura na base`,quando:atras?'deveria ter caído e ainda não caiu: em atraso, jogado para o próximo dia útil':'mesmo dia do último pagamento',base:{fat:null,comp:m,valor:sum(vit,i=>i.valorFat),rep:vit[0].titulo}})}});
+  // agenciamento de empresa sem fatura na base: repete a última parcela paga até completar a regra padrão de 3 parcelas
+  // (ou o que a equipe informou em "Ainda faltam"). Sai marcado como estimado sem fatura (semFat) para a tela sinalizar.
+  const agH={};
+  comMerged.forEach(c=>{const od={};(c.ordens||[]).forEach(o=>od[o.op]=o.dataISO);
+    (c.itens||[]).forEach(i=>{const k=fam(i.operadora)+'|'+norm(i.empresa);if(i.eid||fatNames.has(k))return;
+      const H=agH[k]=agH[k]||{op:i.operadora,empresa:i.empresa,itens:[]};H.itens.push(Object.assign({comp:c.comp,dt:od[i.op]||null},i))})});
+  const agExtra=[];
+  Object.entries(agH).forEach(([k,H])=>{
+    const byP={};H.itens.forEach(i=>{if(+i.parcela>0)(byP[i.parcela]=byP[i.parcela]||[]).push(i)});
+    const ps=Object.keys(byP).map(Number).sort((a,b)=>a-b);if(!ps.length)return;
+    const kP=p=>byP[p].some(isAg)?'ag':'vit';
+    const rp=ps.filter(p=>kP(p)==='ag');if(!rp.length)return;
+    const lastP=ps[ps.length-1],lastAg=rp[rp.length-1];
+    const Lag=byP[lastAg].filter(isAg),lastC=Lag.map(i=>i.comp).sort().pop();
+    if(lastC<addMonth(cmT,-3))return; // agenciamento antigo: não projeta
+    const key='SF-'+k.replace(/[^A-Za-z0-9]+/g,'_'),cfg=(o.agcfg||{})[key];
+    const assum=kP(ps[0])==='ag'?ps[0]-1:0;
+    let restantes,apos=lastAg,auto=!cfg;
+    if(cfg){restantes=Math.max(0,+cfg.restantes||0);apos=+cfg.aposParcela||lastAg}
+    else restantes=kP(lastP)==='vit'?0:Math.max(0,3-(assum+rp.length));
+    const val=sum(Lag,i=>i.comissao),dts=Lag.map(i=>i.dt).filter(Boolean).sort(),day=dts.length?+dts[dts.length-1].slice(8,10):10;
+    const prox=[];
+    for(let j=1;j<=restantes&&val>0;j++){const m=addMonth(lastC,j);if(m>endM)break;const [a,mm]=m.split('-').map(Number);const last_=new Date(Date.UTC(a,mm,0)).getUTCDate();
+      let d=util(new Date(Date.UTC(a,mm-1,Math.min(day,last_))));const atras=d<T;if(atras)d=util(new Date(T.getTime()+864e5));
+      const x={tipo:'proj',semFat:true,agKey:key,atraso:atras,op:H.op,kind:'ag',empresa:H.empresa,eid:'',data:d,valor:val,comp:m,taxa:100,parc:apos+j,
+        obs:(apos+j)+'ª parcela · agenciamento estimado (sem fatura na base)',
+        how:`Agenciamento estimado, empresa sem fatura na base: repete a última parcela paga (${lastAg}ª, ${mesLabel(lastC)}, R$ ${brl(val)}). ${auto?'Regra padrão de 3 parcelas':'Informado pela equipe: faltam '+restantes}; se forem menos, ajuste em "Agenciamentos em andamento"`,
+        quando:atras?'deveria ter caído e ainda não caiu: em atraso, jogado para o próximo dia útil':'mesmo dia do último pagamento',base:{fat:null,comp:m,valor:sum(Lag,i=>i.valorFat),rep:Lag[0].titulo}};
+      prox.push(x);agExtra.push(x)}
+    if(!prox.length&&!cfg)return;
+    const recR=M.com.filter(x=>x.tipo==='real'&&x.kind==='ag'&&!x.eid&&fam(x.op)+'|'+norm(x.empresa)===k);
+    M.ag.push({eid:key,nome:H.empresa+' (sem fatura na base)',semFat:true,restantes,apos,auto,last:lastAg,cfg:cfg||null,im:null,assum,
+      rec:rp.map(p=>({parcela:p,taxa:Math.max(...byP[p].filter(isAg).map(i=>+i.taxa)),valor:sum(byP[p].filter(isAg),i=>i.comissao),comp:byP[p][0].compFat})),recR,prox,vit:null})});
+  extra.push(...agExtra);
   M.semHist=M.com.filter(x=>x.semHist); M.com=M.com.filter(x=>!x.semHist).concat(extra); M.extraN=Object.keys(last).length; return M;
 }
 //</model>

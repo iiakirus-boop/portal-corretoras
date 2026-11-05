@@ -577,3 +577,5 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
 .csem .h.late { color: var(--bad-fg); font-weight: 700; }
 @media (max-width: 640px) { .csems { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 .cx-det { display: grid; gap: 1rem; }
+.cx-det-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .3rem 1rem; margin-top: .4rem; }
+.cx-det-h h2 { font-size: 1.05rem; font-weight: 800; }
