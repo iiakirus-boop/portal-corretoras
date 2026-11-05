@@ -240,7 +240,13 @@ async function comissao(comp, login, saida) {
       return { i, card: card.replace(/\s+/g, ' ').trim(), linha: (r.innerText || '').replace(/\s+/g, ' ').trim() };
     }).filter(x => /Anal[íi]tico por Data/i.test(x.linha) || /Anal[íi]tico por Data/i.test(x.card));
   });
-  if (!cards.length) throw new Error('nenhum card com EXCEL do "Analítico por Data Pagamento" na tela');
+  if (!cards.length) {
+    // começo do mês: a Hapvida ainda não publicou o lote do mês = nada novo (não é erro).
+    // Se a tela mostra o "Analítico por Data" e mesmo assim não achamos o botão, a tela mudou: aí é erro.
+    if (/Anal[íi]tico por Data/i.test(tela)) throw new Error('a tela mostra o "Analítico por Data Pagamento", mas sem o botão EXCEL que o agente conhece');
+    saida.sem_dados.push({ comissao: comp, login, motivo: 'a Hapvida ainda não publicou a comissão deste mês' });
+    return;
+  }
   const tsv = path.join(dest, 'lotes.tsv');
   const lotes = fs.existsSync(tsv) ? fs.readFileSync(tsv, 'utf8').split(/\r?\n/).filter(l => l && !l.startsWith('lote\t')) : [];
   const vistos = new Set();
