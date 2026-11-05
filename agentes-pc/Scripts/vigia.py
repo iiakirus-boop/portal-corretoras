@@ -209,6 +209,8 @@ def automatico(o, simular=False):
     if not simular:
         banco.inicio(ag, ordem=o['id'], maquina=MAQUINA, mensagem='Baixando do portal')
     caiu = f'login caiu: clique em Entrar na {NOME[op]}'
+    if ag == 'faturas' and op == 'hapvida':  # faturas Hapvida = Portal Empresa, que o baixar_hapvida.js loga sozinho ("Entrar na Hapvida" é só o webhap da comissão)
+        caiu = 'o login do Portal Empresa da Hapvida falhou duas vezes seguidas: tente de novo pelo master (não precisa abrir o Entrar na Hapvida)'
     # os três logins juntos na comissão Hapvida: o painel do mês sai das três pastas (comissao_hapvida.py)
     if not todos_logados(op, ag):
         motivo = entrar(op, ag)
@@ -224,12 +226,17 @@ def automatico(o, simular=False):
         args = ['comissao', comp]
     else:
         args = ['comissao', ultimo_pagamento(op).isoformat(), hoje.isoformat()]  # o mesmo dia de novo: ordem já gravada é pulada
-    log(f'{ag} {op}: node baixar_{op}.js ' + ' '.join(args))
-    r = subprocess.run(['node', f'baixar_{op}.js', *args], cwd=AQUI, capture_output=True, text=True, encoding='utf-8')
-    try:
-        saida = json.loads((r.stdout or '').strip().splitlines()[-1])
-    except (ValueError, IndexError):
-        saida = {}
+    for tentativa in (1, 2):  # login que falha (ex.: portal em branco por um instante) ganha uma 2ª tentativa sozinho
+        log(f'{ag} {op}: node baixar_{op}.js ' + ' '.join(args) + (' (2ª tentativa)' if tentativa == 2 else ''))
+        r = subprocess.run(['node', f'baixar_{op}.js', *args], cwd=AQUI, capture_output=True, text=True, encoding='utf-8')
+        try:
+            saida = json.loads((r.stdout or '').strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            saida = {}
+        if r.returncode != 3 or tentativa == 2:
+            break
+        log(f'{ag} {op}: login falhou no passo "{saida.get("passo", "?")}"; tento de novo em 2 min')
+        time.sleep(120)
     if r.returncode == 3:
         return parar(o, 'aguardando_voce', caiu, simular)
     if r.returncode:
