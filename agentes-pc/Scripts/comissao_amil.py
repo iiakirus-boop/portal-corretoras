@@ -16,8 +16,11 @@ Uso:  python comissao_amil.py <Base_Faturas_Vidas.xlsx> <extrato1.txt> [extrato2
 - Conferência: comissão = base de cálculo × percentual; soma do detalhe = valor líquido do extrato.
   A base ainda não tem faturas Amil, então não há conferência com fatura.
 - Extrato já gravado não é gravado de novo: o script compara o total e relata.
+- Painel da Central (_painel/com_AAAA-MM_amil.json): para cada mês de pagamento dos extratos passados, o painel do mês
+  é refeito com TODOS os extratos daquele mês que estão em Comissoes/*/Amil/ (não só os novos), e o rodar.py publica.
+  Só o painel:  python comissao_amil.py --painel AAAA-MM [AAAA-MM ...]
 """
-import sys, os, re, datetime
+import sys, os, re, glob, json, datetime
 import openpyxl
 from shaddai_comum import classe_por_taxa, preparar, _prox, _w, MOEDA, DATA, CINZA, PAG, COM
 
@@ -180,7 +183,75 @@ def importar(wb, arquivos, pasta_rel_de):
     return rel
 
 
+def _comp_ref(s):
+    m = re.match(r"(\d{1,2})/(\d{4})", s or "")
+    return f"{m.group(2)}-{int(m.group(1)):02d}" if m else None
+
+
+def gravar_painel(comps, pasta_comissoes, dir_painel):
+    """Refaz _painel/com_<comp>_amil.json de cada mês com todos os extratos Amil daquele mês de pagamento."""
+    comps = set(comps)
+    por_mes = {}
+    for f in sorted(glob.glob(os.path.join(pasta_comissoes, "*", "Amil", "EXTRATO_COMISSAO_*.txt"))):
+        try:
+            ext, ls = ler_txt(f)
+        except Exception:
+            continue
+        data = ext["efetivo"] or ext["previsto"]
+        if data and f"{data:%Y-%m}" in comps:
+            por_mes.setdefault(f"{data:%Y-%m}", {})[ext["extrato"]] = (ext, ls, data)  # mesmo nº em 2 pastas = 1 só
+    os.makedirs(dir_painel, exist_ok=True)
+    agora = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    saida = []
+    for comp in sorted(por_mes):
+        ordens, itens, obs = [], [], []
+        for nro in sorted(por_mes[comp], key=int):
+            ext, ls, data = por_mes[comp][nro]
+            op = f"AMIL-{nro}"
+            soma = round(sum(l["valor"] for l in ls), 2)
+            conf = "OK" if abs(soma - ext["liquido"]) <= 0.01 else "Divergência"
+            ordens.append(dict(op=op, data=f"{data:%d/%m/%Y}", dataISO=f"{data:%Y-%m-%d}", empresa=f"Amil · {ext['op']}",
+                               bruto=ext["nf_valor"], debcred=round(ext["liquido"] - ext["nf_valor"], 2), apagar=ext["liquido"],
+                               conf=conf, lanc=len(ls), debitos="" if conf == "OK" else f"detalhe soma {soma:.2f}".replace(".", ",")))
+            if conf != "OK":
+                obs.append(f"Extrato {nro} ({data:%d/%m/%Y}): líquido R$ {ext['liquido']:.2f} e o detalhe soma R$ {soma:.2f}.".replace(".", ","))
+            for l in ls:
+                tp = tipo_shaddai(l)
+                calc = round((l["base"] or 0) * (l["perc"] or 0) / 100, 2)
+                itens.append(dict(eid="", empresa=l["cliente"], op=op, titulo=l["cod"], compFat=_comp_ref(l["mes_ref"]), venc=None,
+                                  valorFat=l["valor_fatura"] or l["base"], premio=l["base"], premioEsp=None, taxa=l["perc"],
+                                  comissao=round(l["valor"], 2), parcela=int(l["parcela"]) if l["parcela"].isdigit() else l["parcela"],
+                                  tipo="AN" if tp == "Agenciamento" else "CO", copart=0, taxaFixa=0,
+                                  conf="OK" if tp == "Estorno" or abs(calc - l["valor"]) <= 0.02 else "Divergência"))
+        texto = ("Amil: a base ainda não tem faturas da Amil; cada linha foi conferida pelo próprio extrato "
+                 "(comissão = base de cálculo × percentual). Agenciamento = taxa acima de 50%; vitalício = até 10%.")
+        if obs:
+            texto += " " + " ".join(obs)
+        doc = dict(comp=comp, operadora="Amil", atualizadoEm=agora, ordens=ordens, itens=itens, extras=[], pendentes=[],
+                   faturasMes=0, obs=texto)
+        p = os.path.join(dir_painel, f"com_{comp}_amil.json")
+        json.dump(doc, open(p, "w", encoding="utf-8"), ensure_ascii=False)
+        saida.append(p)
+    return saida
+
+
+def _meses_dos(arqs):
+    out = set()
+    for p in arqs:
+        ext, _ = ler_txt(p)
+        data = ext["efetivo"] or ext["previsto"]
+        if data:
+            out.add(f"{data:%Y-%m}")
+    return out
+
+
 if __name__ == "__main__":
+    aqui = os.path.dirname(os.path.abspath(__file__))
+    comissoes, painel = os.path.join(os.path.dirname(aqui), "Comissoes"), os.path.join(aqui, "_painel")
+    if sys.argv[1:2] == ["--painel"]:
+        for p in gravar_painel(sys.argv[2:], comissoes, painel):
+            print("painel:", os.path.basename(p))
+        sys.exit(0)
     base, *arqs = sys.argv[1:]
     wb = openpyxl.load_workbook(base)
     raiz = os.path.dirname(os.path.abspath(base))
@@ -188,3 +259,9 @@ if __name__ == "__main__":
     for linha in importar(wb, arqs, rel_de):
         print(*linha, sep=" | ")
     wb.save(base)
+    # painel do(s) mês(es): na simulação o rodar.py roda numa cópia, então o _painel e a pasta Comissoes ficam ao lado da cópia
+    comissoes = os.path.join(os.path.dirname(os.path.abspath(base)), "Comissoes")
+    if not os.path.isdir(comissoes):
+        comissoes = os.path.join(os.path.dirname(aqui), "Comissoes")
+    for p in gravar_painel(_meses_dos(arqs), comissoes, painel):
+        print("painel:", os.path.basename(p))
