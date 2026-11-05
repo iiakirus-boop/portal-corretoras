@@ -96,7 +96,7 @@ export function Projecao({ c, d, hoje, usuario }: { c: string; d: DadosProjecao;
     return (
       <li><details className="prow"><summary>
         <span className={'date' + (late ? ' late' : '')}>{String(x.data.getUTCDate()).padStart(2, '0')}<br />{MES[x.data.getUTCMonth()]}</span>
-        <span style={{ minWidth: 0 }}><b>{x.empresa}</b><small>{com && <span className={`ktag ${x.kind}`}>{x.kind === 'ag' ? 'Agenciamento' : x.kind === 'outro' ? x.obs || 'Outro' : 'Vitalício'}</span>}{fam(x.op)}</small></span>
+        <span style={{ minWidth: 0 }}><b>{x.empresa}</b><small>{com && <span className={`ktag ${x.kind}`}>{x.kind === 'ag' ? 'Agenciamento' : x.kind === 'outro' ? x.obs || 'Outro' : 'Vitalício'}</span>}{com && x.semFat && <span className="pill p-info" title="Empresa sem fatura na base: valor estimado pela última parcela paga">Estimado sem fatura</span>}{fam(x.op)}</small></span>
         <span className="r">R$ {brl(x.valor)}<small><span className={`pill ${st[1]}`}>{st[0]}</span></small></span>
       </summary><div className="pwhy">{why || 'Sem detalhe do cálculo.'}{x.quando && <><br />Data: {x.quando}</>}{x.eid && <><br /><Link className="lnk" href={fichaUrl(x.eid)}>Abrir a empresa</Link></>}</div></details></li>
     );
@@ -229,7 +229,7 @@ export function Projecao({ c, d, hoje, usuario }: { c: string; d: DadosProjecao;
               <tbody>
                 {AG.length ? AG.map((A) => (
                   <tr key={A.eid}>
-                    <td>{A.nome}<small>{A.eid}</small></td>
+                    <td>{A.nome}<small>{A.semFat ? 'Estimado pela última parcela paga. Se faltar menos, ajuste ao lado' : A.eid}</small></td>
                     <td>{(A.rec || []).map((p: Doc) => ord(p.parcela) + ' ' + p.taxa + '%').join(' · ')}<small>R$ {brl(sum(A.recR || [], (x: Doc) => x.valor))} recebidos</small></td>
                     <td>{(A.prox || []).length ? A.prox.map((x: Doc) => <div key={x.parc}>{ord(x.parc)} · {mesLabel(x.comp)} · R$ {brl(x.valor)}</div>) : <span className="hint">nenhuma</span>}</td>
                     <td>
