@@ -58,6 +58,8 @@ function grava(pasta, nome, dados, saida) {
 
 async function fechaAvisos() {
   for (const b of await page.locator('.modal.in button.close').all()) await b.click({ timeout: 2000 }).catch(() => {});
+  // faixa de cookies (11/2026): sem fechar, ela fica por cima da lista
+  await page.getByRole('button', { name: 'Rejeitar cookies não necessários' }).click({ timeout: 2000 }).catch(() => {});
 }
 
 async function painelSaude() {
@@ -92,9 +94,10 @@ async function faturas(comp, saida) {
   const sel = (await page.getByText(/Você selecionou \d+ kit/).innerText({ timeout: 10000 })).match(/\d+/)[0] * 1;
   passo = `Faturas: download PDF (${sel} kits)`;
   // os kits são montados na página e saem como data:application/pdf; o evento do CDP já traz o arquivo inteiro
-  const cdp = await browser.newBrowserCDPSession(), arqs = [];
+  const cdp = await browser.newBrowserCDPSession(), arqs = [], outros = [];
   cdp.on('Browser.downloadWillBegin', e => {
     if (e.url.startsWith('data:')) arqs.push({ nome: e.suggestedFilename, dados: e.url.slice(e.url.indexOf(',') + 1) });
+    else outros.push(e.url.slice(0, 60));
   });
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: path.join(require('os').tmpdir(), 'baixar_bradesco'), eventsEnabled: true });
   // às vezes o clique na opção não dispara nada (sem o aviso "Download(s) iniciado(s)"): tenta até 3 vezes
@@ -103,7 +106,7 @@ async function faturas(comp, saida) {
     await page.waitForTimeout(1000);
     await page.locator('.botao-seletor__opcoes__item', { hasText: 'em PDF' }).click();
     for (let t = 0; t < 90000 && !arqs.length; t += 2000) await page.waitForTimeout(2000);
-    await page.getByRole('button', { name: 'Ok' }).click({ timeout: 3000 }).catch(() => {});
+    await page.getByRole('button', { name: 'Ok', exact: true }).click({ timeout: 3000 }).catch(() => {});
   }
   // "Você selecionou N kits" conta LINHAS; o portal manda um PDF por SUBFATURA (11/2026: 64 linhas, 76 PDFs) e
   // alguns chegam minutos depois. Por isso não para ao chegar em N: espera até ficar 4 min sem chegar nada.
@@ -111,8 +114,9 @@ async function faturas(comp, saida) {
     parado = arqs.length === n && n > 0 ? parado + 2000 : 0; n = arqs.length;
     await page.waitForTimeout(2000);
   }
-  await page.getByRole('button', { name: 'Ok' }).click({ timeout: 5000 }).catch(() => {}); // sem marcar "download realizado"
-  if (!arqs.length) throw new Error('o portal não entregou nenhum PDF');
+  await page.getByRole('button', { name: 'Ok', exact: true }).click({ timeout: 5000 }).catch(() => {}); // sem marcar "download realizado"
+  if (!arqs.length) throw new Error('o portal não entregou nenhum PDF' + (outros.length ? ` (chegou ${outros.length} download fora do formato: ${outros[0]})` : ''));
+  if (arqs.length < sel) saida.aviso = `Bradesco ${rotulo}: o portal entregou ${arqs.length} de ${sel} kits; os que faltaram vêm na próxima rodada.`;
   const pasta = path.join(FAT, 'Faturas', 'Bradesco_portal', comp);
   for (const a of arqs) grava(pasta, a.nome, a.dados, saida);
   saida.faturas = { competencia: comp, selecionados: sel, recebidos: arqs.length, pasta };
