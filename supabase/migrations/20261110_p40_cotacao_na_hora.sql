@@ -135,7 +135,6 @@ language plpgsql as $$
 declare n integer;
 begin
   if auth.uid() is not null and not eh_master() then raise exception 'só o master recalcula o de>para'; end if;
-  delete from cot_equivalencias where true;
   with hosp as (select distinct operadora, plano, prestador_id from cot_rede where atendimento ~ '(^|,)H'),
   univ as (select distinct operadora, prestador_id from hosp),
   pl as (select p.operadora, p.plano, p.acomodacao, p.preco_ref, c.categoria from cot_planos p left join cot_categorias c on c.operadora = p.operadora and c.plano = p.plano),
@@ -167,7 +166,10 @@ begin
                     (cobertura_rel >= 0.70 and cobertura >= 0.40) desc,
                     round(cobertura, 2) desc,
                     preco_ref asc nulls last)
-  from par;
+  from par
+  on conflict (op_o, plano_o, acom_o, op_d, plano_d, acom_d) do update set
+    cobertura = excluded.cobertura, cobertura_rel = excluded.cobertura_rel, preco_ref = excluded.preco_ref,
+    categoria_o = excluded.categoria_o, categoria_d = excluded.categoria_d, valida = excluded.valida, ordem = excluded.ordem, faltam = null;
   get diagnostics n = row_count;
   update cot_equivalencias e set faltam = (
     select array_agg(pr.nome order by pr.nome) from cot_rede a join cot_prestadores pr on pr.id = a.prestador_id
@@ -197,10 +199,10 @@ grant select on cot_empresas to authenticated;
 --   fora   grupos que saem da cotação
 create or replace function public.cot_cotacao(e uuid, ops text[] default null, trocas jsonb default '{}', fora int[] default '{}')
 returns jsonb
-language plpgsql as $$
+language plpgsql stable as $$
 declare
   emp record; info record; g record; eq record; tb record; v_op text; achou boolean; manual boolean := ops is not null;
-  grupos jsonb := '[]'; opcoes jsonb := '[]'; linhas jsonb; faltando jsonb; t text; v_plano text; v_acom text; v_escolha text; v_fora boolean;
+  grupos jsonb := '[]'; gs jsonb; opcoes jsonb := '[]'; linhas jsonb; faltando jsonb; t text; v_plano text; v_acom text; v_escolha text; v_fora boolean;
   n_vidas int := 0; n_tit int := 0; custo numeric := 0; tem_copart boolean := false; comp text;
   v_mei boolean; v_simples boolean; tot numeric; cob_soma numeric; status text := null; v_cob numeric; v_faltam text[];
   iof constant numeric := 0.0238;
@@ -211,8 +213,6 @@ begin
   select mei, simples, municipio, situacao into info from empresas_cnpj where cnpj = regexp_replace(coalesce(emp.cnpj, ''), '\D', '', 'g');
   v_mei := coalesce(info.mei, false); v_simples := coalesce(info.simples, false);
 
-  create temp table if not exists _cot_h (i int, op text, plano text, acom text, fx int[], valor numeric, tit int, seg text, plano_atual text, sem_ref boolean, copart boolean, excluido boolean);
-  delete from _cot_h;
   with ult as (select seguradora_id, max(competencia) c from vidas where empresa_id = e group by 1),
   v as (select v.*, s.nome seg,
           coalesce(v.idade, extract(year from age((v.competencia || '-01')::date, v.nascimento))::int) id2
@@ -236,18 +236,17 @@ begin
            r.seg, string_agg(distinct r.nome_atual, ', ') plano_atual, bool_or(r.plano_ref is null) sem_ref, bool_or(r.cp) copart
     from r join cs on cs.seg = r.seg
     group by r.operadora_ref, r.plano_ref, r.acom, r.seg)
-  insert into _cot_h
-  select (row_number() over (order by seg, op nulls last, plano nulls last, acom) - 1)::int, op, plano, acom, fx, valor, tit, seg, plano_atual, sem_ref, copart,
-         false
-  from gr;
-  update _cot_h set excluido = true where i = any(fora);
+  select coalesce(jsonb_agg(to_jsonb(z) order by z.i), '[]') into gs from (
+    select (row_number() over (order by seg, op nulls last, plano nulls last, acom) - 1)::int i, op, plano, acom, fx, valor, tit, seg, plano_atual, sem_ref, copart
+    from gr) z;
+  select coalesce(jsonb_agg(x || jsonb_build_object('excluido', (x->>'i')::int = any(fora))), '[]') into gs from jsonb_array_elements(gs) x;
 
   select coalesce(sum((select sum(x) from unnest(fx) x)), 0), coalesce(sum(tit), 0), coalesce(sum(valor), 0), coalesce(bool_or(copart), false)
-    into n_vidas, n_tit, custo, tem_copart from _cot_h where not _cot_h.excluido;
+    into n_vidas, n_tit, custo, tem_copart from jsonb_to_recordset(gs) as _cot_h(i int, op text, plano text, acom text, fx int[], valor numeric, tit int, seg text, plano_atual text, sem_ref boolean, copart boolean, excluido boolean) where not _cot_h.excluido;
   select max(v.competencia) into comp from vidas v where v.empresa_id = e;
   select coalesce(jsonb_agg(jsonb_build_object('i', i, 'seguradora', seg, 'plano_atual', plano_atual, 'operadora', op, 'plano', plano, 'acomodacao', acom,
            'faixas', fx, 'vidas', (select sum(x) from unnest(fx) x), 'valor', round(valor, 2), 'sem_equivalente', sem_ref, 'copart', copart, 'fora', _cot_h.excluido) order by i), '[]')
-    into grupos from _cot_h;
+    into grupos from jsonb_to_recordset(gs) as _cot_h(i int, op text, plano text, acom text, fx int[], valor numeric, tit int, seg text, plano_atual text, sem_ref boolean, copart boolean, excluido boolean);
 
   if n_vidas = 0 then status := 'sem vidas de saúde';
   elsif n_vidas >= 100 then status := '100 vidas ou mais';
@@ -256,7 +255,7 @@ begin
   if status is null then
     for v_op in select x from unnest(coalesce(ops, array(select distinct operadora from cot_tabelas where ativa and operadora <> 'porto_bairro' order by 1))) x loop
       linhas := '[]'; faltando := '[]'; tot := 0; cob_soma := 0;
-      for g in select * from _cot_h where not _cot_h.excluido order by i loop
+      for g in select * from jsonb_to_recordset(gs) as _cot_h(i int, op text, plano text, acom text, fx int[], valor numeric, tit int, seg text, plano_atual text, sem_ref boolean, copart boolean, excluido boolean) where not _cot_h.excluido order by i loop
         achou := false; v_fora := false; v_cob := null; v_faltam := null;
         t := trocas -> v_op ->> g.i::text;
         if t is not null and t <> '' then
@@ -317,7 +316,7 @@ begin
         from (select o from jsonb_array_elements(opcoes) o order by (o->>'economia')::numeric desc limit 3) z;
     end if;
     status := case when exists (select 1 from jsonb_array_elements(opcoes) o where (o->>'completa')::boolean and (o->>'economia')::numeric > 0) then 'com opção mais barata'
-                   when exists (select 1 from _cot_h where sem_ref and not _cot_h.excluido) then 'plano atual sem equivalente: escolha o plano'
+                   when exists (select 1 from jsonb_to_recordset(gs) as _cot_h(i int, op text, plano text, acom text, fx int[], valor numeric, tit int, seg text, plano_atual text, sem_ref boolean, copart boolean, excluido boolean) where sem_ref and not _cot_h.excluido) then 'plano atual sem equivalente: escolha o plano'
                    when custo <= 0 then 'sem valor atual'
                    else 'sem opção mais barata com rede equivalente' end;
   end if;
