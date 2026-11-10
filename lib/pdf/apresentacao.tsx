@@ -4,7 +4,7 @@
 import path from 'node:path';
 import { Document, Font, Image, Page, StyleSheet, Text, View, type Styles } from '@react-pdf/renderer';
 type Estilo = Styles[string];
-import { operadora, pctCob, somaFx, type Cotacao, type LinhaCot, type OpcaoCot } from '@/lib/cotacao';
+import { operadora, pctCob, somaFx, type Cotacao, type LinhaCot, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
 import type { Marca } from '@/lib/marca';
 
 const DIR = path.join(process.cwd(), 'lib', 'pdf');
@@ -119,7 +119,7 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
         </View>
         <View style={{ position: 'absolute', left: 43, top: 299, width: 421, height: 169, borderRadius: 6, borderWidth: 1, borderColor: CLARO, padding: 20 }}>
           <Text style={[s.kicker, { fontSize: 10 }]}>EMPRESA</Text>
-          {[['Razão social', d.empresa.razao], ['CNPJ', d.empresa.cnpj ?? '—'], ['Plano atual', [...new Set(ativos.map((g) => g.plano_atual ?? g.plano ?? '—'))].join(', ')], ['Fatura de referência', k.competencia ? `${k.competencia.slice(5, 7)}/${k.competencia.slice(0, 4)}` : '—']].map(([a, b]) => (
+          {[['Razão social', d.empresa.razao], ['CNPJ', d.empresa.cnpj ?? '—'], ['Plano atual', [...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')], ['Fatura de referência', k.competencia ? `${k.competencia.slice(5, 7)}/${k.competencia.slice(0, 4)}` : '—']].map(([a, b]) => (
             <View key={a} style={{ flexDirection: 'row', marginTop: 10 }}>
               <Text style={{ width: 130, fontFamily: 'Texto', fontWeight: 700, fontSize: 11, color: CINZA }}>{a}</Text>
               <Text style={{ flex: 1, fontFamily: 'Texto', fontSize: 11, color: TEXTO }}>{b}</Text>
@@ -143,7 +143,7 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
         <View style={{ position: 'absolute', left: 43, right: 43, top: 104 }}>
           <View style={s.linhaTab}>
             <Cel w={150} cab cor={c.principal}>FAIXA ETÁRIA</Cel>
-            {ativos.map((g) => <Cel key={g.i} flex cab cor={c.vinho}>{`${(g.plano_atual ?? g.plano ?? '—').toUpperCase()}${g.acomodacao ? `\n${g.acomodacao.toUpperCase()}` : ''}`}</Cel>)}
+            {ativos.map((g) => <Cel key={g.i} flex cab cor={c.vinho}>{`${resumirPlano(g.plano_atual ?? g.plano).toUpperCase()}${g.acomodacao ? `\n${g.acomodacao.toUpperCase()}` : ''}`}</Cel>)}
             <Cel w={110} cab cor={c.principal}>TOTAL DE VIDAS</Cel>
           </View>
           {FX.map((f, j) => (
@@ -192,7 +192,7 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
           </View>
           <View style={[s.linhaTab, { backgroundColor: OFF }]}>
             <Cel w={200} negrito>Atual</Cel>
-            <Cel flex>{[...new Set(ativos.map((g) => g.plano_atual ?? g.plano ?? '—'))].join(', ')}</Cel>
+            <Cel flex>{[...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')}</Cel>
             <Cel w={130} negrito>{brl(k.custo_atual)}</Cel><Cel w={130}>-</Cel><Cel w={130}>-</Cel><Cel w={90}>100%</Cel>
           </View>
           {ops.map((o, i) => (
