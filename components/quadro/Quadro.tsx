@@ -5,19 +5,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { arquivarCard, comentarCard, moverCard, salvarCard } from '@/lib/acoes-quadro';
 import {
-  COLUNAS, PRIORIDADES, ROTULO_COLUNA, diasDesde, iniciais, nomeCurto,
-  type CardQuadro, type Coluna, type EventoCard, type Pessoa, type TipoDemanda,
+  COLUNAS, PRIORIDADES, ROTULO_COLUNA, diasDesde, iniciais, nomeCurto, tamanho,
+  type ArquivoCard, type CardQuadro, type EmailCard, type Coluna, type EventoCard, type Pessoa, type TipoDemanda,
 } from '@/lib/quadro';
 
-type Props = { c: string; equipe: Pessoa[]; tipos: TipoDemanda[]; cards: CardQuadro[]; eventos: EventoCard[]; agora: number };
+type Props = { c: string; equipe: Pessoa[]; tipos: TipoDemanda[]; cards: CardQuadro[]; eventos: EventoCard[]; emails: EmailCard[]; arquivos: ArquivoCard[]; agora: number };
 type Filtro = { pessoa: string; tipo: string; busca: string; so: '' | 'urgentes' | 'atrasados' | 'parados' };
 const PARADO_DIAS = 3;
 
 const hojeISO = (agora: number) => new Date(agora - 3 * 3600000).toISOString().slice(0, 10); // dia em Brasília
 const dataCurta = (d: string) => { const [, m, dia] = d.split('-'); return `${dia}/${m}`; };
+const quandoLongo = (iso: string) => {
+  const d = new Date(iso), o = { timeZone: 'America/Sao_Paulo' } as const;
+  return `${d.toLocaleDateString('pt-BR', { ...o, day: '2-digit', month: '2-digit', year: 'numeric' })} às ${d.toLocaleTimeString('pt-BR', { ...o, hour: '2-digit', minute: '2-digit' })}`;
+};
 const quando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-export function Quadro({ c, equipe, tipos, cards, eventos, agora }: Props) {
+export function Quadro({ c, equipe, tipos, cards, eventos, emails, arquivos, agora }: Props) {
   const router = useRouter();
   const [lista, setLista] = useState(cards);
   useEffect(() => setLista(cards), [cards]);
@@ -172,6 +176,10 @@ export function Quadro({ c, equipe, tipos, cards, eventos, agora }: Props) {
                           )}
                           {x.coluna !== 'feito' && dias >= PARADO_DIAS && <span className="qd-parado">parado {dias} d</span>}
                           {x.origem === 'email' && <span className="qd-orig" title="Criado pelo e-mail">e-mail</span>}
+                          {(() => {
+                            const ne = emails.filter((m) => m.card_id === x.id).length, na = arquivos.filter((a) => a.card_id === x.id && a.tipo === 'anexo').length;
+                            return (ne > 0 || na > 0) && <span className="qd-cont" title={`${ne} e-mail(s) e ${na} anexo(s)`}>{ne > 0 && `✉ ${ne}`}{ne > 0 && na > 0 && ' · '}{na > 0 && `📎 ${na}`}</span>;
+                          })()}
                           <span className="qd-av sm" title={nomeCurto(resp)}>{iniciais(resp)}</span>
                         </span>
                       </button>
@@ -189,20 +197,23 @@ export function Quadro({ c, equipe, tipos, cards, eventos, agora }: Props) {
       {aberto && (
         <Detalhe key={aberto} c={c} card={cardAberto} colunaNova={novoEm} equipe={equipe} tipos={tipos}
           eventos={cardAberto ? eventos.filter((e) => e.card_id === cardAberto.id) : []}
+          emails={cardAberto ? emails.filter((e) => e.card_id === cardAberto.id) : []}
+          arquivos={cardAberto ? arquivos.filter((a) => a.card_id === cardAberto.id) : []}
           fechar={() => setAberto(null)} />
       )}
     </div>
   );
 }
 
-function Detalhe({ c, card, colunaNova, equipe, tipos, eventos, fechar }: {
-  c: string; card: CardQuadro | null; colunaNova: Coluna; equipe: Pessoa[]; tipos: TipoDemanda[]; eventos: EventoCard[]; fechar: () => void;
+function Detalhe({ c, card, colunaNova, equipe, tipos, eventos, emails, arquivos, fechar }: {
+  c: string; card: CardQuadro | null; colunaNova: Coluna; equipe: Pessoa[]; tipos: TipoDemanda[]; eventos: EventoCard[];
+  emails: EmailCard[]; arquivos: ArquivoCard[]; fechar: () => void;
 }) {
   const router = useRouter();
   const [v, setV] = useState({
     titulo: card?.titulo ?? '', tipo_id: card?.tipo_id ?? '', coluna: card?.coluna ?? colunaNova, prioridade: String(card?.prioridade ?? 3),
     responsavel_id: card?.responsavel_id ?? '', apoio_id: card?.apoio_id ?? '', empresa_nome: card?.empresa_nome ?? '', seguradora: card?.seguradora ?? '',
-    prazo: card?.prazo ?? '', proximo_passo: card?.proximo_passo ?? '', descricao: card?.descricao ?? '',
+    prazo: card?.prazo ?? '', proximo_passo: card?.proximo_passo ?? '', descricao: card?.descricao ?? '', resumo: card?.resumo ?? '',
   });
   const [coment, setComent] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -263,6 +274,10 @@ function Detalhe({ c, card, colunaNova, equipe, tipos, eventos, fechar }: {
         {card?.email_assunto && <p className="hint">E-mail: {card.email_assunto}</p>}
         {erro && <p className="msg erro" role="alert">{erro}</p>}
 
+        {card && (card.resumo || emails.length > 0 || arquivos.length > 0) && (
+          <Conversa card={card} emails={emails} arquivos={arquivos} />
+        )}
+
         <form className="form" onSubmit={salvar}>
           <label className="campo">Título<input value={v.titulo} onChange={muda('titulo')} placeholder="Empresa: o que é" required autoFocus={!card} /></label>
           <div className="linha">
@@ -304,6 +319,11 @@ function Detalhe({ c, card, colunaNova, equipe, tipos, eventos, fechar }: {
           </div>
           <label className="campo">Próximo passo<input value={v.proximo_passo} onChange={muda('proximo_passo')} placeholder="O que falta fazer agora" /></label>
           <label className="campo">Detalhes<textarea value={v.descricao} onChange={muda('descricao')} /></label>
+          <details className="dobra qd-ed-resumo" open={!card?.resumo && !!card && emails.length > 0}>
+            <summary className="lnk">{card?.resumo ? 'Corrigir o resumo da conversa' : 'Escrever um resumo da conversa'}</summary>
+            <label className="campo">Resumo da conversa<small>O Claude escreve e atualiza pelos e-mails. Se corrigir aqui, vale a sua versão até o próximo e-mail.</small>
+              <textarea value={v.resumo} onChange={muda('resumo')} rows={6} /></label>
+          </details>
           <div className="acoes">
             <button className="btn" disabled={salvando}>{card ? 'Salvar' : 'Criar card'}</button>
             {card && <button type="button" className="btn perigo" disabled={salvando} onClick={arquivar}>Tirar do quadro</button>}
@@ -330,5 +350,62 @@ function Detalhe({ c, card, colunaNova, equipe, tipos, eventos, fechar }: {
         )}
       </div>
     </div>
+  );
+}
+
+// Resumo do que foi conversado, os e-mails do assunto (com o e-mail inteiro para conferir) e os anexos
+function Conversa({ card, emails, arquivos }: { card: CardQuadro; emails: EmailCard[]; arquivos: ArquivoCard[] }) {
+  const doEmail = (id: string | null) => arquivos.filter((a) => a.email_id === id);
+  const soltos = arquivos.filter((a) => !a.email_id || !emails.some((m) => m.id === a.email_id));
+  const anexos = arquivos.filter((a) => a.tipo === 'anexo');
+  const recebido = (id: string | null) => { const em = emails.find((m) => m.id === id)?.em; return em ? quandoLongo(em).slice(0, 10) : null; };
+  const link = (a: ArquivoCard) => (
+    <a key={a.id} className={`qd-arq ${a.tipo}`} href={`/quadro-arquivo/${a.id}`} target="_blank" rel="noopener">
+      <span aria-hidden="true">{a.tipo === 'email' ? '✉' : '📎'}</span>{a.tipo === 'email' ? 'E-mail completo' : a.nome}
+      {a.tipo === 'anexo' && recebido(a.email_id) && <small>recebido {recebido(a.email_id)}</small>}
+      {a.tamanho != null && <small>{tamanho(a.tamanho)}</small>}
+    </a>
+  );
+  return (
+    <section className="qd-conv" aria-label="Conversa por e-mail">
+      {card.resumo && (
+        <div className="qd-resumo">
+          <h3>Resumo da conversa</h3>
+          <p>{card.resumo}</p>
+          {card.resumo_em && <span className="hint">Atualizado em {quando(card.resumo_em)}</span>}
+        </div>
+      )}
+      {anexos.length > 0 && (
+        <div>
+          <h3>Anexos ({anexos.length})</h3>
+          <div className="qd-arqs">{anexos.map(link)}</div>
+        </div>
+      )}
+      {emails.length > 0 && (
+        <details className="dobra qd-emails">
+          <summary><h3>E-mails do assunto ({emails.length}) <span className="lnk">ver</span></h3>
+            {emails.some((m) => m.em) && (() => {
+              const ds = emails.map((m) => m.em).filter(Boolean).sort() as string[];
+              return <span className="hint">Do primeiro, em {quandoLongo(ds[0])}, ao último, em {quandoLongo(ds[ds.length - 1])}</span>;
+            })()}
+          </summary>
+          <ul>
+            {emails.map((m) => (
+              <li key={m.id}>
+                <div className="qd-em-h">
+                  <b>{m.de ?? 'Sem remetente'}</b>
+                  {m.em && <span className="qd-em-d">Recebido em {quandoLongo(m.em)}</span>}
+                </div>
+                {m.assunto && <span className="qd-em-a">{m.assunto}</span>}
+                {(m.para || m.cc) && <span className="hint">Para: {m.para}{m.cc ? ` · Cc: ${m.cc}` : ''}</span>}
+                {m.trecho && <p className="qd-em-t">{m.trecho}</p>}
+                {doEmail(m.id).length > 0 && <div className="qd-arqs">{doEmail(m.id).map(link)}</div>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {soltos.filter((a) => a.tipo === 'email').length > 0 && <div className="qd-arqs">{soltos.filter((a) => a.tipo === 'email').map(link)}</div>}
+    </section>
   );
 }

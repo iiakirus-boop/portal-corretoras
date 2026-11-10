@@ -26,15 +26,21 @@ export type CardQuadro = {
   empresa_id: string | null; empresa_nome: string | null; seguradora: string | null; prazo: string | null;
   origem: 'manual' | 'email' | 'agente' | 'exemplo'; email_assunto: string | null; ordem: number; arquivado: boolean;
   criado_em: string; atualizado_em: string; coluna_desde: string; concluido_em: string | null;
+  resumo?: string | null; resumo_em?: string | null;
 };
 export type EventoCard = { id: number; card_id: string; em: string; autor_id: string | null; autor_nome: string | null; tipo: string; texto: string | null };
 
+export type EmailCard = { id: string; card_id: string; mensagem_id: string; em: string | null; de: string | null; para: string | null; cc: string | null; assunto: string | null; trecho: string | null };
+export type ArquivoCard = { id: string; card_id: string; email_id: string | null; tipo: 'email' | 'anexo'; nome: string; tamanho: number | null };
+
 // campos que a tela pode gravar num card
 export const CAMPOS_CARD = ['titulo', 'descricao', 'tipo_id', 'coluna', 'prioridade', 'responsavel_id', 'apoio_id', 'proximo_passo',
-  'empresa_nome', 'seguradora', 'prazo'] as const;
+  'empresa_nome', 'seguradora', 'prazo', 'resumo'] as const;
 
 export const iniciais = (p?: Pessoa | null) => (p ? (p.apelido || p.nome).split(/\s+/).map((x) => x[0]).slice(0, 2).join('').toUpperCase() : '?');
 export const nomeCurto = (p?: Pessoa | null) => (p ? p.apelido || p.nome.split(' ')[0] : 'Sem responsável');
 
 // dias corridos desde uma data (para "parado há X dias")
 export const diasDesde = (iso: string, agora = Date.now()) => Math.floor((agora - new Date(iso).getTime()) / 86400000);
+
+export const tamanho = (n: number | null) => (n == null ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} MB`);

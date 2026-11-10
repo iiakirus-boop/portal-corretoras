@@ -42,7 +42,7 @@ export function criarBanco(): Banco {
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
     maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [], exclusoes: [], apelidos_empresa: [],
-    quadro_equipe: [], quadro_tipos: [], quadro_cards: [], quadro_eventos: [],
+    quadro_equipe: [], quadro_tipos: [], quadro_cards: [], quadro_eventos: [], quadro_emails: [], quadro_arquivos: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();
@@ -259,6 +259,24 @@ export function criarBanco(): Banco {
         ordem: i, arquivado: false, criado_por: null, criado_em: desde, atualizado_em: desde, coluna_desde: desde, concluido_em: null });
       db.quadro_eventos.push({ id: db.quadro_eventos.length + 1, card_id: id, corretora_id: C, em: desde, autor_id: null, autor_nome: null, tipo: 'criado', texto: 'Card criado' });
     });
+    // o primeiro card com a conversa por e-mail, como o Claude deixa
+    const k = db.quadro_cards[0];
+    k.resumo = 'A Padaria Bom Grão pediu a inclusão imediata de 2 funcionários novos (titular e dependente) a partir de 01/11.\n'
+      + 'A Larissa mandou a ficha para a Porto em 06/11; a Porto pediu o comprovante de vínculo do dependente.\n'
+      + 'Falta: a empresa mandar a certidão de casamento e a Larissa reenviar para a Porto.';
+    k.resumo_em = h(5);
+    const em = [
+      ['qm-1', h(70), 'rh@padariabomgrao.demo', 'Inclusão imediata de 2 funcionários', 'Bom dia, precisamos incluir com urgência os dois funcionários novos que começaram dia 01/11. Seguem as fichas.'],
+      ['qm-2', h(50), 'larissa@shaddai.demo', 'RES: Inclusão imediata de 2 funcionários', 'Recebido! Já enviei para a Porto e aviso assim que tiver o protocolo.'],
+      ['qm-3', h(6), 'movimentacao@porto.demo', 'RES: Inclusão imediata de 2 funcionários', 'Para concluir a inclusão do dependente, favor enviar o comprovante de vínculo (certidão de casamento).'],
+    ];
+    em.forEach(([id, quando, de, assunto, trecho]) => db.quadro_emails.push({ id, card_id: k.id, corretora_id: C, mensagem_id: id, em: quando, de, para: 'bruno@shaddai.demo', cc: 'renata@shaddai.demo', assunto, trecho }));
+    db.quadro_arquivos.push(
+      { id: 'qa-1', card_id: k.id, corretora_id: C, email_id: 'qm-1', tipo: 'anexo', nome: 'Ficha de inclusão - titular.pdf', tamanho: 182000 },
+      { id: 'qa-2', card_id: k.id, corretora_id: C, email_id: 'qm-1', tipo: 'anexo', nome: 'Ficha de inclusão - dependente.pdf', tamanho: 176000 },
+      { id: 'qa-3', card_id: k.id, corretora_id: C, email_id: 'qm-1', tipo: 'email', nome: 'Inclusão imediata de 2 funcionários.msg', tamanho: 512000 },
+      { id: 'qa-4', card_id: k.id, corretora_id: C, email_id: 'qm-3', tipo: 'email', nome: 'RES Inclusão imediata.msg', tamanho: 88000 },
+    );
   }
 
   return db;

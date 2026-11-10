@@ -48,6 +48,8 @@ function regras(uid: string | null) {
     quadro_tipos: (r) => daCorretora(r.corretora_id),
     quadro_cards: (r) => daCorretora(r.corretora_id),
     quadro_eventos: (r) => daCorretora(r.corretora_id),
+    quadro_emails: (r) => daCorretora(r.corretora_id),
+    quadro_arquivos: (r) => daCorretora(r.corretora_id),
     maquinas: () => false,
     login_status: () => false,
   };
