@@ -66,9 +66,30 @@ button, a.btn, .sair, .perfil, a.kpi, button.kpi { touch-action: manipulation; -
 .brand-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .72rem; color: var(--marca-muted); }
 .nav { display: flex; gap: .1rem; overflow-x: auto; scrollbar-width: none; flex: 1 1 0; min-width: 0; align-self: stretch; }
 .nav::-webkit-scrollbar { display: none; }
-.nav a { display: flex; align-items: center; padding: 0 .85rem; color: var(--marca-muted); font-weight: 700; font-size: .88rem; white-space: nowrap; text-decoration: none; border-block: 3px solid transparent; }
-.nav a[aria-current="page"] { color: var(--marca-fg); border-bottom-color: var(--accent-strong); }
-.top.master .nav a[aria-current="page"] { border-bottom-color: var(--master-edge); }
+.nav .nav-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: .35rem; padding: 0 .85rem; color: var(--marca-muted); font-weight: 700; font-size: .88rem; white-space: nowrap; text-decoration: none; border-block: 3px solid transparent; touch-action: manipulation; }
+.nav .nav-item[aria-current="page"], .nav .nav-item[data-ativo] { color: var(--marca-fg); border-bottom-color: var(--accent-strong); }
+.nav .nav-item[aria-expanded="true"] { color: var(--marca-fg); }
+.nav .nav-item:focus-visible { outline-offset: -4px; }
+.top.master .nav .nav-item[aria-current="page"], .top.master .nav .nav-item[data-ativo] { border-bottom-color: var(--master-edge); }
+.seta { flex-shrink: 0; opacity: .75; transition: transform 160ms cubic-bezier(.23, 1, .32, 1); }
+[aria-expanded="true"] > .seta { transform: rotate(180deg); }
+/* lista que abre por baixo de um item da barra (ou do nome da pessoa) */
+.menu-lista { position: fixed; z-index: 20; margin-top: 4px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: 0 10px 30px rgba(15, 23, 42, .16); padding: .35rem; display: flex; flex-direction: column; animation: menu-abre 140ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes menu-abre { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .menu-lista { animation: none; } .seta { transition: none; } }
+.menu-lista a, .menu-lista .menu-sair { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: .1rem; padding: .55rem .7rem; border-radius: calc(var(--r-md) - 4px); font-weight: 700; font-size: .88rem; color: var(--fg); text-decoration: none; touch-action: manipulation; }
+.menu-lista a small { font-weight: 500; font-size: .76rem; color: var(--muted); line-height: 1.35; }
+.menu-lista a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-strong); }
+.menu-lista a:focus-visible, .menu-lista .menu-sair:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-lista form { display: contents; }
+.menu-lista .menu-sair { color: var(--muted); border-top: 1px solid var(--line); border-radius: 0 0 calc(var(--r-md) - 4px) calc(var(--r-md) - 4px); margin-top: .25rem; padding-top: .65rem; }
+.menu-quem { display: flex; flex-direction: column; padding: .45rem .7rem .55rem; border-bottom: 1px solid var(--line); margin-bottom: .25rem; font-size: .8rem; color: var(--muted); }
+.menu-lista .menu-quem b { color: var(--fg); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (pointer: coarse) { .menu-lista a, .menu-lista .menu-sair { min-height: 44px; justify-content: center; } }
+/* botão com o nome da pessoa (abre o menu da conta) */
+.conta-btn { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: .55rem; padding: .25rem .45rem .25rem .3rem; border-radius: 999px; border: 1px solid transparent; color: var(--marca-muted); touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.conta-btn[aria-expanded="true"] { border-color: rgba(255, 255, 255, .25); }
+.conta-ini { flex-shrink: 0; width: 30px; height: 30px; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: .75rem; }
 .quem { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; font-size: .8rem; color: var(--marca-muted); }
 .quem b { color: var(--marca-fg); font-weight: 700; }
 .quem form { display: contents; }
@@ -78,7 +99,7 @@ button, a.btn, .sair, .perfil, a.kpi, button.kpi { touch-action: manipulation; -
 .faixa-master { background: var(--sunken); border-bottom: 1px solid var(--line); font-size: .82rem; }
 .faixa-master .wrap { display: flex; align-items: center; gap: .75rem; min-height: 40px; color: var(--muted); }
 .faixa-master a { font-weight: 800; color: var(--accent); }
-@media (max-width: 760px) { .brand-txt, .quem-txt { display: none; } .top .wrap { gap: .6rem; } .nav a { padding: 0 .55rem; } }
+@media (max-width: 760px) { .brand-txt, .quem-txt { display: none; } .top .wrap { gap: .6rem; } .nav .nav-item { padding: 0 .55rem; } }
 /* celular: o menu desce para uma linha só dele, inteira, e o nome da empresa volta ao lado do logo */
 @media (max-width: 640px) {
   .top .wrap { flex-wrap: wrap; row-gap: 0; padding-top: .55rem; min-height: 0; }
@@ -484,7 +505,10 @@ select.agsel { min-height: 32px; font-size: .8rem; font-weight: 700; padding: 0 
 }
 /* hover só onde existe mouse: no celular o toque deixava o hover grudado */
 @media (hover: hover) and (pointer: fine) {
-  .nav a:hover { color: var(--marca-fg); }
+  .nav .nav-item:hover { color: var(--marca-fg); }
+  .menu-lista a:hover, .menu-lista .menu-sair:hover { background: var(--sunken); }
+  .menu-lista a[aria-current="page"]:hover { background: var(--accent-soft); }
+  .conta-btn:hover { border-color: rgba(255, 255, 255, .25); }
   .sair:hover { color: var(--marca-fg); border-color: rgba(255, 255, 255, .45); }
   .voltar:hover { text-decoration: underline; }
   a.kpi:hover { border-color: var(--accent); }

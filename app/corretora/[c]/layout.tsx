@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Topo } from '@/components/Topo';
+import type { ItemNav } from '@/components/Nav';
 import { cliente, exigirCorretora, papeisCorretora } from '@/lib/servidor';
 import { PAPEL } from '@/lib/formato';
 
@@ -12,20 +13,27 @@ export default async function CorretoraLayout({ children, params }: { children: 
   if (!cor) notFound();
   const base = `/corretora/${c}`;
   const papel = master ? 'Master' : PAPEL[papeisCorretora(s, c).includes('admin_corretora') ? 'admin_corretora' : 'operador_corretora'];
-  const links = [
-    // as abas da Central (já como telas do portal), depois as outras telas do portal
+  // Barra de cima enxuta: só as telas do dia a dia ficam soltas; o resto entra em menus.
+  // "Equipe e acessos" vai para o menu do nome da pessoa (canto direito).
+  const links: ItemNav[] = [
     { href: base, rotulo: 'Início', exato: true },
     { href: `${base}/quadro`, rotulo: 'Quadro' },
     { href: `${base}/faturamento`, rotulo: 'Faturamento' },
-    ...(admin ? [{ href: `${base}/comissoes`, rotulo: 'Comissões' }, { href: `${base}/projecao`, rotulo: 'Projeção' }] : []),
-    { href: `${base}/pendencias`, rotulo: 'Pendências' },
-    { href: `${base}/empresas`, rotulo: 'Empresas' },
-    { href: `${base}/pedidos`, rotulo: 'Pedidos' },
-    ...(admin ? [{ href: `${base}/usuarios`, rotulo: 'Equipe e acessos' }] : []),
+    // quando a tela de Cotação existir, ela entra aqui: { href: `${base}/cotacao`, rotulo: 'Cotação' },
+    { rotulo: 'Empresas', itens: [
+      { href: `${base}/empresas`, rotulo: 'Empresas', dica: 'Carteira, vidas e faturas por empresa' },
+      { href: `${base}/pedidos`, rotulo: 'Pedidos', dica: 'Inclusões, exclusões e outros pedidos' },
+      { href: `${base}/pendencias`, rotulo: 'Pendências', dica: 'O que os agentes deixaram para conferir' },
+    ] },
+    ...(admin ? [{ rotulo: 'Financeiro', itens: [
+      { href: `${base}/comissoes`, rotulo: 'Comissões', dica: 'Comissão recebida e a receber' },
+      { href: `${base}/projecao`, rotulo: 'Projeção', dica: 'O que vai cair nos próximos meses' },
+    ] }] : []),
   ];
+  const conta = admin ? [{ href: `${base}/usuarios`, rotulo: 'Equipe e acessos' }] : [];
   return (
     <>
-      <Topo nome={cor.nome} sub="Portal da corretora" cor={cor.cor_primaria} inicio={base} links={links} usuario={s.nome} papel={papel} />
+      <Topo nome={cor.nome} sub="Portal da corretora" cor={cor.cor_primaria} inicio={base} links={links} conta={conta} usuario={s.nome} papel={papel} />
       {master && (
         <div className="faixa-master"><div className="wrap">Você está vendo o painel da {cor.nome} como master. <Link href={`/master/corretoras/${c}`}>Voltar ao master</Link></div></div>
       )}
