@@ -244,7 +244,9 @@ def automatico(o, simular=False):
         if r.returncode != 3 or tentativa == 2:
             break
         log(f'{ag} {op}: login falhou no passo "{saida.get("passo", "?")}"; tento de novo em 2 min')
-        time.sleep(120)
+        # sessão expirada com a aba do portal ainda aberta: o logado() não percebe, então entra de novo antes da 2ª tentativa
+        if op not in ENTRAR or entrar(op, ag):
+            time.sleep(120)
     if r.returncode == 3:
         return parar(o, 'aguardando_voce', caiu, simular)
     if r.returncode:
@@ -259,7 +261,9 @@ def automatico(o, simular=False):
     log(f"{ag} {op}: {len(novos)} arquivo(s) novo(s), {len(saida.get('repetidos', []))} já baixado(s)")
     for f in saida.get('falhas', []):  # um login de empresa que falhou não para os outros
         log(f"{ag} {op}: login {f.get('login')} falhou no passo \"{f.get('passo')}\": {f.get('motivo')} (print {os.path.basename(f.get('print') or '')})")
-    if not novos:
+    # faturas amil/sulamerica: arquivo já na pasta (baixado à mão ou numa rodada sem gravar) também vai para o rodar.py,
+    # que pula o que já está na base; senão ele nunca chega na plataforma
+    if not novos and not (ag == 'faturas' and op in LOGA_SOZINHO and saida.get('repetidos')):
         return parar(o, 'concluida', saida.get('aviso') or 'Nada novo no portal.', simular)
     data, fim = hoje.isoformat(), ['--ordem', o['id']] + (['--simular'] if simular else [])
     if ag == 'faturas':

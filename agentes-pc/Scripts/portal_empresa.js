@@ -125,7 +125,8 @@ async function socorro(page, op, apelido, passo, erro) {
 
 // cfg: { op: 'sulamerica', pasta: 'SUL AMERICA', entra(page, login, cred), menus: [[regex, ...], ...] }
 async function faturas(chromium, cfg, comp, saida) {
-  const lista = logins.ativos(`${cfg.op}_empresa`);
+  // só: apelidos pedidos (ex.: só COMUNA); sem nada = todos os logins ativos
+  const lista = logins.ativos(`${cfg.op}_empresa`).filter(l => !cfg.so || cfg.so.includes(l.apelido.toUpperCase()));
   if (!lista.length) return Object.assign(saida, { ok: false, motivo: 'login', passo: `nenhum login de empresa cadastrado (atalho "Cadastrar login empresa ${cfg.nome}")` });
   const dirMes = path.join(path.resolve(ENTRADA, cfg.pasta), mmaa(comp));
   saida.pasta = dirMes;
