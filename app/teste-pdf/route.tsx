@@ -18,7 +18,7 @@ export async function GET() {
     opcoes: [{ operadora: 'amil', completa: true, total: 540, iof: 12.85, total_iof: 552.85, economia: 447.15, cobertura: 0.8, linhas: [linha('S750 R1')], faltando: [] }],
     automatico: true, operadoras: ['amil'], calculado_em: new Date().toISOString() };
   try {
-    const buf = await renderToBuffer(<Apresentacao d={{ marca: marcaDa('17e3e5ee-591d-4dbf-8e47-44930ef2941f', 'Shaddai'), empresa: { razao: 'EMPRESA EXEMPLO LTDA', curta: 'EXEMPLO', cnpj: null }, cot, rede: [], data: new Date().toISOString() }} />);
+    const buf = await renderToBuffer(<Apresentacao d={{ marca: marcaDa('17e3e5ee-591d-4dbf-8e47-44930ef2941f', 'Shaddai'), empresa: { razao: 'EMPRESA EXEMPLO LTDA', curta: 'EXEMPLO', cnpj: null }, cot, rede: { colunas: ['HOJE\nPlano exemplo', 'Amil\nS750 R1'], secoes: [{ regiao: 'São Paulo - Zona Sul', linhas: [{ nome: 'Hospital A', bairro: 'Vila Mariana', at: ['H,PS', 'H,M,PS'] }, { nome: 'Hospital B', bairro: 'Moema', at: ['H', '—'] }] }] }, data: new Date().toISOString() }} />);
     return new Response(new Uint8Array(buf), { headers: { 'Content-Type': 'application/pdf' } });
   } catch (err) {
     return new Response(`Erro ao montar o PDF: ${(err as Error).stack ?? err}`, { status: 500 });

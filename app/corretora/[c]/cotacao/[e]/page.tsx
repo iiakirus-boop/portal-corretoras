@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cliente, exigirCorretora } from '@/lib/servidor';
 import { cnpj, competencia, moeda, num, plural } from '@/lib/formato';
-import { CATEGORIA, FAIXAS, calcularCotacao, lerEscolhas, operadora, pctCob, queryEscolhas, somaFx, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
+import { CATEGORIA, FAIXAS, calcularCotacao, lerEscolhas, operadora, queryEscolhas, somaFx, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
 import { AutoEnviar } from '@/components/AutoEnviar';
 import type { Empresa } from '@/lib/tipos';
 
@@ -119,7 +119,7 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
                               <option value="">{l && l.escolha === 'automatico' ? `Automático: ${l.plano}${l.acomodacao ? ` ${l.acomodacao}` : ''}` : 'Automático'}</option>
                               {cs.map((x) => (
                                 <option key={`${x.plano_d}|${x.acom_d}`} value={`${o}:${g.i}:${x.plano_d}|${x.acom_d}`}>
-                                  {x.plano_d}{x.acom_d ? ` ${x.acom_d}` : ''}{x.categoria_d ? ` · ${CATEGORIA[x.categoria_d]}` : ''}{Number.isFinite(x.cobertura) ? ` · ${pctCob(x.cobertura)} dos hospitais` : ''}{x.valida ? ' ✓' : ''}
+                                  {x.plano_d}{x.acom_d ? ` ${x.acom_d}` : ''}{x.categoria_d ? ` · ${CATEGORIA[x.categoria_d]}` : ''}{x.valida ? ' ✓' : ''}
                                 </option>
                               ))}
                             </select>
@@ -135,7 +135,7 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
           </div>
           <noscript><button className="btn">Recalcular</button></noscript>
         </AutoEnviar>
-        <p className="hint" style={{ marginTop: '.5rem' }}>✓ = plano equivalente pelo critério: mesma categoria de mercado (ou vizinha) e rede com pelo menos 70% dos hospitais de hoje que a operadora atende.</p>
+        <p className="hint" style={{ marginTop: '.5rem' }}>✓ = plano equivalente: mesma categoria de mercado (ou vizinha) e rede hospitalar parecida com a de hoje.</p>
       </section>
 
       {k.opcoes.length > 0 && (
@@ -143,9 +143,9 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
           <div className="card-h"><h2>Comparativo</h2><span className="hint">valores com IOF de 2,38%</span></div>
           <div className="tbl">
             <table>
-              <thead><tr><th>Operadora</th><th>Planos</th><th className="num">Mensal</th><th className="num">Economia/mês</th><th className="num">Economia 12 meses</th><th className="num">Hospitais de hoje</th></tr></thead>
+              <thead><tr><th>Operadora</th><th>Planos</th><th className="num">Mensal</th><th className="num">Economia/mês</th><th className="num">Economia 12 meses</th></tr></thead>
               <tbody>
-                <tr><td>Hoje</td><td>{[...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')}</td><td className="num">{moeda(k.custo_atual)}</td><td className="num">—</td><td className="num">—</td><td className="num">—</td></tr>
+                <tr><td>Hoje</td><td>{[...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')}</td><td className="num">{moeda(k.custo_atual)}</td><td className="num">—</td><td className="num">—</td></tr>
                 {k.opcoes.map((o) => (
                   <tr key={o.operadora}>
                     <td><a href={`#op-${o.operadora}`}>{operadora(o.operadora)}</a></td>
@@ -153,7 +153,6 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
                     <td className="num">{o.completa ? moeda(o.total_iof) : '—'}</td>
                     <td className="num">{o.completa ? <strong className={(o.economia ?? 0) < 0 ? 'down' : ''}>{moeda(o.economia)}</strong> : '—'}</td>
                     <td className="num">{o.completa ? moeda((o.economia ?? 0) * 12) : '—'}</td>
-                    <td className="num">{o.completa ? pctCob(o.cobertura) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -175,7 +174,7 @@ function BlocoOperadora({ o, grupos }: { o: OpcaoCot; grupos: { i: number; plano
   return (
     <section id={`op-${o.operadora}`} className="card cot-op">
       <div className="card-h">
-        <h2>{operadora(o.operadora)}{o.completa && <small>{pctCob(o.cobertura)} dos hospitais de hoje</small>}</h2>
+        <h2>{operadora(o.operadora)}</h2>
         <span className="hint">{o.completa ? `${moeda(o.total_iof)} por mês com IOF` : 'incompleta'}</span>
       </div>
       {o.faltando.length > 0 && (
@@ -201,9 +200,6 @@ function BlocoOperadora({ o, grupos }: { o: OpcaoCot; grupos: { i: number; plano
               </tbody>
             </table>
           </div>
-          {l.faltam && l.faltam.length > 0 && (
-            <details className="cot-falta"><summary>{plural(l.faltam.length, 'hospital de hoje fica', 'hospitais de hoje ficam')} de fora ({pctCob(l.cobertura)} da rede atual)</summary>{l.faltam.join(' · ')}</details>
-          )}
         </div>
       ))}
       {o.completa && (

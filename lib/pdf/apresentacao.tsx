@@ -4,8 +4,9 @@
 import path from 'node:path';
 import { Document, Font, Image, Page, StyleSheet, Text, View, type Styles } from '@react-pdf/renderer';
 type Estilo = Styles[string];
-import { operadora, pctCob, somaFx, type Cotacao, type LinhaCot, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
+import { operadora, somaFx, type Cotacao, type LinhaCot, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
 import type { Marca } from '@/lib/marca';
+import type { RedeTabela } from '@/lib/rede';
 
 const DIR = path.join(process.cwd(), 'lib', 'pdf');
 let fontes = false;
@@ -33,10 +34,9 @@ const brl = (v: number | null | undefined) => (v == null ? '—' : 'R$ ' + v.toL
 const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 const FX = ['00-18 ANOS', '19-23 ANOS', '24-28 ANOS', '29-33 ANOS', '34-38 ANOS', '39-43 ANOS', '44-48 ANOS', '49-53 ANOS', '54-58 ANOS', '59 em diante'];
 
-export type Rede = { operadora: string; comuns: string[]; total: number; faltam: string[] };
 export type DadosApresentacao = {
   marca: Marca; empresa: { razao: string; curta: string; cnpj: string | null };
-  cot: Cotacao; rede: Rede[]; data: string;
+  cot: Cotacao; rede: RedeTabela | null; data: string;
 };
 
 export function Apresentacao({ d }: { d: DadosApresentacao }) {
@@ -188,12 +188,11 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
             <Cel w={130} cab cor={c.principal}>MENSAL (C/ IOF)</Cel>
             <Cel w={130} cab cor={c.principal}>ECONOMIA MENSAL</Cel>
             <Cel w={130} cab cor={c.principal}>ECONOMIA 12 MESES</Cel>
-            <Cel w={90} cab cor={c.principal}>REDE ATUAL</Cel>
           </View>
           <View style={[s.linhaTab, { backgroundColor: OFF }]}>
             <Cel w={200} negrito>Atual</Cel>
             <Cel flex>{[...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')}</Cel>
-            <Cel w={130} negrito>{brl(k.custo_atual)}</Cel><Cel w={130}>-</Cel><Cel w={130}>-</Cel><Cel w={90}>100%</Cel>
+            <Cel w={130} negrito>{brl(k.custo_atual)}</Cel><Cel w={130}>-</Cel><Cel w={130}>-</Cel>
           </View>
           {ops.map((o, i) => (
             <View key={o.operadora} style={[s.linhaTab, { backgroundColor: i % 2 ? OFF : BRANCO }]}>
@@ -202,7 +201,6 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
               <Cel w={130} negrito>{brl(o.total_iof)}</Cel>
               <Cel w={130} negrito cor2={(o.economia ?? 0) >= 0 ? c.verde : c.vinho}>{brl(o.economia)}</Cel>
               <Cel w={130} negrito cor2={(o.economia ?? 0) >= 0 ? c.verde : c.vinho}>{brl(r2((o.economia ?? 0) * 12))}</Cel>
-              <Cel w={90}>{pctCob(o.cobertura)}</Cel>
             </View>
           ))}
         </View>
@@ -210,7 +208,7 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
           <View style={{ position: 'absolute', left: 43, right: 43, bottom: 60, height: 92, borderRadius: 6, backgroundColor: c.destaque, padding: 18, flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: 'Texto', fontWeight: 700, fontSize: 12, color: '#D9ECF2', letterSpacing: 1.2 }}>MELHOR CENÁRIO: {operadora(melhor.operadora).toUpperCase()}</Text>
-              <Text style={{ fontFamily: 'Texto', fontSize: 11, color: '#D9ECF2', marginTop: 4 }}>{pctCob(melhor.cobertura)} dos hospitais da rede atual, mesma categoria de plano.</Text>
+              <Text style={{ fontFamily: 'Texto', fontSize: 11, color: '#D9ECF2', marginTop: 4 }}>Plano equivalente, na mesma categoria de mercado.</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ fontFamily: 'Titulo', fontWeight: 700, fontSize: 30, color: BRANCO }}>{brl(melhor.economia)}/mês</Text>
@@ -221,24 +219,34 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
         <Rodape />
       </Page>
 
-      {/* rede credenciada */}
-      {d.rede.length > 0 && (
-        <Page size={[W, H]} style={s.pagina}>
-          <Titulo kicker="Rede Credenciada" titulo="Hospitais da Rede Atual Mantidos" />
-          <View style={{ position: 'absolute', left: 43, right: 43, top: 110, bottom: 56, flexDirection: 'row', gap: 16 }}>
-            {d.rede.map((r) => (
-              <View key={r.operadora} style={{ flex: 1, borderRadius: 6, borderWidth: 1, borderColor: CLARO, backgroundColor: OFF, padding: 14 }}>
-                <Text style={{ fontFamily: 'Titulo', fontWeight: 700, fontSize: 14, color: c.escuro }}>{operadora(r.operadora)}</Text>
-                <Text style={{ fontFamily: 'Texto', fontSize: 10, color: CINZA, marginTop: 2, marginBottom: 8 }}>{r.comuns.length} de {r.total} hospitais de hoje</Text>
-                {r.comuns.slice(0, 16).map((h) => <Text key={h} style={{ fontFamily: 'Texto', fontSize: 9, color: TEXTO, marginBottom: 2.5 }}>•  {h}</Text>)}
-                {r.comuns.length > 16 && <Text style={{ fontFamily: 'Texto', fontStyle: 'italic', fontSize: 9, color: CINZA }}>e mais {r.comuns.length - 16}</Text>}
-                {r.faltam.length > 0 && <Text style={{ fontFamily: 'Texto', fontSize: 8.5, color: c.vinho, marginTop: 8 }}>Fora: {r.faltam.slice(0, 6).join(', ')}{r.faltam.length > 6 ? ` e mais ${r.faltam.length - 6}` : ''}</Text>}
+      {/* rede credenciada: principais hospitais da região, uma linha por hospital e uma coluna por plano */}
+      {d.rede && paginasRede(d.rede).map((pg, i, todas) => (
+        <Page key={`rede${i}`} size={[W, H]} style={s.pagina}>
+          <Titulo kicker="Rede Credenciada" titulo={`Principais Hospitais${todas.length > 1 ? ` - Parte ${i + 1}` : ''}`} />
+          <View style={{ position: 'absolute', left: 43, right: 43, top: 100 }}>
+            <View style={s.linhaTab}>
+              <Cel w={250} cab cor={c.principal}>HOSPITAL</Cel>
+              <Cel w={150} cab cor={c.principal}>BAIRRO / CIDADE</Cel>
+              {d.rede!.colunas.map((col, j) => <Cel key={col} flex cab cor={j === 0 && col.startsWith('HOJE') ? c.vinho : c.principal}>{col.toUpperCase()}</Cel>)}
+            </View>
+            {pg.map((l, j) => l.tipo === 'regiao' ? (
+              <View key={`r${j}`} style={[s.linhaTab, { backgroundColor: '#E6EEF2' }]}>
+                <View style={{ flex: 1, paddingHorizontal: 6, paddingVertical: 4, borderWidth: 0.5, borderColor: CLARO }}>
+                  <Text style={{ fontFamily: 'Texto', fontWeight: 700, fontSize: 9, color: c.destaque, letterSpacing: 1 }}>{l.regiao.toUpperCase().replace(' - ', ' — ')}</Text>
+                </View>
+              </View>
+            ) : (
+              <View key={`h${j}`} style={[s.linhaTab, { backgroundColor: j % 2 ? OFF : BRANCO }]}>
+                <Cel w={250} negrito esq>{l.nome}</Cel>
+                <Cel w={150} cor2={CINZA}>{l.bairro}</Cel>
+                {l.at.map((a, k) => <Cel key={k} flex negrito={a !== '—'} cor2={a === '—' ? CINZA : TEXTO}>{a}</Cel>)}
               </View>
             ))}
           </View>
+          <Text style={[s.nota, { position: 'absolute', left: 43, right: 43, bottom: 40 }]}>H = internação · M = maternidade · PS = pronto-socorro · — = não atende no plano. Rede sujeita a alteração pela operadora; confirme no guia médico antes da contratação.</Text>
           <Rodape />
         </Page>
-      )}
+      ))}
 
       {/* encerramento */}
       <Page size={[W, H]} style={[s.pagina, { backgroundColor: c.escuro }]}>
@@ -260,6 +268,23 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
       </Page>
     </Document>
   );
+}
+
+type LinhaRede = { tipo: 'regiao'; regiao: string } | { tipo: 'hosp'; nome: string; bairro: string; at: string[] };
+function paginasRede(r: RedeTabela, max = 16) {
+  const total = r.secoes.reduce((a, x) => a + x.linhas.length + 1, 0);
+  const porPagina = Math.ceil(total / Math.ceil(total / max)) + 1; // páginas equilibradas
+  const pags: LinhaRede[][] = [[]];
+  for (const sec of r.secoes) {
+    let atual = pags[pags.length - 1];
+    if (atual.length >= porPagina - 1) { atual = []; pags.push(atual); }
+    atual.push({ tipo: 'regiao', regiao: sec.regiao });
+    for (const h of sec.linhas) {
+      if (atual.length >= porPagina) { atual = [{ tipo: 'regiao', regiao: `${sec.regiao} (continuação)` }]; pags.push(atual); }
+      atual.push({ tipo: 'hosp', ...h });
+    }
+  }
+  return pags.filter((p) => p.length);
 }
 
 function partes<T>(xs: T[], n: number) {
@@ -318,13 +343,13 @@ function TabelaOperadora({ o, ls, ultima, c, s }: { o: OpcaoCot; ls: LinhaCot[];
   );
 }
 
-function Cel({ children, w, flex, cab, cor, negrito, claro, ouro, cor2, pequeno, grande }: {
-  children: React.ReactNode; w?: number; flex?: boolean | number; cab?: boolean; cor?: string; negrito?: boolean; claro?: boolean; ouro?: string; cor2?: string; pequeno?: boolean; grande?: boolean;
+function Cel({ children, w, flex, cab, cor, negrito, claro, ouro, cor2, pequeno, grande, esq }: {
+  children: React.ReactNode; w?: number; flex?: boolean | number; cab?: boolean; cor?: string; negrito?: boolean; claro?: boolean; ouro?: string; cor2?: string; pequeno?: boolean; grande?: boolean; esq?: boolean;
 }) {
   const color = cab || claro ? BRANCO : ouro ? ouro : cor2 ?? TEXTO;
   return (
     <View style={{ width: w, flex: flex === true ? 1 : flex || undefined, backgroundColor: cab ? cor : undefined, borderWidth: 0.5, borderColor: CLARO, justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 3, minHeight: 22 }}>
-      <Text style={{ fontFamily: 'Texto', fontWeight: negrito || cab ? 700 : 400, fontSize: grande ? 15 : pequeno ? 7.5 : cab ? 8.5 : 9.5, color: ouro ? ouro : color, textAlign: 'center' }}>{children}</Text>
+      <Text style={{ fontFamily: 'Texto', fontWeight: negrito || cab ? 700 : 400, fontSize: grande ? 15 : pequeno ? 7.5 : cab ? 8.5 : 9.5, color: ouro ? ouro : color, textAlign: esq ? 'left' : 'center' }}>{children}</Text>
     </View>
   );
 }
