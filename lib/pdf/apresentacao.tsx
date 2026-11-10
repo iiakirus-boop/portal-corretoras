@@ -173,7 +173,7 @@ export function Apresentacao({ d }: { d: DadosApresentacao }) {
         <Page key={`${o.operadora}-${n}`} size={[W, H]} style={s.pagina}>
           <Titulo kicker={`Proposta ${operadora(o.operadora)}`} titulo={`Tabela por Faixa Etária${todas.length > 1 ? ` (${n + 1}/${todas.length})` : ''} — ${k.copart ? 'Com' : 'Sem'} Coparticipação`} />
           <TabelaOperadora o={o} ls={ls} ultima={n === todas.length - 1} c={c} s={s} />
-          <Text style={s.nota}>Valores por faixa etária, com IOF de 2,38%. {[...new Set(ls.map((l) => `${l.plano}: ${l.tabela.titulo} (${l.tabela.condicoes})`))].join(' · ')}. Produto sujeito à análise de aceitação da operadora.</Text>
+          <Text style={s.nota}>Valores por faixa etária, com IOF de 2,38%. {[...new Set(ls.map((l) => `${l.plano}: ${l.tabela.titulo} (${l.tabela.condicoes}${l.tabela.copart ? ', com coparticipação' : ''})`))].join(' · ')}. Produto sujeito à análise de aceitação da operadora.</Text>
           <Rodape />
         </Page>
       )))}

@@ -20,7 +20,7 @@ export type LinhaCot = {
   grupo: number;
   origem: { seguradora: string; operadora: string | null; plano: string | null; acomodacao: string; plano_atual: string | null };
   plano: string; acomodacao: string; cobertura: number | null; faltam: string[] | null; escolha: 'automatico' | 'manual'; fora_criterio: boolean;
-  tabela: { id: number; titulo: string; condicoes: string };
+  tabela: { id: number; titulo: string; condicoes: string; copart?: boolean };
   faixas: number[]; valores: number[]; total: number;
 };
 export type OpcaoCot = {
