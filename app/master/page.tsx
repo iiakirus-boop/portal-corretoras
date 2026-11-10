@@ -5,6 +5,8 @@ import { sinal, vidasCarteira, type VidaCarteira } from '@/lib/contas';
 import { Pill, StatusPill } from '@/components/Pill';
 import type { Corretora, Empresa, LoginStatus, Maquina, Ordem, Pedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Visão geral' };
+
 export default async function Master() {
   const db = await cliente();
   const [{ data: corretoras }, { data: empresas }, { data: vidasC }, { data: pedidos }, { data: ordens }, { data: maquinas }, { data: logins }] = await Promise.all([

@@ -4,6 +4,8 @@ import { Aviso } from '@/components/Aviso';
 import { Pessoas } from '@/components/Pessoas';
 import type { Convite, Empresa, Membro } from '@/lib/tipos';
 
+export const metadata = { title: 'Equipe e acessos' };
+
 type P = { params: Promise<{ c: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Usuarios({ params, searchParams }: P) {

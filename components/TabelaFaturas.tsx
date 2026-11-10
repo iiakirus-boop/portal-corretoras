@@ -1,9 +1,13 @@
 import { PAGO_ROTULO, competencia, data, moeda, num, pagamento, seg } from '@/lib/formato';
+import { pedirSegundaVia } from '@/lib/acoes';
 import { Pill } from './Pill';
 import type { Fatura } from '@/lib/tipos';
 
 // Faturas com os links de fatura e boleto. A coluna de conferência só aparece para a corretora.
-export function TabelaFaturas({ faturas, conferencia = false }: { faturas: Fatura[]; conferencia?: boolean }) {
+export function TabelaFaturas({ faturas, conferencia = false, segundaVia }: {
+  faturas: Fatura[]; conferencia?: boolean;
+  /** id da empresa: mostra o botão "Pedir 2ª via" nas faturas ainda não pagas */ segundaVia?: string;
+}) {
   const h = new Date().toISOString().slice(0, 10);
   if (faturas.length === 0) return <p className="empty">Nenhuma fatura ainda. Elas aparecem aqui quando a corretora busca no portal da seguradora.</p>;
   return (
@@ -27,6 +31,12 @@ export function TabelaFaturas({ faturas, conferencia = false }: { faturas: Fatur
                 <span className="acoes">
                   {f.fatura_doc_id && <a href={`/arquivo/${f.fatura_doc_id}`} target="_blank" rel="noopener">Fatura</a>}
                   {f.boleto_doc_id && !pg && <a href={`/arquivo/${f.boleto_doc_id}`} target="_blank" rel="noopener">Boleto</a>}
+                  {segundaVia && !pg && (
+                    <form action={pedirSegundaVia}>
+                      <input type="hidden" name="empresa_id" value={segundaVia} /><input type="hidden" name="fatura_id" value={f.id} />
+                      <button className="lnk" title="Pede à corretora um boleto novo desta fatura">Pedir 2ª via</button>
+                    </form>
+                  )}
                 </span>
               </td>
             </tr>

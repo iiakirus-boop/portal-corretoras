@@ -5,6 +5,8 @@ import { Aviso } from '@/components/Aviso';
 import { StatusPill } from '@/components/Pill';
 import type { Pedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Pedidos' };
+
 type P = { params: Promise<{ e: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function PedidosEmpresa({ params, searchParams }: P) {

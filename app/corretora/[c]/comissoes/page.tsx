@@ -3,6 +3,8 @@ import { cliente, exigirCorretora } from '@/lib/servidor';
 import { docsCentral } from '@/lib/central/dados';
 import { Comissoes } from '@/components/central/Comissoes';
 
+export const metadata = { title: 'Comissões' };
+
 export const dynamic = 'force-dynamic';
 
 // As Comissões da Central de Agentes, como tela do portal: mesmos dados (central_docs) e a mesma Projeção. Só administrador.

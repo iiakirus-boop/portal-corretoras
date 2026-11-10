@@ -3,7 +3,7 @@ import './globals.css';
 import { MODO_DEMO } from '@/lib/servidor';
 
 export const metadata: Metadata = {
-  title: 'Portal da corretora',
+  title: { default: 'Portal da corretora', template: '%s · Portal da corretora' },
   description: 'Faturas, vidas, pedidos e comissões das empresas atendidas pela corretora.',
 };
 

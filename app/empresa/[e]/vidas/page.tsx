@@ -5,6 +5,8 @@ import { competencia, data, idadeVida, moeda, num, seg, valorVida } from '@/lib/
 import { FAIXAS, faixaDe } from '@/lib/contas';
 import type { Fatura, Vida } from '@/lib/tipos';
 
+export const metadata = { title: 'Vidas' };
+
 type P = { params: Promise<{ e: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Vidas({ params, searchParams }: P) {

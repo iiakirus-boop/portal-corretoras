@@ -105,7 +105,7 @@ export function Pendencias({ c, d, podeEditar, usuario, nomes, agente = null }: 
   return (
     <div className="page cx">
       <div className="page-head">
-        <div><h1>Pendências</h1><p>O que precisa de você, o que os agentes estão fazendo e o que impede cada mês de fechar. <a href={`/central/${c}#pendencias`}>Ver na Central antiga</a></p></div>
+        <div><h1>Pendências</h1><p>O que precisa de você, o que os agentes estão fazendo e o que impede cada mês de fechar.</p></div>
         <div className="filtros">
           <div className="chips" role="group" aria-label="Agente">
             <button type="button" aria-pressed={!filtro} onClick={() => setFiltro(null)}>Todos</button>

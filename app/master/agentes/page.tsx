@@ -8,6 +8,8 @@ import { Aviso } from '@/components/Aviso';
 import { Pill } from '@/components/Pill';
 import type { Agente, Corretora, LoginStatus, Maquina, Ordem, Previsao, Rotina } from '@/lib/tipos';
 
+export const metadata = { title: 'Agentes' };
+
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 
 // Traduz a agenda (cron) mais comum para português; o resto aparece como está

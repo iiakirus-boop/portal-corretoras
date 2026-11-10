@@ -50,6 +50,7 @@ function regras(uid: string | null) {
     quadro_eventos: (r) => daCorretora(r.corretora_id),
     quadro_emails: (r) => daCorretora(r.corretora_id),
     quadro_arquivos: (r) => daCorretora(r.corretora_id),
+    faturamento_envios: (r) => daCorretora(r.corretora_id),
     maquinas: () => false,
     login_status: () => false,
   };
@@ -68,6 +69,7 @@ function regras(uid: string | null) {
       db.pedidos.some((p) => p.id === r.pedido_id && p.corretora_id === r.corretora_id && (daCorretora(p.corretora_id) || (r.visivel_empresa && daEmpresa(p.empresa_id)))),
     membros: (r) => r.papel !== 'master' && daCorretora(r.corretora_id, true),
     quadro_cards: (r) => daCorretora(r.corretora_id),
+    faturamento_envios: (r) => daCorretora(r.corretora_id),
     quadro_eventos: (r) => daCorretora(r.corretora_id) && r.tipo === 'comentario' && r.autor_id === uid,
     documentos: (r) => r.tipo === 'anexo_pedido' && db.pedidos.some((p) => p.id === r.pedido_id && (daCorretora(p.corretora_id) || daEmpresa(p.empresa_id))),
   };
@@ -76,6 +78,7 @@ function regras(uid: string | null) {
     empresas: (r) => daCorretora(r.corretora_id, true),
     membros: (r) => r.papel !== 'master' && daCorretora(r.corretora_id, true),
     quadro_cards: (r) => daCorretora(r.corretora_id),
+    faturamento_envios: (r) => daCorretora(r.corretora_id),
   };
   return {
     master, daEmpresa,

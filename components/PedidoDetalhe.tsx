@@ -9,6 +9,7 @@ const CAMPO: Record<string, string> = {
   nome: 'Nome', cpf: 'CPF', nascimento: 'Nascimento', parentesco: 'Parentesco', titular: 'Titular', plano: 'Plano', inicio: 'Início',
   motivo: 'Motivo', data: 'Data', competencia: 'Mês', observacao: 'Observação', plano_atual: 'Plano atual', plano_novo: 'Plano novo',
   assunto: 'Assunto', mensagem: 'Mensagem', mae: 'Nome da mãe', admissao: 'Admissão', carteirinha: 'Carteirinha', seguradora: 'Seguradora',
+  fatura: 'Nº da fatura', vencimento: 'Vencimento', origem: 'Pedido por',
 };
 const valor = (k: string, v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? data(v) : k === 'competencia' && /^\d{4}-\d{2}$/.test(v) ? `${v.slice(5)}/${v.slice(0, 4)}` : v);
 
@@ -38,7 +39,7 @@ export function PedidoDetalhe({ pedido: p, eventos, anexos, empresa, lado, de, p
           <div className="tbl">
             <table style={{ minWidth: 0 }}>
               <tbody>
-                {Object.entries(p.dados).map(([k, v]) => (
+                {Object.entries(p.dados).filter(([k]) => k !== 'fatura_id').map(([k, v]) => (
                   <tr key={k}><th style={{ position: 'static', width: '34%' }}>{CAMPO[k] ?? k}</th><td>{valor(k, String(v))}</td></tr>
                 ))}
               </tbody>

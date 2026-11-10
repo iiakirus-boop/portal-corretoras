@@ -8,6 +8,8 @@ import { Pill } from '@/components/Pill';
 import type { Corretora, Empresa, Membro, Pedido } from '@/lib/tipos';
 import { ABERTOS } from '@/lib/formato';
 
+export const metadata = { title: 'Corretoras' };
+
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Corretoras({ searchParams }: P) {
