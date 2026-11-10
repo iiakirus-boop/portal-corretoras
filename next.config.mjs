@@ -1,5 +1,5 @@
 // arquivos que o PDF lê do disco: fontes e logos, e as fontes padrão do pdfkit (carregadas por '#standard-fonts', que o rastreio não vê)
-const PDF = ['./lib/pdf/fontes/*', './lib/pdf/marcas/*', './node_modules/pdfkit/js/standard-fonts/*', './node_modules/pdfkit/js/data/*'];
+const PDF = ['./lib/pdf/fontes/*', './lib/pdf/marcas/*', './node_modules/pdfkit/js/standard-fonts/**/*', './node_modules/pdfkit/js/data/**/*'];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
