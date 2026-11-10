@@ -90,12 +90,13 @@ def comando(o):
 
 
 # Ciclo automático (pedidos do Supervisor ou do master): baixa do portal -> rodar.py, que grava, publica e sincroniza.
-AUTO = {('faturas', 'porto'), ('faturas', 'bradesco'), ('faturas', 'hapvida'),
-        ('comissao', 'porto'), ('comissao', 'bradesco'), ('comissao', 'hapvida')}
+AUTO = {('faturas', 'porto'), ('faturas', 'bradesco'), ('faturas', 'hapvida'), ('faturas', 'amil'), ('faturas', 'sulamerica'),
+        ('comissao', 'porto'), ('comissao', 'bradesco'), ('comissao', 'hapvida'), ('comissao', 'amil'), ('comissao', 'sulamerica')}
+LOGA_SOZINHO = {'amil', 'sulamerica'}  # o baixar_<op>.js entra sozinho com os logins do logins.js (comissão: corretor; faturas: um por empresa)
 # Logins dos portais: vêm do cadastro do banco (corretora_codigos, uma linha por login, com a porta do Chrome do atalho
 # "Entrar na <op>"). Login novo (ex.: outro grupo de contratos da Hapvida) entra cadastrando lá, sem mexer neste arquivo.
 DOMINIO = {'porto': 'portoseguro.com.br', 'bradesco': 'bradescoseguros.com.br', 'hapvida': 'webhap.hapvida.com.br'}
-NOME = {'porto': 'Porto', 'bradesco': 'Bradesco', 'hapvida': 'Hapvida'}
+NOME = {'porto': 'Porto', 'bradesco': 'Bradesco', 'hapvida': 'Hapvida', 'amil': 'Amil', 'sulamerica': 'SulAmérica'}
 UM_LOGIN = {'porto', 'bradesco'}  # portais em que o atalho abre um login só (o primeiro do cadastro)
 
 
@@ -123,7 +124,8 @@ def senhas(op):
     """Arquivos do cofre que o atalho precisa: porto.cred / bradesco.cred; Hapvida um por login (hapvida_<código>.cred)."""
     return [f'{op}.cred'] if op in UM_LOGIN else [f'{op}_{cod}.cred' for _, cod, _, _ in logins_pc(op)]
 TENTOU = {}  # op -> quando o vigia abriu o login pela última vez
-SEGURADORA = {'porto': ('PORTO SEGURO - SEGURO SAUDE', 'PORTOMED'), 'bradesco': ('BRADESCO',)}
+SEGURADORA = {'porto': ('PORTO SEGURO - SEGURO SAUDE', 'PORTOMED'), 'bradesco': ('BRADESCO',), 'amil': ('AMIL',),
+              'sulamerica': ('SULAMÉRICA',)}
 
 
 def logado(op, porta=None, dominio=None):
@@ -143,6 +145,8 @@ def logado(op, porta=None, dominio=None):
 
 
 def todos_logados(op, ag):
+    if op in LOGA_SOZINHO:
+        return True
     if op in UM_LOGIN:
         return logado(op)
     return ag != 'comissao' or all(logado(op, p, d) for _, _, p, d in logins_pc(op))  # Hapvida faturas entra sozinha no baixar
@@ -211,6 +215,10 @@ def automatico(o, simular=False):
     caiu = f'login caiu: clique em Entrar na {NOME[op]}'
     if ag == 'faturas' and op == 'hapvida':  # faturas Hapvida = Portal Empresa, que o baixar_hapvida.js loga sozinho ("Entrar na Hapvida" é só o webhap da comissão)
         caiu = 'o login do Portal Empresa da Hapvida falhou duas vezes seguidas: tente de novo pelo master (não precisa abrir o Entrar na Hapvida)'
+    if op in LOGA_SOZINHO:
+        caiu = (f'o login do portal {NOME[op]} não entrou duas vezes seguidas (captcha, código ou senha): '
+                f'confira o login no atalho "Cadastrar login {"empresa " if ag == "faturas" else ""}{NOME[op].replace("é", "e")}" '
+                f'e tente de novo pelo master')
     # os três logins juntos na comissão Hapvida: o painel do mês sai das três pastas (comissao_hapvida.py)
     if not todos_logados(op, ag):
         motivo = entrar(op, ag)
@@ -249,12 +257,16 @@ def automatico(o, simular=False):
             log(f'{ag} {op}: situação dos boletos não enviada ({e.__class__.__name__}: {e})')
     novos = saida.get('arquivos', [])
     log(f"{ag} {op}: {len(novos)} arquivo(s) novo(s), {len(saida.get('repetidos', []))} já baixado(s)")
+    for f in saida.get('falhas', []):  # um login de empresa que falhou não para os outros
+        log(f"{ag} {op}: login {f.get('login')} falhou no passo \"{f.get('passo')}\": {f.get('motivo')} (print {os.path.basename(f.get('print') or '')})")
     if not novos:
         return parar(o, 'concluida', saida.get('aviso') or 'Nada novo no portal.', simular)
     data, fim = hoje.isoformat(), ['--ordem', o['id']] + (['--simular'] if simular else [])
     if ag == 'faturas':
         extra = {'porto': ['--comp', comp, '--sem-baixar'], 'bradesco': ['--entrada', os.path.dirname(novos[0])],
-                 'hapvida': ['--portal', novos[0]]}[op]
+                 'hapvida': ['--portal', novos[0]],
+                 # amil/sulamerica: boletos a enviar\<OP>\MM-AA (o que já está na base é pulado)
+                 'amil': ['--entrada', saida.get('pasta') or ''], 'sulamerica': ['--entrada', saida.get('pasta') or '']}[op]
         cmds = [['faturas', op, data] + extra]
     elif op == 'porto':  # o analítico fica em Comissoes/<mês do pagamento>/: uma rodada por mês, com --comp
         meses = {}
