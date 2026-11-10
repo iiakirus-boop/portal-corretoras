@@ -285,6 +285,8 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .chips a.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
 
 /* cotação */
+.chip-check { min-height: 30px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-weight: 700; font-size: .78rem; display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
+.chip-check:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); }
 .cot-op { border-top: 3px solid var(--accent); }
 .cot-op .card-h h2 small { font-weight: 600; color: var(--muted); font-size: .8rem; margin-left: .4rem; }
 .cot-falta { font-size: .78rem; color: var(--muted); margin: .4rem 0 0; }
