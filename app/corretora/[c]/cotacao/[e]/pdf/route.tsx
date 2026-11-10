@@ -48,13 +48,19 @@ export async function GET(req: Request, { params }: Ctx) {
     rede.push({ operadora: o.operadora, comuns, total: hoje.size, faltam });
   }
 
-  const buf = await renderToBuffer(
-    <Apresentacao d={{
-      marca: marcaDa(c, cor?.nome),
-      empresa: { razao: em.razao_social, curta: em.nome_curto || em.razao_social, cnpj: em.cnpj ? cnpj(em.cnpj) : null },
-      cot, rede, data: new Date().toISOString(),
-    }} />,
-  );
+  let buf: Buffer;
+  try {
+    buf = await renderToBuffer(
+      <Apresentacao d={{
+        marca: marcaDa(c, cor?.nome),
+        empresa: { razao: em.razao_social, curta: em.nome_curto || em.razao_social, cnpj: em.cnpj ? cnpj(em.cnpj) : null },
+        cot, rede, data: new Date().toISOString(),
+      }} />,
+    );
+  } catch (err) {
+    console.error('pdf da cotação', err);
+    return new Response(`Não deu para montar o PDF: ${(err as Error).message ?? err}`, { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }
   const nome = `Proposta_${(em.nome_curto || em.razao_social).replace(/[^\p{L}\p{N}]+/gu, '_')}.pdf`;
   return new Response(new Uint8Array(buf), {
     headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${nome}"`, 'Cache-Control': 'no-store' },

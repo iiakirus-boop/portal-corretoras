@@ -187,6 +187,7 @@ function BlocoOperadora({ o, grupos }: { o: OpcaoCot; grupos: { i: number; plano
             <strong>{l.plano}{l.acomodacao ? ` · ${l.acomodacao}` : ''}</strong> no lugar de {l.origem.plano_atual ?? l.origem.plano}
             {l.escolha === 'manual' && <span className="pill p-info" style={{ marginLeft: '.4rem' }}>escolhido à mão</span>}
             {l.fora_criterio && <span className="pill p-warn" style={{ marginLeft: '.4rem' }}>fora do critério de equivalência</span>}
+            {l.tabela.copart && <span className="pill p-warn" style={{ marginLeft: '.4rem' }}>com coparticipação</span>}
             <small className="hint"> · tabela {l.tabela.titulo} ({l.tabela.condicoes})</small>
           </p>
           <div className="tbl">
