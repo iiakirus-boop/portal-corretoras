@@ -70,3 +70,30 @@ export async function calcularCotacao(db: any, e: string, es: Escolhas) {
   const { data, error } = await db.rpc('cot_cotacao', { e, ops: es.ops, trocas: es.trocas, fora: es.fora });
   return { cot: (data ?? null) as Cotacao | null, erro: error?.message as string | undefined };
 }
+
+// Nome curto do plano de hoje, para a tela e o PDF. Os nomes das faturas vêm compridos:
+//   "6702 OURO MAIS Q - PME + REDE TERCEIRIZADA / 6703 MEDISERVICE ..." -> "Ouro Mais Q"
+//   "AMIL S380 QC NAC R COPART PJ" -> "S380 QC Copart"     "Bradesco Saúde TN3P" -> "TN3P"
+const SIGLA = /^(?:[A-Z]{1,3}\d[A-Z0-9]*|[A-Z]\d+|\d+[A-Z]*|QC|QP|CE|CP|RC|R\d|I{1,3}|IV|ABC|ABCDM|SP|RJ|DF|PR|NDI|RMCA|GM|BX)$/;
+const ACESSORIO = /MEDISERVICE|ASO E PCMSO|\bPGR\b|ODONTO|\bVIDA\b|PORTO SERVI/i;
+function resumirUm(nome: string) {
+  const partes = nome.split(/\s+\/\s+/).map((p) => p.trim()).filter(Boolean);
+  let s = partes.find((p) => !ACESSORIO.test(p)) ?? partes[0] ?? nome;
+  if (/^Bradesco Saúde\s/i.test(s)) return s.replace(/^Bradesco Saúde\s+/i, '');
+  s = s.replace(/^(AMIL|HAP)\s+/i, '')
+    .replace(/^\d{3,6}[\s-]+/, '')
+    .replace(/\s*\+\s*RE?DE?\s*(TERCEIRIZADA|PORTO|PO)\b.*$/i, '')
+    .replace(/\s+-\s+PME\b/i, '')
+    .replace(/\b(PME|EMPRESARIAL|EMP|NAC|PJ|TP|JUL|PF)\b/gi, '')
+    .replace(/\bR\b(?!\d)/g, '')
+    .replace(/\bCE\b/g, '')
+    .replace(/\s{2,}/g, ' ').trim();
+  // maiúsculas viram "Ouro Mais Q"; siglas (S380, QC, R1, II) ficam como estão
+  if (s === s.toUpperCase()) s = s.split(' ').map((w) => (SIGLA.test(w) || w.length <= 1 ? w : w[0] + w.slice(1).toLowerCase())).join(' ');
+  s = s.replace(/\bCopart?\b/gi, 'Copart');
+  return s.length > 32 ? s.slice(0, 31).trimEnd() + '…' : s;
+}
+export function resumirPlano(nome: string | null | undefined) {
+  if (!nome) return '—';
+  return [...new Set(nome.split(/,\s+/).map(resumirUm))].join(', ');
+}

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cliente, exigirCorretora } from '@/lib/servidor';
 import { cnpj, competencia, moeda, num, plural } from '@/lib/formato';
-import { CATEGORIA, FAIXAS, calcularCotacao, lerEscolhas, operadora, pctCob, queryEscolhas, somaFx, type OpcaoCot } from '@/lib/cotacao';
+import { CATEGORIA, FAIXAS, calcularCotacao, lerEscolhas, operadora, pctCob, queryEscolhas, somaFx, type OpcaoCot, resumirPlano } from '@/lib/cotacao';
 import { AutoEnviar } from '@/components/AutoEnviar';
 import type { Empresa } from '@/lib/tipos';
 
@@ -105,7 +105,7 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
               <tbody>
                 {k.grupos.map((g) => (
                   <tr key={g.i} style={g.fora ? { opacity: 0.5 } : undefined}>
-                    <td>{g.plano_atual ?? g.plano ?? '—'}{g.acomodacao ? ` · ${g.acomodacao}` : ''}<small>{g.seguradora}{g.plano ? ` · na tabela: ${g.plano}${catTxt(cat.get(`${g.operadora}|${g.plano}`)) ? ` (${catTxt(cat.get(`${g.operadora}|${g.plano}`))})` : ''}` : ' · plano sem equivalente: escolha à mão'}</small></td>
+                    <td><span title={g.plano_atual ?? undefined}>{resumirPlano(g.plano_atual ?? g.plano)}</span>{g.acomodacao ? ` · ${g.acomodacao}` : ''}<small>{g.seguradora}{g.plano ? ` · na tabela: ${g.plano}${catTxt(cat.get(`${g.operadora}|${g.plano}`)) ? ` (${catTxt(cat.get(`${g.operadora}|${g.plano}`))})` : ''}` : ' · plano sem equivalente: escolha à mão'}</small></td>
                     <td className="num">{num(g.vidas)}</td>
                     <td className="num">{moeda(g.valor)}</td>
                     {sel.map((o) => {
@@ -115,7 +115,7 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
                       return (
                         <td key={o}>
                           {g.fora ? '—' : (
-                            <select name="t" defaultValue={atual ? `${o}:${g.i}:${atual}` : ''} aria-label={`Plano na ${operadora(o)} para ${g.plano_atual ?? g.plano}`} style={{ maxWidth: 260 }}>
+                            <select name="t" defaultValue={atual ? `${o}:${g.i}:${atual}` : ''} aria-label={`Plano na ${operadora(o)} para ${resumirPlano(g.plano_atual ?? g.plano)}`} style={{ maxWidth: 260 }}>
                               <option value="">{l && l.escolha === 'automatico' ? `Automático: ${l.plano}${l.acomodacao ? ` ${l.acomodacao}` : ''}` : 'Automático'}</option>
                               {cs.map((x) => (
                                 <option key={`${x.plano_d}|${x.acom_d}`} value={`${o}:${g.i}:${x.plano_d}|${x.acom_d}`}>
@@ -145,7 +145,7 @@ export default async function CotacaoEmpresa({ params, searchParams }: P) {
             <table>
               <thead><tr><th>Operadora</th><th>Planos</th><th className="num">Mensal</th><th className="num">Economia/mês</th><th className="num">Economia 12 meses</th><th className="num">Hospitais de hoje</th></tr></thead>
               <tbody>
-                <tr><td>Hoje</td><td>{[...new Set(ativos.map((g) => g.plano_atual ?? g.plano ?? '—'))].join(', ')}</td><td className="num">{moeda(k.custo_atual)}</td><td className="num">—</td><td className="num">—</td><td className="num">—</td></tr>
+                <tr><td>Hoje</td><td>{[...new Set(ativos.map((g) => resumirPlano(g.plano_atual ?? g.plano)))].join(', ')}</td><td className="num">{moeda(k.custo_atual)}</td><td className="num">—</td><td className="num">—</td><td className="num">—</td></tr>
                 {k.opcoes.map((o) => (
                   <tr key={o.operadora}>
                     <td><a href={`#op-${o.operadora}`}>{operadora(o.operadora)}</a></td>
@@ -179,12 +179,12 @@ function BlocoOperadora({ o, grupos }: { o: OpcaoCot; grupos: { i: number; plano
         <span className="hint">{o.completa ? `${moeda(o.total_iof)} por mês com IOF` : 'incompleta'}</span>
       </div>
       {o.faltando.length > 0 && (
-        <p className="msg erro">Nenhuma tabela da {operadora(o.operadora)} serve para {o.faltando.map((i) => grupos.find((g) => g.i === i)?.plano_atual ?? grupos.find((g) => g.i === i)?.plano ?? `grupo ${i}`).join(', ')} (faixa de vidas, MEI, Simples ou coparticipação). Escolha outro plano para esse grupo ou tire o grupo.</p>
+        <p className="msg erro">Nenhuma tabela da {operadora(o.operadora)} serve para {o.faltando.map((i) => resumirPlano(grupos.find((g) => g.i === i)?.plano_atual ?? grupos.find((g) => g.i === i)?.plano ?? `grupo ${i}`)).join(', ')} (faixa de vidas, MEI, Simples ou coparticipação). Escolha outro plano para esse grupo ou tire o grupo.</p>
       )}
       {o.linhas.map((l) => (
         <div key={l.grupo} style={{ marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 .4rem' }}>
-            <strong>{l.plano}{l.acomodacao ? ` · ${l.acomodacao}` : ''}</strong> no lugar de {l.origem.plano_atual ?? l.origem.plano}
+            <strong>{l.plano}{l.acomodacao ? ` · ${l.acomodacao}` : ''}</strong> no lugar de {resumirPlano(l.origem.plano_atual ?? l.origem.plano)}
             {l.escolha === 'manual' && <span className="pill p-info" style={{ marginLeft: '.4rem' }}>escolhido à mão</span>}
             {l.fora_criterio && <span className="pill p-warn" style={{ marginLeft: '.4rem' }}>fora do critério de equivalência</span>}
             {l.tabela.copart && <span className="pill p-warn" style={{ marginLeft: '.4rem' }}>com coparticipação</span>}
