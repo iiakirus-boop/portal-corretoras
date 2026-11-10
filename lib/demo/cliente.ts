@@ -44,6 +44,10 @@ function regras(uid: string | null) {
     supervisor_previsao: (r) => daCorretora(r.corretora_id),
     conferencias: (r) => daCorretora(r.corretora_id, r.tipo.startsWith('comissao')),
     rotinas: (r) => !!r.corretora_id && daCorretora(r.corretora_id, true),
+    quadro_equipe: (r) => daCorretora(r.corretora_id),
+    quadro_tipos: (r) => daCorretora(r.corretora_id),
+    quadro_cards: (r) => daCorretora(r.corretora_id),
+    quadro_eventos: (r) => daCorretora(r.corretora_id),
     maquinas: () => false,
     login_status: () => false,
   };
@@ -61,12 +65,15 @@ function regras(uid: string | null) {
     pedido_eventos: (r) => r.autor_id === uid && !r.autor_agente && !r.de_status && !r.para_status &&
       db.pedidos.some((p) => p.id === r.pedido_id && p.corretora_id === r.corretora_id && (daCorretora(p.corretora_id) || (r.visivel_empresa && daEmpresa(p.empresa_id)))),
     membros: (r) => r.papel !== 'master' && daCorretora(r.corretora_id, true),
+    quadro_cards: (r) => daCorretora(r.corretora_id),
+    quadro_eventos: (r) => daCorretora(r.corretora_id) && r.tipo === 'comentario' && r.autor_id === uid,
     documentos: (r) => r.tipo === 'anexo_pedido' && db.pedidos.some((p) => p.id === r.pedido_id && (daCorretora(p.corretora_id) || daEmpresa(p.empresa_id))),
   };
   const atualizar: Record<string, (r: Linha) => boolean> = {
     pedidos: (r) => daCorretora(r.corretora_id),
     empresas: (r) => daCorretora(r.corretora_id, true),
     membros: (r) => r.papel !== 'master' && daCorretora(r.corretora_id, true),
+    quadro_cards: (r) => daCorretora(r.corretora_id),
   };
   return {
     master, daEmpresa,
@@ -94,11 +101,27 @@ function aoInserir(tabela: string, r: Linha, uid: string | null) {
   if (tabela === 'corretoras') { r.ativa ??= true; r.criado_em ??= agora(); r.contrato ??= {}; }
   if (tabela === 'pedido_eventos') { r.id = db.pedido_eventos.length + 1; r.em ??= agora(); r.autor_agente ??= null; r.de_status ??= null; r.para_status ??= null; r.visivel_empresa ??= true; }
   if (tabela === 'documentos') { r.criado_em ??= agora(); r.visivel_empresa ??= true; }
+  if (tabela === 'quadro_cards') {
+    r.numero = Math.max(0, ...db.quadro_cards.map((x) => x.numero)) + 1;
+    r.coluna ??= 'entrada'; r.prioridade ??= 3; r.arquivado ??= false; r.origem ??= 'manual';
+    r.criado_em = r.atualizado_em = r.coluna_desde = agora(); r.concluido_em = r.coluna === 'feito' ? agora() : null;
+    db.quadro_eventos.push({ id: db.quadro_eventos.length + 1, card_id: r.id, corretora_id: r.corretora_id, em: agora(), autor_id: uid, autor_nome: null, tipo: 'criado', texto: 'Card criado' });
+  }
+  if (tabela === 'quadro_eventos') { r.id = db.quadro_eventos.length + 1; r.em ??= agora(); }
   if (tabela === 'ordens_execucao') { r.status ??= 'pendente'; r.criada_em ??= agora(); r.prioridade ??= 5; r.origem ??= 'manual'; }
 }
 
+const ROT_COL: Record<string, string> = { entrada: 'Entrada', a_fazer: 'A fazer', fazendo: 'Fazendo', aguardando_seguradora: 'Aguardando seguradora', aguardando_cliente: 'Aguardando cliente', feito: 'Feito' };
 function aoAtualizar(tabela: string, antes: Linha, depois: Linha, uid: string | null) {
   const db = bancoDemo();
+  if (tabela === 'quadro_cards') {
+    depois.atualizado_em = agora();
+    if (antes.coluna !== depois.coluna) {
+      depois.coluna_desde = agora(); depois.concluido_em = depois.coluna === 'feito' ? agora() : null;
+      db.quadro_eventos.push({ id: db.quadro_eventos.length + 1, card_id: depois.id, corretora_id: depois.corretora_id, em: agora(), autor_id: uid, autor_nome: null,
+        tipo: 'movido', texto: `Movido de ${ROT_COL[antes.coluna]} para ${ROT_COL[depois.coluna]}` });
+    }
+  }
   if (tabela === 'pedidos' && antes.status !== depois.status) {
     depois.atualizado_em = agora();
     db.pedido_eventos.push({ id: db.pedido_eventos.length + 1, pedido_id: depois.id, corretora_id: depois.corretora_id, em: agora(), autor_id: uid,

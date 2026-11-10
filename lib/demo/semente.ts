@@ -42,6 +42,7 @@ export function criarBanco(): Banco {
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
     maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [], exclusoes: [], apelidos_empresa: [],
+    quadro_equipe: [], quadro_tipos: [], quadro_cards: [], quadro_eventos: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();
@@ -227,5 +228,38 @@ export function criarBanco(): Banco {
   for (const [seguradora_id, tipo, gravidade, mensagem] of confs)
     db.conferencias.push({ id: uid('conf'), corretora_id: 'c-shaddai', competencia: '2026-10', seguradora_id, empresa_id: null, tipo, gravidade, mensagem,
       primeira_vez: iso(menosMin(160)), ultima_vez: iso(menosMin(160)), resolvida_em: null });
+  // quadro de tarefas da equipe (datas relativas a hoje, para os alertas de prazo e "parado" aparecerem)
+  {
+    const C = 'c-shaddai', ag = Date.now(), d = (n: number) => new Date(ag + n * 86400000).toISOString().slice(0, 10);
+    const h = (n: number) => new Date(ag - n * 3600000).toISOString();
+    const eq = [['Patrícia Yoneda', 'Paty', 'Gerente e sócia'], ['Renata Sampaio', 'Renata', 'Gerente do pós-venda'], ['Larissa Yoneda', 'Larissa', 'Movimentação e atendimento'],
+      ['Camila Moretti', 'Camila', 'Implantação'], ['Guilherme Castro', 'Guilherme', 'Cotação e rede credenciada'], ['Bruno Passos', 'Bruno', 'Faturamento, carimbos e suporte']]
+      .map(([nome, apelido, funcao], i) => ({ id: `qe-${i}`, corretora_id: C, nome, apelido, email: null, funcao, ativo: true, ordem: i + 1 }));
+    db.quadro_equipe.push(...eq);
+    const [P, R, L, CA, G, B] = eq.map((x) => x.id);
+    const tp = [['Inclusão/exclusão', '#16a34a', L], ['Atendimento à empresa', '#f97316', L], ['Cancelamento', '#b91c1c', R], ['Cartas e documentos', '#ca8a04', R],
+      ['Carimbo e assinatura', '#0891b2', B], ['Faturamento', '#2563eb', B], ['Divergência de cobrança', '#db2777', B], ['Implantação', '#7c3aed', CA],
+      ['Cotação', '#4f46e5', G], ['Rede credenciada', '#0d9488', G], ['Reajuste e renovação', '#92400e', P], ['Interno', '#64748b', P]]
+      .map(([nome, cor, resp], i) => ({ id: `qt-${i}`, corretora_id: C, nome, cor, descricao: null, responsavel_padrao: resp, ativo: true, ordem: i + 1 }));
+    db.quadro_tipos.push(...tp);
+    const cards: [string, number, string, number, string | null, string | null, string, string, number, string][] = [
+      ['Padaria Bom Grão: inclusão imediata', 0, 'entrada', 1, L, R, 'Padaria Bom Grão', 'Porto Saúde', 1, 'Conferir se a inclusão já entrou na operadora'],
+      ['Serra Azul: exclusão de beneficiário', 0, 'aguardando_seguradora', 2, L, R, 'Serra Azul', 'Bradesco Saúde', -1, 'Cobrar protocolo da seguradora'],
+      ['Metalúrgica Alfa: cancelamento', 2, 'a_fazer', 1, R, null, 'Metalúrgica Alfa', 'SulAmérica', 0, 'Enviar pedido e confirmar a data'],
+      ['Metalúrgica Alfa: implantação Hapvida', 7, 'fazendo', 2, CA, P, 'Metalúrgica Alfa', 'Hapvida / NotreDame', 10, 'Juntar documentos e conferir vigência'],
+      ['Padaria Bom Grão: divergência na fatura', 6, 'aguardando_seguradora', 2, B, null, 'Padaria Bom Grão', 'Porto Saúde', 5, 'Aguardar resposta sobre o valor'],
+      ['Faturamento do mês: envio às empresas', 5, 'fazendo', 3, B, null, '', '', 12, 'Enviar os que faltam'],
+      ['Clínica Vida: cotação Bradesco', 8, 'a_fazer', 3, G, null, 'Clínica Vida', 'Bradesco Saúde', 3, 'Montar comparativo'],
+      ['Serra Azul: carimbo em documento', 4, 'entrada', 3, null, null, 'Serra Azul', '', 1, 'Carimbar e devolver'],
+    ];
+    cards.forEach(([titulo, t, coluna, prioridade, resp, apoio, empresa, seg, prazo, prox], i) => {
+      const id = `qc-${i}`, desde = h(i === 1 ? 120 : i * 7);
+      db.quadro_cards.push({ id, numero: i + 1, corretora_id: C, titulo, descricao: null, tipo_id: tp[t].id, coluna, prioridade, responsavel_id: resp, apoio_id: apoio,
+        proximo_passo: prox, empresa_id: null, empresa_nome: empresa || null, seguradora: seg || null, prazo: d(prazo), origem: 'exemplo', email_assunto: null, email_conversa: null,
+        ordem: i, arquivado: false, criado_por: null, criado_em: desde, atualizado_em: desde, coluna_desde: desde, concluido_em: null });
+      db.quadro_eventos.push({ id: db.quadro_eventos.length + 1, card_id: id, corretora_id: C, em: desde, autor_id: null, autor_nome: null, tipo: 'criado', texto: 'Card criado' });
+    });
+  }
+
   return db;
 }
