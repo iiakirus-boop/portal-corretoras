@@ -1,6 +1,7 @@
 'use client';
 // Faturamento da Central de Agentes como tela do portal. As contas vêm de lib/central/modelo.ts (as mesmas da Central).
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   type Doc, type Item, type Linha, FAIXAS, FCOL, aberto, addMonth, brl, ckey, comissaoItens, empRows, fam, famsIn, fatItems,
   int, mesLabel, norm, pct, pdate, sum, today, uniq, vidas,
@@ -240,7 +241,7 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
             <h2>{nome}{last.some((r) => r.grupoPendente) && <span className="pill p-warn">Agrupamento a confirmar</span>}</h2>
             <p>{eid} · {ops.join(', ')}{v?.cnpj ? ` · CNPJ ${v.cnpj}` : ''}{v?.diaVenc ? ` · vence todo dia ${v.diaVenc}` : ''}</p>
           </div>
-          <div className="acoes"><button className="btn ghost" type="button" onClick={() => setVd(true)}>Distribuição de vidas</button><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
+          <div className="acoes"><Link className="btn ghost" href={`/corretora/${c}/cotacao?cod=${encodeURIComponent(eid)}`}>Ver cotação</Link><button className="btn ghost" type="button" onClick={() => setVd(true)}>Distribuição de vidas</button><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
         </div>
         <div className="mini-k">
           <div><span className="kpi-l">Fatura {mesLabel(lc)}</span><div className="kpi-v">R$ {brl(vtot)}</div>
