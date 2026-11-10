@@ -6,9 +6,8 @@ import type { Cotacao } from '@/lib/cotacao';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Só nas prévias: confere se o PDF monta no servidor, com dados inventados
+// Diagnóstico: confere se o PDF monta no servidor, com dados inventados (não lê o banco)
 export async function GET() {
-  if (process.env.VERCEL_ENV === 'production') return new Response('Não encontrado', { status: 404 });
   const fx = [2, 0, 0, 0, 0, 0, 0, 2, 0, 0], val = [100, 110, 120, 130, 140, 150, 160, 170, 180, 300];
   const linha = (plano: string) => ({ grupo: 0, origem: { seguradora: 'Exemplo', operadora: 'bradesco', plano: 'Nacional III', acomodacao: 'Quarto', plano_atual: 'Plano exemplo' },
     plano, acomodacao: 'Quarto', cobertura: 0.8, faltam: ['Hospital X'], escolha: 'automatico' as const, fora_criterio: false,
