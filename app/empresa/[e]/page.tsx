@@ -6,6 +6,8 @@ import { preverBoletos } from '@/lib/previsao';
 import { StatusPill } from '@/components/Pill';
 import type { Fatura, Pedido, Vida } from '@/lib/tipos';
 
+export const metadata = { title: 'Início' };
+
 export default async function InicioEmpresa({ params }: { params: Promise<{ e: string }> }) {
   const { e } = await params;
   const x = await exigirEmpresa(e);

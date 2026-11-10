@@ -3,11 +3,13 @@ import { Quadro } from '@/components/quadro/Quadro';
 import type { ArquivoCard, CardQuadro, EmailCard, EventoCard, Pessoa, TipoDemanda } from '@/lib/quadro';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Quadro' };
 
 // Quadro de tarefas da equipe: cards por coluna, cor pelo tipo de demanda e ordem pela prioridade
-export default async function QuadroPage({ params }: { params: Promise<{ c: string }> }) {
+export default async function QuadroPage({ params, searchParams }: { params: Promise<{ c: string }>; searchParams: Promise<{ so?: string; card?: string }> }) {
   const { c } = await params;
-  await exigirCorretora(c);
+  const sp = await searchParams;
+  const { s } = await exigirCorretora(c);
   const db = await cliente();
   const corte = new Date(Date.now() - 14 * 86400000).toISOString();
   const [{ data: equipe }, { data: tipos }, { data: cards }] = await Promise.all([
@@ -27,8 +29,12 @@ export default async function QuadroPage({ params }: { params: Promise<{ c: stri
       db.from('quadro_arquivos').select('id, card_id, email_id, tipo, nome, tamanho').in('card_id', ids).limit(4000),
     ])
     : [vazio, vazio, vazio];
+  // quem está olhando: a pessoa da equipe com o mesmo e-mail do login (para o botão "Minhas tarefas")
+  const eq = (equipe ?? []) as Pessoa[];
+  const eu = eq.find((p) => p.email && p.email.toLowerCase() === s.email.toLowerCase())?.id ?? null;
+  const so = sp.so === 'urgentes' || sp.so === 'atrasados' || sp.so === 'parados' ? sp.so : '';
   return (
-    <Quadro c={c} equipe={(equipe ?? []) as Pessoa[]} tipos={(tipos ?? []) as TipoDemanda[]} cards={cs}
+    <Quadro eu={eu} soInicial={so} cardInicial={sp.card && cs.some((x) => x.id === sp.card) ? sp.card : null} c={c} equipe={(equipe ?? []) as Pessoa[]} tipos={(tipos ?? []) as TipoDemanda[]} cards={cs}
       eventos={(eventos ?? []) as EventoCard[]} emails={(emails ?? []) as EmailCard[]} arquivos={(arquivos ?? []) as ArquivoCard[]} agora={Date.now()} />
   );
 }

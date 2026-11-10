@@ -2,6 +2,8 @@ import { cliente, exigirCorretora } from '@/lib/servidor';
 import { docsCentral } from '@/lib/central/dados';
 import { Pendencias } from '@/components/central/Pendencias';
 
+export const metadata = { title: 'Pendências' };
+
 export const dynamic = 'force-dynamic';
 
 // As Pendências da Central de Agentes, como tela do portal. Quem é da corretora marca tarefa como resolvida, como na Central.

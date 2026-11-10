@@ -6,6 +6,8 @@ import { Aviso } from '@/components/Aviso';
 import { Pill } from '@/components/Pill';
 import type { Conferencia, Corretora, Empresa } from '@/lib/tipos';
 
+export const metadata = { title: 'Corrigir dados' };
+
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 type Conf = Conferencia & { chave: string; ignorada_em: string | null; nota: string | null };
 type Exc = { tabela: string; registro_id: string; resumo: string | null; motivo: string | null; excluido_em: string };

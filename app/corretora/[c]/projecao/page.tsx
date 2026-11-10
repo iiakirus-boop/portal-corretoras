@@ -3,6 +3,8 @@ import { cliente, exigirCorretora } from '@/lib/servidor';
 import { docsCentral } from '@/lib/central/dados';
 import { Projecao } from '@/components/central/Projecao';
 
+export const metadata = { title: 'Projeção' };
+
 export const dynamic = 'force-dynamic';
 
 // A Projeção da Central de Agentes, como tela do portal: mesmos dados (central_docs) e a mesma conta. Só administrador.

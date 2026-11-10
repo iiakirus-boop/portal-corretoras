@@ -3,6 +3,8 @@ import { criarSenha } from '@/lib/acoes';
 import { MODO_DEMO, sessao } from '@/lib/servidor';
 import { Aviso } from '@/components/Aviso';
 
+export const metadata = { title: 'Senha' };
+
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Senha({ searchParams }: P) {

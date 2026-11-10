@@ -5,6 +5,8 @@ import { DEMO_USUARIOS } from '@/lib/demo/semente';
 import { destino, MODO_DEMO, sessao } from '@/lib/servidor';
 import { Aviso } from '@/components/Aviso';
 
+export const metadata = { title: 'Entrar' };
+
 type P = { searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Entrar({ searchParams }: P) {

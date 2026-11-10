@@ -42,7 +42,7 @@ export function criarBanco(): Banco {
     corretoras: [], corretora_cnpjs: [], corretora_codigos: [], empresas: [], apolices: [], membros: [], convites: [],
     faturas: [], vidas: [], documentos: [], pedidos: [], pedido_eventos: [], comissao_pagamentos: [], comissao_lancamentos: [],
     maquinas: [], rotinas: [], ordens_execucao: [], conferencias: [], agentes: [], supervisor_previsao: [], sessoes_portal: [], login_status: [], execucoes: [], cobranca_fechamentos: [], exclusoes: [], apelidos_empresa: [],
-    quadro_equipe: [], quadro_tipos: [], quadro_cards: [], quadro_eventos: [], quadro_emails: [], quadro_arquivos: [],
+    quadro_equipe: [], quadro_tipos: [], quadro_cards: [], quadro_eventos: [], quadro_emails: [], quadro_arquivos: [], faturamento_envios: [],
   };
   const agora = new Date('2026-10-20T09:00:00-03:00');
   const iso = (d: Date) => d.toISOString();
@@ -131,7 +131,7 @@ export function criarBanco(): Banco {
             data_pagamento: `${comps[i + 1]}-${String(entre(3, 27)).padStart(2, '0')}`, bruta: com, a_pagar: com };
           db.comissao_pagamentos.push(pag);
           db.comissao_lancamentos.push({ id: uid('lan'), corretora_id: cid, pagamento_id: pag.id, empresa_id: e.id, numero_fatura: f.numero,
-            taxa, comissao: com, classe: taxa > 50 ? 'agenciamento' : 'vitalicio' });
+            taxa, comissao: com, classe: taxa > 50 ? 'agenciamento' : 'vitalicio', data_lancamento: pag.data_pagamento, segurado: razao, premio_liquido: valor });
         }
       });
     });

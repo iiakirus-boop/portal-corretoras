@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { cliente, COOKIE_DEMO, destino, exigirSessao, MODO_DEMO, sessao, papeisEmpresa, ehMaster } from './servidor';
 import { usuarioDemo } from './demo/cliente';
 import type { Papel, StatusPedido, TipoPedido } from './tipos';
+import { SEGURADORA } from './formato';
 
 const txt = (f: FormData, k: string) => String(f.get(k) ?? '').trim();
 const volta = (para: string, chave: 'ok' | 'erro', msg: string): never => {
@@ -301,6 +302,30 @@ export async function abrirPedido(f: FormData) {
   volta(`${base}/pedidos/${data.id}`, 'ok', status === 'aguardando_aprovacao_empresa'
     ? `Pedido ${data.protocolo} aberto. Ele vai para a corretora assim que o gestor da empresa aprovar.`
     : `Pedido ${data.protocolo} enviado para a corretora.`);
+}
+
+// 2ª via com um clique, direto da linha da fatura: abre o pedido já com o mês, a seguradora e o número.
+// Se já existe um pedido de 2ª via aberto para a mesma fatura, só avisa (não abre outro).
+export async function pedirSegundaVia(f: FormData) {
+  const e = txt(f, 'empresa_id'), fatura = txt(f, 'fatura_id');
+  const de = `/empresa/${e}/faturas`;
+  const s = await exigirSessao();
+  const db = await cliente();
+  const { data: fat } = await db.from('faturas').select('*').eq('id', fatura).eq('empresa_id', e).maybeSingle();
+  if (!fat) volta(de, 'erro', 'Fatura não encontrada.');
+  const { data: abertos } = await db.from('pedidos').select('*').eq('empresa_id', e).eq('tipo', 'segunda_via')
+    .in('status', ['aguardando_aprovacao_empresa', 'recebido', 'conferindo', 'pendencia_cliente', 'pronto_envio', 'enviado_seguradora']);
+  const ja = ((abertos ?? []) as { id: string; protocolo: string; dados: Record<string, string> }[]).find((p) => p.dados?.fatura_id === fatura);
+  if (ja) volta(`/empresa/${e}/pedidos/${ja.id}`, 'ok', `A 2ª via desta fatura já foi pedida (pedido ${ja.protocolo}). A corretora avisa por aqui quando estiver pronta.`);
+  const comp = String(fat.competencia).trim();
+  const { data, error } = await db.from('pedidos').insert({
+    corretora_id: fat.corretora_id, empresa_id: e, apolice_id: fat.apolice_id ?? null, tipo: 'segunda_via', status: 'recebido', solicitante_id: s.userId,
+    dados: { assunto: `2ª via do boleto de ${comp.slice(5)}/${comp.slice(0, 4)}`, competencia: comp, seguradora: SEGURADORA[fat.seguradora_id] ?? fat.seguradora_id, fatura: fat.numero, fatura_id: fatura,
+      vencimento: fat.vencimento ?? '', origem: 'botão da fatura' },
+  }).select('*').single();
+  if (error) volta(de, 'erro', traduzir(error.message));
+  revalidatePath(`/empresa/${e}`);
+  volta(`/empresa/${e}/pedidos/${data.id}`, 'ok', `2ª via pedida (pedido ${data.protocolo}). A corretora avisa por aqui quando o boleto novo estiver pronto.`);
 }
 
 export async function aprovarPedido(f: FormData) {

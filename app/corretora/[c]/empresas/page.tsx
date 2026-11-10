@@ -6,6 +6,8 @@ import { criarEmpresa } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
 import type { Empresa, Pedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Empresas' };
+
 type P = { params: Promise<{ c: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function Empresas({ params, searchParams }: P) {
@@ -36,6 +38,7 @@ export default async function Empresas({ params, searchParams }: P) {
         <form className="acoes" role="search">
           <input className="busca" type="search" enterKeyHint="search" name="q" defaultValue={sp.q} placeholder="Buscar pela razão social" aria-label="Buscar empresa" style={{ width: 260 }} />
           <button className="btn ghost">Buscar</button>
+          <a className="btn ghost" href={`/corretora/${c}/exportar/vidas`} title="Lista de todas as pessoas dos planos no mês mais novo">Baixar vidas em Excel</a>
         </form>
       </div>
       <Aviso sp={sp} />

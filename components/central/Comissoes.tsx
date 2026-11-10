@@ -43,7 +43,7 @@ export function Comissoes({ c, d, hoje }: { c: string; d: DadosComissoes; hoje: 
 
   const cabeca = (
     <div className="page-head">
-      <div><h1>Comissões</h1><p>Quanto falta cair, quanto estava previsto e quanto caiu, e o que vai cair de cada seguradora. Datas de cada empresa na <a href={centralUrl('projecao')}>Projeção</a>. <a href={`/central/${c}#comissoes`}>Ver na Central antiga</a></p></div>
+      <div><h1>Comissões</h1><p>Quanto falta cair, quanto estava previsto e quanto caiu, e o que vai cair de cada seguradora. Datas de cada empresa na <a href={centralUrl('projecao')}>Projeção</a>. <a href={`/corretora/${c}/exportar/comissoes`}>Baixar 12 meses em Excel</a></p></div>
       <div className="filtros">
         {ops.length > 1 && (
           <div className="chips" role="group" aria-label="Seguradora">

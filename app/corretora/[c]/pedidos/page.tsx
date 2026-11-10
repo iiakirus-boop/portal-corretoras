@@ -5,6 +5,8 @@ import { hoje } from '@/lib/contas';
 import { StatusPill } from '@/components/Pill';
 import type { Empresa, Pedido, StatusPedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Pedidos' };
+
 type P = { params: Promise<{ c: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 export default async function PedidosCorretora({ params, searchParams }: P) {

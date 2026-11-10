@@ -5,6 +5,8 @@ import { mensalidade, vidasCarteiraPor, type Contrato, type VidaCarteira } from 
 import { Pill } from '@/components/Pill';
 import type { Corretora } from '@/lib/tipos';
 
+export const metadata = { title: 'Cobrança' };
+
 type Fechamento = { id: string; corretora_id: string; competencia: string; vidas_ativas: number; valor: number; status: string };
 
 export default async function Cobranca() {

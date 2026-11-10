@@ -6,6 +6,8 @@ import { abrirPedido } from '@/lib/acoes';
 import { Aviso } from '@/components/Aviso';
 import type { Apolice, Fatura, TipoPedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Novo pedido' };
+
 type P = { params: Promise<{ e: string }>; searchParams: Promise<Record<string, string | undefined>> };
 
 const AJUDA: Record<TipoPedido, string> = {

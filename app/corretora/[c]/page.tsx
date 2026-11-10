@@ -5,6 +5,8 @@ import { ABERTOS, seg } from '@/lib/formato';
 import type { VidaCarteira } from '@/lib/contas';
 import type { Empresa, EventoPedido, Pedido } from '@/lib/tipos';
 
+export const metadata = { title: 'Início' };
+
 export const dynamic = 'force-dynamic';
 
 // O início da corretora: os totais do mês, as movimentações em andamento, quem ainda não teve a fatura do mês gerada

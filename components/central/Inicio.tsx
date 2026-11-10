@@ -75,7 +75,7 @@ export function Inicio({ c, d, hoje, admin, carteira, faltam, movs }: { c: strin
 
   return (
     <div className="page cx">
-      <div className="page-head"><div><h1>Início</h1><p>Os totais do mês, as movimentações em andamento e as empresas que ainda não tiveram a fatura de {novoL} gerada.{need.length > 0 && <> <Link href={pend}><b>{plural(need.length, 'pendência', 'pendências')} com você</b></Link>.</>} <a href={`/central/${c}#inicio`}>Ver na Central antiga</a></p></div></div>
+      <div className="page-head"><div><h1>Início</h1><p>Os totais do mês, as movimentações em andamento e as empresas que ainda não tiveram a fatura de {novoL} gerada.{need.length > 0 && <> <Link href={pend}><b>{plural(need.length, 'pendência', 'pendências')} com você</b></Link>.</>}</p></div></div>
       <div className="kpis">
         <Link className="kpi" href={`${base}/faturamento`}><span className="kpi-l">Faturamento · {mesLabel(fm)}</span><span className="kpi-v">R$ {brl(ftot)}</span>
           <span className="kpi-s">{plural(new Set(fr.map((r) => r.eid)).size, 'empresa', 'empresas')} até agora{pm && <><br />{mesLabel(pm)} fechou em R$ {brl(ptt)}{faltam.length === 0 && <> · {sinal(dtt)}</>}</>}</span></Link>

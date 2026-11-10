@@ -7,21 +7,40 @@ import {
   int, mesLabel, norm, pct, pdate, sum, today, uniq, vidas,
 } from '@/lib/central/modelo';
 import { plural } from '@/lib/formato';
+import { marcarEnvio, type Envio, type SituacaoEnvio } from '@/lib/acoes-faturamento';
 import { Barras } from './Barras';
 import { DistribuicaoVidas } from './DistribuicaoVidas';
 
-type Filtro = 'todas' | 'aberto' | 'variou' | 'div';
+type Filtro = 'todas' | 'enviar' | 'aberto' | 'variou' | 'div';
+// situação do envio ao cliente por empresa (eid) no mês: sem marca = falta enviar
+type Envios = Record<string, Envio>;
+const chaveEnvio = (comp: string, eid: string) => `${comp.trim()}|${eid}`;
+const faltaEnviar = (en: Envios, comp: string, eid: string) => { const x = en[chaveEnvio(comp, eid)]; return !x || x.situacao === 'pendente'; };
 type Ordem = 'valor' | 'venc' | 'nome' | 'var';
 
 const sinal = (v: number) => <span className={v >= 0 ? 'up' : 'down'}>{v >= 0 ? '+' : '−'}{pct(Math.abs(v))}</span>;
 
-export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { c: string; faturas: Doc[]; comissoes: Doc[] | null; inicial?: string | null }) {
+export function Faturamento({ c, faturas: todas, comissoes, inicial = null, envios = [], fichas = {} }: {
+  c: string; faturas: Doc[]; comissoes: Doc[] | null; inicial?: string | null;
+  /** marcas de envio ao cliente (todas as competências) */ envios?: Envio[];
+  /** código da empresa nesta tela -> id da empresa no cadastro (para abrir a ficha completa) */ fichas?: Record<string, string>;
+}) {
   const [op, setOp] = useState('todas');
   const [mesSel, setMes] = useState<string | null>(null);
   const [fq, setFq] = useState('');
   const [ff, setFf] = useState<Filtro>('todas');
   const [ordem, setOrdem] = useState<Ordem>('valor');
   const [emp, setEmp] = useState<string | null>(inicial);
+  const [en, setEn] = useState<Envios>(() => Object.fromEntries(envios.map((x) => [chaveEnvio(x.competencia, x.eid), x])));
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null);
+  const marcar = async (comp: string, eid: string, situacao: SituacaoEnvio) => {
+    const k = chaveEnvio(comp, eid), antes = en[k];
+    setErroEnvio(null);
+    setEn((m) => ({ ...m, [k]: { competencia: comp, eid, situacao, marcado_nome: null, marcado_em: new Date().toISOString() } }));
+    const r = await marcarEnvio(c, comp, eid, situacao);
+    if (r.erro || !r.envio) { setEn((m) => { const n = { ...m }; if (antes) n[k] = antes; else delete n[k]; return n; }); setErroEnvio(r.erro ?? 'Não salvou. Tente de novo.'); return; }
+    setEn((m) => ({ ...m, [k]: r.envio! }));
+  };
 
   const faturas = useMemo(() => (op === 'todas' ? todas : todas.filter((f) => fam(f.operadora) === op)), [todas, op]);
   const ops = famsIn(uniq(todas.map((f) => fam(f.operadora))));
@@ -43,13 +62,14 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
   const nVidas = sum(rows, (e) => e.vidas);
   const pend = docs.flatMap((d) => d.pendentes || []) as { empresa: string; motivo: string }[];
   const up = docs.map((d) => d.atualizadoEm).filter(Boolean).sort().pop();
+  const aEnviar = rows.filter((e) => faltaEnviar(en, mes, e.eid)), nEnviados = rows.filter((e) => en[chaveEnvio(mes, e.eid)]?.situacao === 'enviado').length;
 
   return (
     <div className="page cx">
       <div className="page-head">
         <div>
           <h1>Faturamento</h1>
-          <p>{up ? `Atualizado em ${new Date(up).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. ` : ''}Clique numa empresa para ver faturas, vidas e situação. <a href={`/central/${c}#faturamento`}>Ver na Central antiga</a></p>
+          <p>{up ? `Atualizado em ${new Date(up).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. ` : ''}Clique numa empresa para ver faturas, vidas e situação. <a href={`/corretora/${c}/exportar/faturas?comp=${mes}`}>Baixar {mesLabel(mes)} em Excel</a></p>
         </div>
         <div className="filtros">
           {ops.length > 1 && (
@@ -74,14 +94,18 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
           <span className="kpi-s">{docs.length} {docs.length === 1 ? 'arquivo' : 'arquivos'} de {plural(uniq(docs.map((d) => fam(d.operadora))).length, 'seguradora', 'seguradoras')}</span></div>
         <div className="kpi"><span className="kpi-l">Vidas</span><span className="kpi-v">{int(nVidas)}</span><span className="kpi-s">custo médio R$ {brl(tot / Math.max(1, nVidas))} por vida</span></div>
         <div className="kpi"><span className="kpi-l">Boletos em aberto</span><span className="kpi-v">{nab.length}</span><span className="kpi-s">R$ {brl(sum(nab, (e) => e.valor))}</span></div>
+        <button type="button" className={`kpi kpi-btn${aEnviar.length ? ' alerta' : ''}`} aria-pressed={ff === 'enviar'} onClick={() => setFf(ff === 'enviar' ? 'todas' : 'enviar')} title="Mostrar só as empresas que ainda não receberam o faturamento deste mês">
+          <span className="kpi-l">Falta enviar ao cliente</span><span className="kpi-v">{aEnviar.length}</span>
+          <span className="kpi-s">{nEnviados} de {rows.length} já enviados em {mesLabel(mes)}</span></button>
       </div>
+      {erroEnvio && <p className="msg erro" role="alert">{erroEnvio}</p>}
       {pend.length > 0 && <p className="msg aviso">Ainda sem fatura em {mesLabel(mes)}: {pend.map((p) => `${p.empresa} — ${p.motivo}`).join('; ')}.</p>}
 
       <div className="fat-layout">
-        <Lista rows={rows} mes={mes} fq={fq} setFq={setFq} ff={ff} setFf={setFf} ordem={ordem} setOrdem={setOrdem} emp={emp} setEmp={setEmp} />
+        <Lista rows={rows} mes={mes} en={en} fq={fq} setFq={setFq} ff={ff} setFf={setFf} ordem={ordem} setOrdem={setOrdem} emp={emp} setEmp={setEmp} />
         <section className="ficha" aria-live="polite">
           {emp
-            ? <Ficha key={emp} c={c} eid={emp} todas={fatItems(todas)} mes={mes} comissoes={comissoes} fechar={() => setEmp(null)} />
+            ? <Ficha key={emp} c={c} eid={emp} todas={fatItems(todas)} mes={mes} comissoes={comissoes} fechar={() => setEmp(null)} envio={en[chaveEnvio(mes, emp)] ?? null} marcar={marcar} ficha={fichas[emp] ?? null} />
             : <Geral itens={itens} comps={comps} mes={mes} setMes={setMes} rows={rows} setEmp={setEmp} />}
         </section>
       </div>
@@ -89,13 +113,14 @@ export function Faturamento({ c, faturas: todas, comissoes, inicial = null }: { 
   );
 }
 
-function Lista({ rows, mes, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }: {
-  rows: Linha[]; mes: string; fq: string; setFq: (v: string) => void; ff: Filtro; setFf: (v: Filtro) => void;
+function Lista({ rows, mes, en, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }: {
+  rows: Linha[]; mes: string; en: Envios; fq: string; setFq: (v: string) => void; ff: Filtro; setFf: (v: Filtro) => void;
   ordem: Ordem; setOrdem: (v: Ordem) => void; emp: string | null; setEmp: (v: string | null) => void;
 }) {
   const q = fq.trim().toUpperCase();
   let L = q ? rows.filter((e) => e.nome.toUpperCase().includes(q) || e.eid.toUpperCase().includes(q)) : rows.slice();
-  if (ff === 'aberto') L = L.filter((e) => e.ab);
+  if (ff === 'enviar') L = L.filter((e) => faltaEnviar(en, mes, e.eid));
+  else if (ff === 'aberto') L = L.filter((e) => e.ab);
   else if (ff === 'variou') L = L.filter((e) => e.d != null && Math.abs(e.d) > 0.009);
   else if (ff === 'div') L = L.filter((e) => e.div);
   const so: Record<Ordem, (a: Linha, b: Linha) => number> = {
@@ -117,13 +142,14 @@ function Lista({ rows, mes, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }
         </select>
       </div>
       <div className="chips" role="group" aria-label="Filtro">
-        {([['todas', 'Todas'], ['aberto', 'Em aberto'], ['variou', 'Mudou de valor'], ['div', 'Divergência']] as [Filtro, string][]).map(([k, t]) => (
+        {([['todas', 'Todas'], ['enviar', 'Falta enviar'], ['aberto', 'Em aberto'], ['variou', 'Mudou de valor'], ['div', 'Divergência']] as [Filtro, string][]).map(([k, t]) => (
           <button key={k} type="button" aria-pressed={ff === k} onClick={() => setFf(k)}>{t}</button>
         ))}
       </div>
       <ul>
         {L.map((e) => {
           const st = e.div ? ['dv', 'divergência'] : e.ab ? ['ab', 'em aberto'] : ['', 'pago'];
+          const env = en[chaveEnvio(mes, e.eid)]?.situacao;
           const dv = e.d == null ? 'novo' : Math.abs(e.d) < 0.01 ? 'igual' : `${e.d > 0 ? '+' : '−'}R$ ${brl(Math.abs(e.d))}`;
           return (
             <li key={e.eid}>
@@ -134,6 +160,7 @@ function Lista({ rows, mes, fq, setFq, ff, setFf, ordem, setOrdem, emp, setEmp }
                 <small>
                   {e.subs > 1 && <span className="subn" title={`${e.subs} subestipulantes`}>{e.subs} subs</span>}
                   {e.pend && <span className="subn pend">a confirmar</span>}
+                  {env === 'enviado' ? <span className="subn env">enviado</span> : env === 'nao_enviar' ? <span className="subn nenv">não enviar</span> : null}
                   {e.eid} · {[...e.ops].join(', ')} · {vidas(e.vidas)}
                 </small>
                 <span className={`s ${st[0]}`}>{ff === 'variou' ? dv : st[1]}</span>
@@ -190,7 +217,10 @@ function conf(r: Item): [string, string, number] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Vidas = { none?: boolean; comp?: string; cnpj?: string; diaVenc?: string; hist?: Record<string, { incl: number; excl: number }>; vidas?: any[] };
 
-function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: string; todas: Item[]; mes: string; comissoes: Doc[] | null; fechar: () => void }) {
+function Ficha({ c, eid, todas, mes, comissoes, fechar, envio, marcar, ficha }: {
+  c: string; eid: string; todas: Item[]; mes: string; comissoes: Doc[] | null; fechar: () => void;
+  envio: Envio | null; marcar: (comp: string, eid: string, s: SituacaoEnvio) => void; ficha: string | null;
+}) {
   const [v, setV] = useState<Vidas | null>(null);
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   const [vd, setVd] = useState(false);
@@ -241,8 +271,9 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
             <h2>{nome}{last.some((r) => r.grupoPendente) && <span className="pill p-warn">Agrupamento a confirmar</span>}</h2>
             <p>{eid} · {ops.join(', ')}{v?.cnpj ? ` · CNPJ ${v.cnpj}` : ''}{v?.diaVenc ? ` · vence todo dia ${v.diaVenc}` : ''}</p>
           </div>
-          <div className="acoes"><Link className="btn ghost" href={`/corretora/${c}/cotacao?cod=${encodeURIComponent(eid)}`}>Ver cotação</Link><button className="btn ghost" type="button" onClick={() => setVd(true)}>Distribuição de vidas</button><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
+          <div className="acoes">{ficha && <Link className="btn ghost" href={`/corretora/${c}/empresas/${ficha}`}>Ficha completa</Link>}<Link className="btn ghost" href={`/corretora/${c}/cotacao?cod=${encodeURIComponent(eid)}`}>Ver cotação</Link><button className="btn ghost" type="button" onClick={() => setVd(true)}>Distribuição de vidas</button><button className="btn ghost" type="button" onClick={fechar}>Fechar</button></div>
         </div>
+        <EnvioBarra mes={mes} temFatura={cur.length > 0} envio={envio} marcar={(s) => marcar(mes, eid, s)} />
         <div className="mini-k">
           <div><span className="kpi-l">Fatura {mesLabel(lc)}</span><div className="kpi-v">R$ {brl(vtot)}</div>
             <span className="kpi-s">vence {venc} · <span className={`pill ${abr ? 'p-warn' : 'p-idle'}`}>{abr ? 'em aberto' : 'pago'}</span></span></div>
@@ -288,6 +319,25 @@ function Ficha({ c, eid, todas, mes, comissoes, fechar }: { c: string; eid: stri
       <VidasCard v={v} abrir={() => setVd(true)} />
       {vd && <DistribuicaoVidas c={c} eid={eid} nome={nome} comp={lc} faturas={todas} fechar={() => setVd(false)} />}
     </>
+  );
+}
+
+// envio do faturamento do mês ao cliente: o que era a cor da linha na planilha mensal
+function EnvioBarra({ mes, temFatura, envio, marcar }: { mes: string; temFatura: boolean; envio: Envio | null; marcar: (s: SituacaoEnvio) => void }) {
+  const s = envio?.situacao ?? 'pendente';
+  const quando = envio && s !== 'pendente' ? `${envio.marcado_nome ? `por ${envio.marcado_nome} ` : ''}em ${new Date(envio.marcado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })}` : '';
+  return (
+    <div className={`envio envio-${s}`}>
+      <span className="envio-txt">
+        <b>Envio de {mesLabel(mes)} ao cliente:</b>{' '}
+        {s === 'enviado' ? <>enviado {quando}</> : s === 'nao_enviar' ? <>marcado como não enviar {quando}</> : temFatura ? 'falta enviar' : 'a fatura deste mês ainda não chegou'}
+      </span>
+      <span className="acoes">
+        {s !== 'enviado' && <button type="button" className="btn sm" onClick={() => marcar('enviado')}>Marcar como enviado</button>}
+        {s === 'pendente' && <button type="button" className="btn sm ghost" onClick={() => marcar('nao_enviar')}>Não enviar este mês</button>}
+        {s !== 'pendente' && <button type="button" className="btn sm ghost" onClick={() => marcar('pendente')}>Desfazer</button>}
+      </span>
+    </div>
   );
 }
 

@@ -42,7 +42,7 @@ export function Projecao({ c, d, hoje, usuario }: { c: string; d: DadosProjecao;
 
   const cabeca = (
     <div className="page-head">
-      <div><h1>Projeção</h1><p>Quanto deve entrar este mês e nos próximos. Escolha um mês e uma semana para ver as empresas. <a href={`/central/${c}#projecao`}>Ver na Central antiga</a></p></div>
+      <div><h1>Projeção</h1><p>Quanto deve entrar este mês e nos próximos. Escolha um mês e uma semana para ver as empresas.</p></div>
       <div className="filtros">
         {ops.length > 1 && (
           <div className="chips" role="group" aria-label="Seguradora">

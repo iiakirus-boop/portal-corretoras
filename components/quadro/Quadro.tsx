@@ -9,7 +9,9 @@ import {
   type ArquivoCard, type CardQuadro, type EmailCard, type Coluna, type EventoCard, type Pessoa, type TipoDemanda,
 } from '@/lib/quadro';
 
-type Props = { c: string; equipe: Pessoa[]; tipos: TipoDemanda[]; cards: CardQuadro[]; eventos: EventoCard[]; emails: EmailCard[]; arquivos: ArquivoCard[]; agora: number };
+type Props = { c: string; equipe: Pessoa[]; tipos: TipoDemanda[]; cards: CardQuadro[]; eventos: EventoCard[]; emails: EmailCard[]; arquivos: ArquivoCard[]; agora: number;
+  /** a pessoa da equipe que está olhando (pelo e-mail do login), para "Minhas tarefas" */ eu?: string | null;
+  soInicial?: Filtro['so']; cardInicial?: string | null };
 type Filtro = { pessoa: string; tipo: string; busca: string; so: '' | 'urgentes' | 'atrasados' | 'parados' };
 const PARADO_DIAS = 3;
 
@@ -21,12 +23,12 @@ const quandoLongo = (iso: string) => {
 };
 const quando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-export function Quadro({ c, equipe, tipos, cards, eventos, emails, arquivos, agora }: Props) {
+export function Quadro({ c, equipe, tipos, cards, eventos, emails, arquivos, agora, eu = null, soInicial = '', cardInicial = null }: Props) {
   const router = useRouter();
   const [lista, setLista] = useState(cards);
   useEffect(() => setLista(cards), [cards]);
-  const [f, setF] = useState<Filtro>({ pessoa: '', tipo: '', busca: '', so: '' });
-  const [aberto, setAberto] = useState<string | null>(null); // id do card, 'novo' ou null
+  const [f, setF] = useState<Filtro>({ pessoa: '', tipo: '', busca: '', so: soInicial });
+  const [aberto, setAberto] = useState<string | null>(cardInicial); // id do card, 'novo' ou null
   const [novoEm, setNovoEm] = useState<Coluna>('entrada');
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [sobre, setSobre] = useState<Coluna | null>(null);
@@ -119,6 +121,7 @@ export function Quadro({ c, equipe, tipos, cards, eventos, emails, arquivos, ago
       </section>
 
       <div className="qd-filtros acoes">
+        {eu && <button className={`btn sm${f.pessoa === eu ? '' : ' ghost'}`} aria-pressed={f.pessoa === eu} onClick={() => setF({ ...f, pessoa: f.pessoa === eu ? '' : eu })}>Minhas tarefas ({abertos.filter((x) => x.responsavel_id === eu || x.apoio_id === eu).length})</button>}
         <input type="search" placeholder="Buscar empresa, assunto ou nº" value={f.busca} onChange={(e) => setF({ ...f, busca: e.target.value })} aria-label="Buscar" />
         <select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })} aria-label="Tipo de demanda">
           <option value="">Todos os tipos</option>
