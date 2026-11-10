@@ -10,10 +10,13 @@ node (Join-Path $PSScriptRoot 'logins.js') listar $Operadora
 do {
   $apelido = Read-Host 'Apelido do login (ex.: grupo1, renata; so letras, numeros, - e _)'
 } until ($apelido -match '^[A-Za-z0-9_-]+$')
+$codigo = ''
+if ($Operadora -eq 'sulamerica_empresa') { $codigo = Read-Host 'Codigo da empresa (o 1o campo da tela de login do Saude Online Empresa, ex.: 8J3U6)'; Write-Host 'Usuario: aperte Enter para usar MASTER' }
 $u = Read-Host 'Usuario'
+if (-not $u -and $Operadora -eq 'sulamerica_empresa') { $u = 'MASTER' }  # no Saude Online Empresa o usuario e sempre MASTER
 $senha = Read-Host 'Senha (nao aparece enquanto digita)' -AsSecureString
 if (-not $u -or $senha.Length -eq 0) { Write-Host 'Usuario e senha nao foram preenchidos. Rode o atalho de novo.'; exit 1 }
 New-Object System.Management.Automation.PSCredential($u, $senha) | Export-Clixml (Join-Path $dir "$($Operadora)_faturas_$apelido.cred")
 $mascara = if ($u.Length -gt 3) { $u.Substring(0, 3) + ('*' * ($u.Length - 3)) } else { '***' }
-node (Join-Path $PSScriptRoot 'logins.js') cadastrar $Operadora $apelido $mascara
+node (Join-Path $PSScriptRoot 'logins.js') cadastrar $Operadora $apelido $mascara $codigo
 Write-Host 'Pronto. Para cadastrar outro, rode o atalho de novo.'

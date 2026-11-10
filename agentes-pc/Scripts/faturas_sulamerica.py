@@ -175,6 +175,55 @@ def ler_fatura(p, t):
     return d
 
 
+COLS_TXT = ['COD DE IDENTIFICACAO', 'PLANO', 'NOME DO SEGURADO', 'CPF', 'ID FUNCIONAL', 'DATA DE NASCIMENTO', 'IDADE',
+            'GRAU DE PARENTESCO', 'INICIO DE VIGENCIA', 'SETOR', 'LOCAL', 'PREMIO', 'TIPO LIMINAR']
+
+
+def ler_fatura_txt(p):
+    """Relatório de Faturamento de Segurados Ativos em TXT (Saúde Online Empresa > Anexos), colunas de largura fixa.
+    Mesmo resultado do ler_fatura (PDF); o Bruno pediu para processar pelo TXT (o PDF embaralha as colunas)."""
+    t = open(p, encoding='utf-8', errors='replace').read().replace('\xa0', ' ').replace('\r', '')
+    d = dict(tipo='fatura', layout='relatorio', arquivo=p, fonte='txt')
+    d['razao'] = (g(r'RAZAO SOCIAL:\s*(.+?)\s*$', t, fl=re.M) or '').strip() or None
+    d['empresa'] = g(r'EMPRESA:\s*([0-9A-Z]{5})\b', t)
+    d['apolice'] = g(r'APOLICE:\s*(\d+)', t)
+    d['cia'] = g(r'CIA:\s*(\d+)', t)
+    d['periodo'] = (iso(g(r'PERIODO DE COMPETENCIA:\s*(' + DT + ')', t)), iso(g(r'PERIODO DE COMPETENCIA:\s*' + DT + r'\s*a\s*(' + DT + ')', t)))
+    d['emissao'] = iso(g(r'FECHAMENTO:\s*(' + DT + ')', t))
+    d['venc'] = iso(g(r'VENCIMENTO:\s*(' + DT + ')', t))
+    tg = re.findall(r'TOTAL GERAL:\s*R\$\s*(' + NUM + ')', t)
+    d['total'] = n(tg[0]) if tg else None
+    d['total_iof'] = n(tg[-1]) if len(tg) > 1 else None
+    d['iof'] = n(g(r'IOF:\s*R\$\s*(' + NUM + ')', t))
+    d['acertos'] = n(g(r'ACERTOS:\s*R\$\s*(' + NUM + ')', t))
+    d['apl5'] = d['apolice'][:5] if d['apolice'] else None
+    linhas, erros, pos = [], [], None
+    for l in t.splitlines():
+        if l.startswith('COD DE IDENTIFICACAO'):
+            pos = [l.index(c) for c in COLS_TXT]  # início de cada coluna pelo cabeçalho
+            continue
+        if not pos or not re.match(r'\d{17}\s', l):
+            continue
+        c = [l[a:b].strip() for a, b in zip(pos, pos[1:] + [len(l) + 1])]
+        cod, plano, nome, cpf, mat, nasc, idade, par, ini, _, _, val = c[:12]
+        m = re.match(r'(\d{5})-(.+)', plano)
+        v = re.search(NUM, val)
+        if not (re.fullmatch(DT, nasc) and v):
+            erros.append('Linha não lida: ' + ' '.join(l.split())[:150]); continue
+        linhas.append(dict(cod=cod, familia=cod[:-4], dep=cod[-4:-1], nome=nome, cpf=re.sub(r'\D', '', cpf).zfill(11),
+                           plano_cod=m.group(1) if m else None, plano=plano or None, mat=mat or None, nasc=iso(nasc),
+                           idade=int(idade) if idade.isdigit() else None, parentesco=par, inicio=iso(ini) if re.fullmatch(DT, ini) else None,
+                           valor=n(v.group(0))))
+    d['linhas'], d['erros'] = linhas, erros
+    d['vidas'] = len(linhas)
+    d['titulares'] = sum(1 for x in linhas if x['parentesco'].upper() == 'TITULAR')
+    d['deps'] = d['vidas'] - d['titulares']
+    soma = round(sum(x['valor'] for x in linhas), 2)
+    if d['total'] is not None and abs(soma - d['total']) > 0.05:
+        erros.append(f'Soma dos segurados ({soma:.2f}) diferente do Total Geral ({d["total"]:.2f})')
+    return d
+
+
 def main(root, out):
     docs = []
     for dp, dn, fn in os.walk(root):
@@ -193,6 +242,8 @@ def main(root, out):
                     elif 'DEMONSTRATIVO' in f.upper() and 'IR' in f.upper():
                         d = dict(tipo='ignorado', arquivo=p, motivo='demonstrativo de IR')
                     else: d = dict(tipo='ignorado', arquivo=p, motivo='não é boleto nem relatório de faturamento (copart, sinistralidade, outro)', inicio=' '.join(t.split())[:100])
+                elif low.endswith('.txt') and open(p, 'rb').read(200).upper().startswith(b'RELATORIO DE FATURAMENTO DE SEGURADOS ATIVOS'):
+                    d = ler_fatura_txt(p)
                 else:
                     ext = f.rsplit('.', 1)[-1].lower() if '.' in f else ''
                     mot = {'txt': 'TXT de coparticipação (FATUCOPA)', 'csv': 'CSV (repete o relatório em PDF / sinistros)', 'xls': 'planilha (copart / repete o PDF)',
@@ -204,6 +255,16 @@ def main(root, out):
             d['cod_arquivo'] = cod_arquivo(f)
             d['mes_arquivo'] = mmaa_arquivo(f)
             docs.append(d)
+    # relatório que veio em TXT: os dados saem do TXT; o PDF igual (mesma empresa e vencimento, mesma pasta) não é lido de novo,
+    # mas continua sendo o arquivo da fatura (vai para Faturas/ e para o portal)
+    for t in [x for x in docs if x.get('fonte') == 'txt']:
+        for x in docs:
+            if x.get('tipo') == 'fatura' and x.get('fonte') != 'txt' and (x.get('empresa'), x.get('venc')) == (t['empresa'], t['venc']) \
+                    and os.path.dirname(x['arquivo']) == os.path.dirname(t['arquivo']):
+                t.setdefault('arquivo_txt', t['arquivo'])
+                t['arquivo'], t['rel'] = x['arquivo'], x['rel']
+                x.clear(); x.update(tipo='ignorado', arquivo=t['arquivo'], rel=os.path.relpath(t['arquivo'], root).replace('\\', '/'),
+                                    motivo='relatório lido pelo TXT', cod_arquivo=t.get('cod_arquivo'), mes_arquivo=t.get('mes_arquivo'))
     json.dump(docs, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
     print(Counter((x['tipo'], x.get('layout')) for x in docs))
 

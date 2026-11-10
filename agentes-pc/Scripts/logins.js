@@ -32,10 +32,12 @@ function marca(op, apelido, campos) {
   if (l) { Object.assign(l, campos); salva(j); }
 }
 
-function cadastra(op, apelido, mascara) {
+// codigo: dado do login que não é segredo (ex.: "Código da Empresa" do Saúde Online Empresa da SulAmérica), fica na lista
+function cadastra(op, apelido, mascara, codigo) {
   if (!OK.test(op) || !OK.test(apelido)) throw new Error('use só letras, números, - e _ no apelido');
   const j = le(), lista = j[op] = j[op] || [], l = lista.find(x => x.apelido === apelido);
-  if (l) Object.assign(l, { usuario: mascara, ativo: true }); else lista.push({ apelido, usuario: mascara, ativo: true, ultimo_sucesso: null });
+  const extra = codigo ? { codigo } : {};
+  if (l) Object.assign(l, { usuario: mascara, ativo: true }, extra); else lista.push({ apelido, usuario: mascara, ...extra, ativo: true, ultimo_sucesso: null });
   salva(j);
 }
 
@@ -68,8 +70,8 @@ function doCadastro(seguradora, uso) {
 module.exports = { ativos, credencial, marca, cadastra, preencheLogin, arquivo, doCadastro };
 
 if (require.main === module) {
-  const [cmd, op, apelido, mascara] = process.argv.slice(2);
-  if (cmd === 'cadastrar' && op && apelido) { cadastra(op, apelido, mascara || ''); console.log(`Login "${apelido}" da ${op} cadastrado.`); }
+  const [cmd, op, apelido, mascara, codigo] = process.argv.slice(2);
+  if (cmd === 'cadastrar' && op && apelido) { cadastra(op, apelido, mascara || '', codigo); console.log(`Login "${apelido}" da ${op} cadastrado.`); }
   else if (cmd === 'listar') console.log(JSON.stringify(op ? le()[op] || [] : le(), null, 2));
   else if (cmd === 'portal' && op) console.log(Object.entries(doCadastro(op, apelido)).map(([c, x]) => `${c}:${x.porta}`).join(','));
   else { console.log('uso: node logins.js cadastrar <op> <apelido> <usuario mascarado> | listar [op]'); process.exit(1); }
