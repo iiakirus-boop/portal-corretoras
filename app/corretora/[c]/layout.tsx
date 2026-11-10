@@ -19,7 +19,7 @@ export default async function CorretoraLayout({ children, params }: { children: 
     { href: base, rotulo: 'Início', exato: true },
     { href: `${base}/quadro`, rotulo: 'Quadro' },
     { href: `${base}/faturamento`, rotulo: 'Faturamento' },
-    // quando a tela de Cotação existir, ela entra aqui: { href: `${base}/cotacao`, rotulo: 'Cotação' },
+    { href: `${base}/cotacao`, rotulo: 'Cotação' },
     { rotulo: 'Empresas', itens: [
       { href: `${base}/empresas`, rotulo: 'Empresas', dica: 'Carteira, vidas e faturas por empresa' },
       { href: `${base}/pedidos`, rotulo: 'Pedidos', dica: 'Inclusões, exclusões e outros pedidos' },

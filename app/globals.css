@@ -281,6 +281,15 @@ details.dobra > summary::-webkit-details-marker { display: none; }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chips button { min-height: 30px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font: inherit; font-weight: 700; font-size: .78rem; display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
 .chips button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+.chips a.chip { min-height: 30px; padding: 0 .7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-weight: 700; font-size: .78rem; display: inline-flex; align-items: center; text-decoration: none; }
+.chips a.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+
+/* cotação */
+.cot-op { border-top: 3px solid var(--accent); }
+.cot-op .card-h h2 small { font-weight: 600; color: var(--muted); font-size: .8rem; margin-left: .4rem; }
+.cot-falta { font-size: .78rem; color: var(--muted); margin: .4rem 0 0; }
+.cot-falta summary { cursor: pointer; font-weight: 700; }
+.cot-fx td, .cot-fx th { white-space: nowrap; }
 .chips i, .legenda i { width: .6rem; height: .6rem; border-radius: 2px; display: inline-block; }
 .up { color: var(--info-fg); font-weight: 800; } .down { color: var(--warn-fg); font-weight: 800; }
 .lnk { all: unset; cursor: pointer; color: var(--accent); font-weight: 800; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
