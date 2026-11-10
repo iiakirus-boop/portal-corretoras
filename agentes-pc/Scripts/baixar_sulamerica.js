@@ -186,6 +186,7 @@ const EMPRESA = {
 (async () => {
   const [cmd, ini, fim = new Date().toLocaleDateString('sv-SE')] = process.argv.slice(2);
   if (cmd === 'faturas' && /^\d{4}-\d\d$/.test(ini || '')) {
+    if (fim && !/^\d{4}-/.test(fim)) EMPRESA.so = fim.toUpperCase().split(','); // node baixar_<op>.js faturas 2026-11 COMUNA,SWB
     const s = await require('./portal_empresa').faturas(chromium, EMPRESA, ini, { ok: true, arquivos: [], repetidos: [], sem_dados: [], falhas: [] });
     sai(s.ok ? 0 : 3, s);
   }
