@@ -262,8 +262,9 @@ def automatico(o, simular=False):
     for f in saida.get('falhas', []):  # um login de empresa que falhou não para os outros
         log(f"{ag} {op}: login {f.get('login')} falhou no passo \"{f.get('passo')}\": {f.get('motivo')} (print {os.path.basename(f.get('print') or '')})")
     # faturas amil/sulamerica: arquivo já na pasta (baixado à mão ou numa rodada sem gravar) também vai para o rodar.py,
-    # que pula o que já está na base; senão ele nunca chega na plataforma
-    if not novos and not (ag == 'faturas' and op in LOGA_SOZINHO and saida.get('repetidos')):
+    # que pula o que já está na base; senão ele nunca chega na plataforma.
+    # comissão hapvida: idem (o CSV baixado numa rodada que parou no meio fica na pasta e só grava se o rodar.py passar por ela)
+    if not novos and not ((ag == 'faturas' and op in LOGA_SOZINHO or ag == 'comissao' and op == 'hapvida') and saida.get('repetidos')):
         return parar(o, 'concluida', saida.get('aviso') or 'Nada novo no portal.', simular)
     data, fim = hoje.isoformat(), ['--ordem', o['id']] + (['--simular'] if simular else [])
     if ag == 'faturas':

@@ -196,10 +196,8 @@ function totalCsv(buf) {
   return Math.round(ls.slice(1).filter(r => r.length > 26).reduce((s, r) => s + (num(r[26].replace(/[="]/g, '').trim() || '0') || 0), 0) * 100) / 100;
 }
 
-// shortcut: telas do webhap mapeadas só pela descrição do caminho (não vistas por dentro); se um passo falhar, o print em _socorro mostra a tela para ajustar
-async function comissao(comp, login, saida) {
-  const { porta, pasta } = LOGINS[login], [y, m] = comp.split('-'), dest = path.join(FAT, 'Comissoes', comp, pasta);
-  const page = await abreAba(porta, WEBHAP, login);
+// webhap logado → mês de referência → RELATORIOS; devolve o texto da tela
+async function telaRelatorios(page, login, m, y) {
   if (await temSenha(page)) throw erroLogin(login);
   // aviso "ATENCAO" que o webhap abre por cima do menu depois do login
   const fechar = page.getByRole('button', { name: /^\s*Fechar\s*$/i }).filter({ visible: true }).first();
@@ -225,21 +223,31 @@ async function comissao(comp, login, saida) {
   await Promise.all([page.waitForLoadState('domcontentloaded'), rel.click()]);
   await page.waitForTimeout(3000);
   passo = `webhap ${login}: ler cards`;
-  const tela = await page.locator('body').innerText();
+  return page.locator('body').innerText();
+}
+
+// cada card = menor bloco com "Lote" e um único botão EXCEL do analítico por data de pagamento; marca os botões com data-shaddai-excel
+const marcaCards = page => page.evaluate(() => {
+  const ex = [...document.querySelectorAll('a, button, input[type=button], input[type=submit], img')].filter(e => /EXCEL/i.test(e.innerText || e.value || e.alt || e.title || ''));
+  return ex.map((e, i) => {
+    let r = e.closest('tr') || e.parentElement; // linha do relatório dentro do card
+    // os lotes ficam todos numa tabela só: o card são as linhas desde o "Lote:" acima do botão até ele
+    let card = '';
+    if (e.closest('tr')) for (let t = r; t; t = t.previousElementSibling) { card = (t.innerText || '') + ' ' + card; if (/Lote/i.test(t.innerText || '')) break; }
+    else { let c = e; while (c.parentElement && !/Lote/i.test(c.innerText || '')) c = c.parentElement; card = c.innerText || ''; }
+    e.setAttribute('data-shaddai-excel', i);
+    return { i, card: card.replace(/\s+/g, ' ').trim(), linha: (r.innerText || '').replace(/\s+/g, ' ').trim() };
+  }).filter(x => /Anal[íi]tico por Data/i.test(x.linha) || /Anal[íi]tico por Data/i.test(x.card));
+});
+const loteDo = card => (card.match(/Lote\D{0,15}(\d{4,})/i) || [])[1];
+
+// shortcut: telas do webhap mapeadas só pela descrição do caminho (não vistas por dentro); se um passo falhar, o print em _socorro mostra a tela para ajustar
+async function comissao(comp, login, saida) {
+  const { porta, pasta } = LOGINS[login], [y, m] = comp.split('-'), dest = path.join(FAT, 'Comissoes', comp, pasta);
+  let page = await abreAba(porta, WEBHAP, login);
+  const tela = await telaRelatorios(page, login, m, y);
   if (/nenhum|n[ãa]o (h[áa]|existe|foram encontrad)/i.test(tela) && !/EXCEL/i.test(tela)) { saida.sem_dados.push({ comissao: comp, login }); return; }
-  // cada card = menor bloco com "Lote" e um único botão EXCEL do analítico por data de pagamento
-  const cards = await page.evaluate(() => {
-    const ex = [...document.querySelectorAll('a, button, input[type=button], input[type=submit], img')].filter(e => /EXCEL/i.test(e.innerText || e.value || e.alt || e.title || ''));
-    return ex.map((e, i) => {
-      let r = e.closest('tr') || e.parentElement; // linha do relatório dentro do card
-      // os lotes ficam todos numa tabela só: o card são as linhas desde o "Lote:" acima do botão até ele
-      let card = '';
-      if (e.closest('tr')) for (let t = r; t; t = t.previousElementSibling) { card = (t.innerText || '') + ' ' + card; if (/Lote/i.test(t.innerText || '')) break; }
-      else { let c = e; while (c.parentElement && !/Lote/i.test(c.innerText || '')) c = c.parentElement; card = c.innerText || ''; }
-      e.setAttribute('data-shaddai-excel', i);
-      return { i, card: card.replace(/\s+/g, ' ').trim(), linha: (r.innerText || '').replace(/\s+/g, ' ').trim() };
-    }).filter(x => /Anal[íi]tico por Data/i.test(x.linha) || /Anal[íi]tico por Data/i.test(x.card));
-  });
+  const cards = await marcaCards(page);
   if (!cards.length) {
     // começo do mês: a Hapvida ainda não publicou o lote do mês = nada novo (não é erro).
     // Se a tela mostra o "Analítico por Data" e mesmo assim não achamos o botão, a tela mudou: aí é erro.
@@ -249,13 +257,15 @@ async function comissao(comp, login, saida) {
   }
   const tsv = path.join(dest, 'lotes.tsv');
   const lotes = fs.existsSync(tsv) ? fs.readFileSync(tsv, 'utf8').split(/\r?\n/).filter(l => l && !l.startsWith('lote\t')) : [];
+  const poeNoTsv = linha => { if (!lotes.some(l => l.split('\t')[0] === linha.split('\t')[0])) lotes.push(linha); };
   const vistos = new Set();
+  let baixou = 0; // o Chrome bloqueia o 2º download da mesma aba ("baixar vários arquivos"): cada EXCEL depois do 1º sai de uma aba nova
   saida.comissao = saida.comissao || [];
   for (const c of cards) {
     const t = c.card, pega = re => (t.match(re) || [])[1];
     const datas = t.match(/\d\d\/\d\d\/\d{4}/g) || [];
     const L = {
-      lote: pega(/Lote\D{0,15}(\d{4,})/i), tipo: pega(/\b([A-ZÇÃÉ]+ HAPVIDA)\b/), regra: pega(/\b(SUPLEMENTO|AGENCIAMENTO|VITAL[ÍI]CIO|PRIMEIRA|RENOVA\S*)\b/i),
+      lote: loteDo(t), tipo: pega(/\b([A-ZÇÃÉ]+ HAPVIDA)\b/), regra: pega(/\b(SUPLEMENTO|AGENCIAMENTO|VITAL[ÍI]CIO|PRIMEIRA|RENOVA\S*)\b/i),
       integracao: pega(/Integra\S*\D{0,15}(\d\d\/\d\d\/\d{4})/i) || datas[0], ini: pega(/(\d\d\/\d\d\/\d{4})\s*(?:a|at[ée]|-)\s*\d\d\/\d\d\/\d{4}/i),
       fim: pega(/\d\d\/\d\d\/\d{4}\s*(?:a|at[ée]|-)\s*(\d\d\/\d\d\/\d{4})/i), obrigacao: pega(/Obriga\S*\D{0,15}(\d{8,})/i), valor: pega(/R\$\s*([\d.]+,\d\d)/) || pega(/([\d.]+,\d\d)/),
     };
@@ -267,16 +277,39 @@ async function comissao(comp, login, saida) {
     saida.comissao.push({ login, lote: L.lote, tipo: L.tipo, regra: L.regra, valor: L.valor });
     const arq = path.join(dest, `${L.lote} - ${L.tipo} - ${L.regra}.csv`);
     const linha = [L.lote, L.tipo, L.regra, L.integracao, L.ini, L.fim, L.obrigacao, L.valor].join('\t');
-    if (!lotes.some(l => l.split('\t')[0] === L.lote)) lotes.push(linha);
-    if (fs.existsSync(arq)) { saida.repetidos.push(arq); continue; }
-    passo = `webhap ${login}: EXCEL do lote ${L.lote}`;
-    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.locator(`[data-shaddai-excel="${c.i}"]`).click()]);
-    const buf = fs.readFileSync(await dl.path());
+    if (fs.existsSync(arq)) { poeNoTsv(linha); saida.repetidos.push(arq); continue; }
+    let buf = null, motivo = '';
+    for (let tentativa = 1; tentativa <= 2 && !buf; tentativa++) {
+      try {
+        let i = c.i;
+        if (baixou || tentativa > 1) { // aba nova, mesma sessão, de volta à tela de relatórios
+          await page.close().catch(() => {});
+          page = await abreAba(porta, WEBHAP, login);
+          await telaRelatorios(page, login, m, y);
+          const achou = (await marcaCards(page)).find(x => loteDo(x.card) === L.lote);
+          if (!achou) throw new Error(`o lote ${L.lote} sumiu da tela ao voltar`);
+          i = achou.i;
+        }
+        passo = `webhap ${login}: EXCEL do lote ${L.lote}`;
+        const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 90000 }), page.locator(`[data-shaddai-excel="${i}"]`).click()]);
+        buf = fs.readFileSync(await dl.path());
+      } catch (e) {
+        if (e.message === 'login') throw e;
+        motivo = semSessao(String(e.message || e).split('\n')[0]);
+      }
+    }
+    if (!buf) { // um lote que não baixou não segura os outros: fica para a próxima rodada (o CSV não existe, então ele tenta de novo)
+      saida.falhas.push({ login, passo, motivo: `lote ${L.lote} não baixou: ${motivo}` });
+      continue;
+    }
+    baixou++;
     const tot = totalCsv(buf);
     if (tot === null) throw new Error(`o EXCEL do lote ${L.lote} não é o analítico por data de pagamento`);
     if (Math.abs(tot - num(L.valor)) > 0.05) saida.avisos.push(`${login} lote ${L.lote}: CSV soma ${tot.toFixed(2)} e o card mostra ${L.valor}`);
     grava(arq, buf, saida);
+    poeNoTsv(linha);
   }
+  await page.close().catch(() => {});
   fs.mkdirSync(dest, { recursive: true });
   fs.writeFileSync(tsv, 'lote\ttipo\tregra\tintegracao\tini\tfim\tobrigacao\tvalor\n' + lotes.join('\n') + '\n', 'utf8');
 }
